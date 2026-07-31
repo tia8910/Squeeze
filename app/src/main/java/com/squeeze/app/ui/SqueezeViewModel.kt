@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.squeeze.app.ads.AdGate
 import com.squeeze.app.data.BodyCompositionRepository
 import com.squeeze.app.data.db.ProfileDao
+import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Profile
@@ -33,9 +34,15 @@ data class SqueezeUiState(
 class SqueezeViewModel @Inject constructor(
     private val repository: BodyCompositionRepository,
     private val profileDao: ProfileDao,
+    private val securitySettings: SecuritySettings,
     /** Exposed so composables can consult ad policy without reaching for a singleton. */
     val adGate: AdGate,
 ) : ViewModel() {
+
+    /** Whether FLAG_SECURE is applied; see [SecuritySettings.blockScreenshots]. */
+    val blockScreenshots: StateFlow<Boolean> = securitySettings.blockScreenshots
+
+    fun setBlockScreenshots(enabled: Boolean) = securitySettings.setBlockScreenshots(enabled)
 
     private val _state = MutableStateFlow(SqueezeUiState())
     val state: StateFlow<SqueezeUiState> = _state.asStateFlow()
