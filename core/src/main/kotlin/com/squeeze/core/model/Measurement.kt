@@ -1,0 +1,133 @@
+package com.squeeze.core.model
+
+/**
+ * How a set of circumferences was obtained. Recorded per measurement because mixing
+ * sources silently is the single fastest way to corrupt a trend line: a tape reading and
+ * a photo estimate can differ by more than the change the user is trying to detect.
+ *
+ * The trend engine treats each source as having its own measurement noise, so provenance
+ * has to survive into storage.
+ */
+enum class MeasurementSource {
+    /** Hand measurement with a tape. Lowest noise when tension is controlled. */
+    TAPE,
+
+    /** Derived from silhouette extraction. Noise depends on scale recovery quality. */
+    PHOTO,
+
+    /** Bioimpedance scale, imported via Health Connect. Highly hydration sensitive. */
+    BIA_SCALE,
+
+    /** DEXA, BodPod or hydrostatic weighing. Treated as ground truth for calibration. */
+    REFERENCE_SCAN,
+}
+
+/**
+ * Body circumferences in centimetres. All are optional because different equations need
+ * different subsets, and the app must not force a user to measure sites it will not use.
+ */
+data class Circumferences(
+    val neckCm: Double? = null,
+    val waistCm: Double? = null,
+    val hipCm: Double? = null,
+    val chestCm: Double? = null,
+    val thighCm: Double? = null,
+    val armCm: Double? = null,
+    val calfCm: Double? = null,
+)
+
+/** Skinfold thicknesses in millimetres, for the Jackson-Pollock 3-site equations. */
+data class Skinfolds(
+    val chestMm: Double? = null,
+    val abdomenMm: Double? = null,
+    val thighMm: Double? = null,
+    val tricepsMm: Double? = null,
+    val suprailiacMm: Double? = null,
+)
+
+/**
+ * One measurement session.
+ *
+ * @param epochDay days since the Unix epoch; the trend engine needs a monotonic time axis
+ *   and this keeps [Measurement] free of platform date types so it stays testable on the JVM.
+ * @param weightKg bodyweight at the time of measurement
+ * @param referenceBodyFatPercent a scan result the user entered by hand. When present this
+ *   measurement can anchor [com.squeeze.core.bodycomp.PersonalCalibration].
+ */
+data class Measurement(
+    val epochDay: Long,
+    val source: MeasurementSource,
+    val weightKg: Double? = null,
+    val circumferences: Circumferences = Circumferences(),
+    val skinfolds: Skinfolds = Skinfolds(),
+    val referenceBodyFatPercent: Double? = null,
+    val note: String? = null,
+)
+
+/**
+ * A body-fat estimate together with how much to trust it.
+ *
+ * @param percent estimated body fat, 0-100
+ * @param standardErrorPercent the published standard error of estimate for [method],
+ *   in absolute percentage points. This is what feeds the trend engine's measurement
+ *   noise and what the UI must show alongside the number. Presenting an estimate without
+ *   its error is the core dishonesty of this app category.
+ * @param calibrated true when a personal reference scan has been applied
+ */
+data class BodyFatEstimate(
+    val percent: Double,
+    val method: EstimationMethod,
+    val standardErrorPercent: Double,
+    val calibrated: Boolean = false,
+)
+
+/**
+ * Supported estimation equations and their two quite different error figures.
+ *
+ * Keeping these separate is the central idea of this app, so it is worth stating plainly:
+ *
+ *  - [standardErrorPercent] is **accuracy**: how far this method's estimate sits from a
+ *    criterion measurement like DEXA. It is dominated by a systematic, person-specific
+ *    offset, which is why [com.squeeze.core.bodycomp.PersonalCalibration] can remove most
+ *    of it from a single reference scan. Use it when displaying an absolute number.
+ *
+ *  - [repeatabilityPercent] is **precision**: the random scatter between two measurements
+ *    of an unchanged body. Use it for anything about *change over time*.
+ *
+ * A systematic offset is constant, so it cancels out when comparing a user against
+ * themselves. Feeding accuracy into the trend filter would make a real 0.3%/week cut
+ * statistically undetectable over three months, even though the user can see it in the
+ * mirror. Precision is what determines whether a trend is readable, and precision is far
+ * better than accuracy for every method here. That gap is the whole product.
+ */
+enum class EstimationMethod(
+    val standardErrorPercent: Double,
+    val repeatabilityPercent: Double,
+    val displayName: String,
+) {
+    /** Hodgdon-Beckett circumference equations, as used by the US Navy. */
+    NAVY_CIRCUMFERENCE(3.5, 0.5, "Tape (Navy)"),
+
+    /**
+     * Jackson-Pollock 3-site skinfolds, converted through the Siri equation.
+     * Scatters more than tape because caliper pinch depth is harder to reproduce.
+     */
+    JACKSON_POLLOCK_3(3.5, 0.8, "Skinfold (JP3)"),
+
+    /**
+     * Deurenberg BMI-based estimate. Least accurate method by a wide margin, yet highly
+     * repeatable, because a scale reading is precise even when what it implies is wrong.
+     * A clean illustration of why the two figures must not be conflated.
+     */
+    DEURENBERG_BMI(4.5, 0.2, "BMI estimate"),
+
+    /** Circumferences recovered from silhouette extraction, then fed to the Navy equation. */
+    PHOTO_SILHOUETTE(4.0, 0.6, "Photo scan"),
+
+    /**
+     * A directly entered DEXA/BodPod result. The most accurate input available, but
+     * repeat scans disagree by more than a careful tape measurement does, so it anchors
+     * absolute level without being the best signal for week-to-week change.
+     */
+    REFERENCE_SCAN(1.5, 1.0, "Reference scan"),
+}
