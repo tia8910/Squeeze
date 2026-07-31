@@ -1,0 +1,203 @@
+package com.squeeze.core.scan
+
+import com.squeeze.core.model.Circumferences
+
+/**
+ * Anatomical levels a scan can measure, and where each one sits.
+ *
+ * The Navy equations need neck and waist for men, plus hip for women, so those three are
+ * what a scan must produce to be useful. The rest are tracked for their own sake, because
+ * a lifter cares whether an arm grew even when body fat did not move.
+ */
+enum class ScanSite {
+    NECK, CHEST, WAIST, HIP, THIGH, ARM, CALF;
+
+    /**
+     * Whether a body-fat estimate can be produced without this site.
+     *
+     * Used by the capture UI to decide what to insist on: a scan missing the waist is not
+     * a partial result, it is no result.
+     */
+    val requiredForBodyFat: Boolean
+        get() = this == NECK || this == WAIST || this == HIP
+}
+
+/** One measured level, before conversion to real units. */
+data class ScanMarker(
+    val site: ScanSite,
+    val slice: BodySlice,
+)
+
+/**
+ * A problem with the capture that the user can fix by retaking the photo.
+ *
+ * Surfaced rather than silently absorbed, because every one of these produces a number that
+ * looks perfectly reasonable and is wrong — which is precisely the failure mode that makes
+ * users stop trusting a measurement app.
+ */
+sealed interface ScanWarning {
+    /** The subject fills too much of the frame for perspective distortion to be ignorable. */
+    data object FramingTooTight : ScanWarning
+
+    /** A marker sits at a different height in the front and side photos. */
+    data class LevelMismatch(val site: ScanSite) : ScanWarning
+
+    /** The cross-section is far from any plausible human shape. */
+    data class ImplausibleShape(val site: ScanSite, val ratio: Double) : ScanWarning
+
+    /** A site needed for a body-fat estimate was not marked. */
+    data class MissingRequiredSite(val site: ScanSite) : ScanWarning
+}
+
+/**
+ * @param circumferences the measured sites, ready to feed the same equations tape
+ *   measurements use
+ * @param warnings capture problems worth showing the user
+ * @param usableForBodyFat false when a required site is missing, in which case the scan is
+ *   still worth storing for its individual measurements but cannot produce a percentage
+ */
+data class ScanResult(
+    val circumferences: Circumferences,
+    val warnings: List<ScanWarning>,
+    val usableForBodyFat: Boolean,
+)
+
+/**
+ * Turns marked-up photographs into circumferences.
+ *
+ * The pipeline is deliberately split so that where the markers came from is irrelevant to
+ * the geometry. Today the user drags them onto the photo; a segmentation model can produce
+ * the same [BodySlice] values later without any of this changing. That also means the
+ * geometry is unit tested on plain numbers, with no camera, model or device involved.
+ *
+ * Output feeds [com.squeeze.core.bodycomp.BodyFatCalculator] exactly as a tape measurement
+ * does — the only difference is that the estimate is tagged as a photo scan, which carries
+ * its own repeatability figure because scale recovery adds error the tape does not have.
+ */
+class BodyScanAnalyser(
+    private val scale: ScaleRecovery,
+    private val imageAspectRatio: Double,
+) {
+
+    fun analyse(markers: List<ScanMarker>): ScanResult {
+        val warnings = mutableListOf<ScanWarning>()
+
+        if (scale.isFramingTooTight()) {
+            warnings += ScanWarning.FramingTooTight
+        }
+
+        val measured = mutableMapOf<ScanSite, Double>()
+
+        for (marker in markers) {
+            val slice = marker.slice
+
+            if (CircumferenceEstimator.isLevelMismatched(
+                    slice.frontHeightFraction,
+                    slice.sideHeightFraction,
+                )
+            ) {
+                warnings += ScanWarning.LevelMismatch(marker.site)
+            }
+
+            val frontCm = scale.widthToCm(slice.frontWidthFraction, imageAspectRatio)
+            val sideCm = scale.widthToCm(slice.sideWidthFraction, imageAspectRatio)
+
+            val ratio = CircumferenceEstimator.eccentricityRatio(frontCm, sideCm)
+            if (ratio > MAX_PLAUSIBLE_RATIO) {
+                warnings += ScanWarning.ImplausibleShape(marker.site, ratio)
+            }
+
+            measured[marker.site] = CircumferenceEstimator.circumference(frontCm, sideCm)
+        }
+
+        val missingRequired = ScanSite.entries
+            .filter { it.requiredForBodyFat && it !in measured }
+
+        // Hip is only required for the female equation, so its absence is not fatal on its
+        // own. The caller knows the profile; here we only report what was not measured.
+        missingRequired.forEach { warnings += ScanWarning.MissingRequiredSite(it) }
+
+        val hasCore = ScanSite.NECK in measured && ScanSite.WAIST in measured
+
+        return ScanResult(
+            circumferences = Circumferences(
+                neckCm = measured[ScanSite.NECK],
+                waistCm = measured[ScanSite.WAIST],
+                hipCm = measured[ScanSite.HIP],
+                chestCm = measured[ScanSite.CHEST],
+                thighCm = measured[ScanSite.THIGH],
+                armCm = measured[ScanSite.ARM],
+                calfCm = measured[ScanSite.CALF],
+            ),
+            warnings = warnings,
+            usableForBodyFat = hasCore,
+        )
+    }
+
+    private companion object {
+        /**
+         * A torso cross-section is wider than it is deep, but not unboundedly so. Beyond
+         * this, the likeliest explanation is a misplaced marker rather than an unusual body.
+         */
+        const val MAX_PLAUSIBLE_RATIO = 2.6
+    }
+}
+
+/**
+ * Builds scan markers automatically from two segmented photographs.
+ *
+ * This is the path the app actually uses: the camera produces a front and a side image, a
+ * segmentation model reduces each to a [WidthProfile], a pose model supplies [PoseAnchors],
+ * and [AnatomicalLevelFinder] locates each site on its own silhouette. Nothing is measured
+ * by hand.
+ *
+ * Sites are detected independently in each view rather than assuming the two photos are
+ * aligned, because they are not: a person shifts between shots, and the camera may sit at a
+ * different distance. Each view finds its own waist, and the pairing step then checks the
+ * two agree about where that waist is before trusting the slice.
+ */
+object AutomaticScanBuilder {
+
+    /**
+     * @return markers for every site found in *both* views. A site detected in only one
+     *   photo is dropped: a circumference needs a width and a depth, and substituting a
+     *   guess for the missing axis would produce a number indistinguishable from a measured
+     *   one.
+     */
+    fun build(
+        frontProfile: WidthProfile,
+        frontAnchors: PoseAnchors,
+        sideProfile: WidthProfile,
+        sideAnchors: PoseAnchors,
+    ): List<ScanMarker> {
+        val frontSites = AnatomicalLevelFinder.detectSites(frontProfile, frontAnchors)
+        val sideSites = AnatomicalLevelFinder.detectSites(sideProfile, sideAnchors)
+
+        return frontSites.mapNotNull { (site, frontRow) ->
+            val sideRow = sideSites[site] ?: return@mapNotNull null
+
+            val frontWidth = frontProfile.widthAt(frontRow)
+            val sideWidth = sideProfile.widthAt(sideRow)
+            if (frontWidth <= 0.0 || sideWidth <= 0.0) return@mapNotNull null
+
+            ScanMarker(
+                site = site,
+                slice = BodySlice(
+                    frontWidthFraction = frontWidth,
+                    sideWidthFraction = sideWidth,
+                    // Heights are normalised against each photo's own body span, so that a
+                    // level detected at the same point on the body compares equal even when
+                    // the subject was framed differently in the two shots.
+                    frontHeightFraction = relativeBodyHeight(frontProfile, frontRow),
+                    sideHeightFraction = relativeBodyHeight(sideProfile, sideRow),
+                ),
+            )
+        }
+    }
+
+    /** Where a row sits along the body itself, 0.0 at the crown and 1.0 at the feet. */
+    private fun relativeBodyHeight(profile: WidthProfile, row: Int): Double {
+        val span = (profile.bottomRow - profile.topRow).toDouble()
+        return if (span > 0.0) (row - profile.topRow) / span else 0.0
+    }
+}

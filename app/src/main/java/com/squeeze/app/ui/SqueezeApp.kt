@@ -27,7 +27,10 @@ import androidx.navigation.compose.rememberNavController
 import com.squeeze.app.ads.AdSurface
 import com.squeeze.app.ui.ads.AdBanner
 import com.squeeze.app.ui.composition.CompositionScreen
+import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
+
+private const val ROUTE_SCAN = "scan"
 
 private enum class Destination(
     val route: String,
@@ -91,16 +94,29 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                     trend = state.bodyFatTrend,
                     repeatability = state.repeatability,
                     calibration = state.calibration,
+                    onStartScan = { navController.navigate(ROUTE_SCAN) },
                 )
             }
             composable(Destination.TRAINING.route) {
                 TrainingPlaceholder()
+            }
+            composable(ROUTE_SCAN) {
+                ScanScreen(onFinished = {
+                    // Pop back to the dashboard, which re-reads measurements on resume so
+                    // the new scan appears in the trend immediately.
+                    navController.popBackStack()
+                    viewModel.refresh()
+                })
             }
             composable(Destination.SETTINGS.route) {
                 val blockScreenshots by viewModel.blockScreenshots.collectAsStateWithLifecycle()
                 SettingsScreen(
                     blockScreenshots = blockScreenshots,
                     onBlockScreenshotsChange = viewModel::setBlockScreenshots,
+                    heightCm = state.profile?.heightCm,
+                    birthYear = state.profile?.birthYear,
+                    sex = state.profile?.sex,
+                    onProfileChange = viewModel::updateProfile,
                 )
             }
         }

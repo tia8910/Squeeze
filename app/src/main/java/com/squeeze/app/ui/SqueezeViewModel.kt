@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.squeeze.app.ads.AdGate
 import com.squeeze.app.data.BodyCompositionRepository
 import com.squeeze.app.data.db.ProfileDao
+import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Goal
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class SqueezeUiState(
@@ -43,6 +45,35 @@ class SqueezeViewModel @Inject constructor(
     val blockScreenshots: StateFlow<Boolean> = securitySettings.blockScreenshots
 
     fun setBlockScreenshots(enabled: Boolean) = securitySettings.setBlockScreenshots(enabled)
+
+    /**
+     * Persists the profile once it is complete enough to be usable.
+     *
+     * Partial input is ignored rather than stored with placeholders: a profile with a
+     * defaulted height would silently mis-scale every photo scan, which is worse than
+     * having no profile at all, because the failure would be invisible.
+     */
+    fun updateProfile(heightCm: Double?, birthYear: Int?, sex: Sex?) {
+        if (heightCm == null || birthYear == null || sex == null) return
+        if (heightCm !in 100.0..250.0) return
+        if (birthYear !in 1900..LocalDate.now().year) return
+
+        viewModelScope.launch {
+            val existing = profileDao.get()
+            profileDao.upsert(
+                ProfileEntity(
+                    id = 1,
+                    heightCm = heightCm,
+                    birthYear = birthYear,
+                    sex = sex.name,
+                    trainingAge = existing?.trainingAge ?: TrainingAge.NOVICE.name,
+                    goal = existing?.goal ?: Goal.HYPERTROPHY.name,
+                    unitSystem = existing?.unitSystem ?: UnitSystem.METRIC.name,
+                ),
+            )
+            refresh()
+        }
+    }
 
     private val _state = MutableStateFlow(SqueezeUiState())
     val state: StateFlow<SqueezeUiState> = _state.asStateFlow()

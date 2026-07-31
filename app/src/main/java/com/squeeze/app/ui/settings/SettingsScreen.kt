@@ -16,11 +16,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.squeeze.core.model.Sex
 
 @Composable
 fun SettingsScreen(
     blockScreenshots: Boolean,
     onBlockScreenshotsChange: (Boolean) -> Unit,
+    heightCm: Double?,
+    birthYear: Int?,
+    sex: Sex?,
+    onProfileChange: (Double?, Int?, Sex?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -30,6 +35,13 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        ProfileSection(
+            heightCm = heightCm,
+            birthYear = birthYear,
+            sex = sex,
+            onProfileChange = onProfileChange,
+        )
+
         Text("Privacy", style = MaterialTheme.typography.titleMedium)
 
         SettingToggle(

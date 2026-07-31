@@ -1,5 +1,7 @@
 import java.util.Properties
 
+apply(from = "mediapipe-models.gradle.kts")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -151,6 +153,12 @@ dependencies {
     implementation(libs.billing.ktx)
     implementation(libs.play.services.ads)
     implementation(libs.health.connect)
+
+    implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
