@@ -112,6 +112,13 @@ android {
     }
 }
 
+// Room exports its schema so migrations can be diffed and tested. Without a location set
+// the export is a build warning and the schema is silently lost, which matters here: this
+// app has no cloud backup, so a botched migration is unrecoverable data loss.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // All measurement, trend and programming logic lives here, free of Android types.
     implementation(project(":core"))
@@ -138,6 +145,7 @@ dependencies {
     implementation(libs.androidx.sqlite)
     implementation(libs.tink.android)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment)
 
     implementation(libs.billing.ktx)
     implementation(libs.play.services.ads)

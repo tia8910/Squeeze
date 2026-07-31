@@ -1,0 +1,114 @@
+name: CI
+
+# Builds and tests on every push and pull request, and publishes an installable debug APK
+# as a build artifact.
+#
+# This is the workflow that produces a usable APK without any credentials: debug builds are
+# signed with the auto-generated debug keystore, so the artifact installs on a device
+# directly. release.yml handles signed, Play-ready output and needs secrets.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "17"
+
+jobs:
+  test:
+    name: Core tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Gradle evaluates every project in the build before running any task, so even a
+      # :core-only task needs the SDK present for :app to configure.
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
+
+      - name: Run core tests
+        run: ./gradlew :core:test --no-daemon --stacktrace
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-report
+          path: core/build/reports/tests/test/
+          retention-days: 14
+
+  debug-apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::assembleDebug produced no APK"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$APK" "dist/squeeze-debug-${GITHUB_SHA::7}.apk"
+          ls -la dist
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: squeeze-debug-apk
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+
+      # Lint and merged-manifest reports are where manifest, resource and policy problems
+      # surface. Kept only on failure, since that is the only time they are worth reading.
+      - name: Upload build reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build-reports
+          path: |
+            app/build/reports/
+            app/build/outputs/logs/
+            app/build/intermediates/merged_manifests/
+          retention-days: 14
