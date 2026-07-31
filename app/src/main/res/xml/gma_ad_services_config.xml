@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attribution reporting is left at the SDK default; no custom topics or measurement
+     registration is added, so nothing derived from health data reaches the ad stack. -->
+<ad-services-config>
+    <attribution allowAllToAccess="false" />
+</ad-services-config>
