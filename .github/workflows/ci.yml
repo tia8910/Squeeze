@@ -6,9 +6,11 @@ name: CI
 # This is the workflow that produces a usable APK without any credentials: debug builds are
 # signed with the auto-generated debug keystore, so the artifact installs on a device
 # directly. release.yml handles signed, Play-ready output and needs secrets.
+# Push is limited to main so branch pushes are covered once, by pull_request. Listening to
+# both on every branch runs the whole matrix twice for each PR commit.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
