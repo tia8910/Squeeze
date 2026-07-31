@@ -11,6 +11,7 @@ billing = "7.1.1"
 sqlcipher = "4.6.1"
 sqliteAndroid = "2.4.0"
 biometric = "1.1.0"
+fragment = "1.8.5"
 tink = "1.15.0"
 adsMobile = "23.6.0"
 healthConnect = "1.1.0-alpha07"
@@ -47,6 +48,10 @@ androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqliteAndr
 # deliberately not used: it is deprecated and should not be built on for new work.
 tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+# MainActivity extends FragmentActivity because BiometricPrompt requires a fragment host.
+# It arrives transitively via biometric, but an implicit dependency on a type we extend
+# directly is the kind that breaks on an unrelated version bump.
+androidx-fragment = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
 
 billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
 play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "adsMobile" }
@@ -61,6 +66,7 @@ junit = { module = "junit:junit", version.ref = "junit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

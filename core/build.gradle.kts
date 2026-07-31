@@ -1,7 +1,12 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "2.0.21"
+    // No version here. The root build already puts the Kotlin plugin on the build
+    // classpath, and a subproject that re-requests a plugin *with* a version when one is
+    // already loaded fails configuration outright:
+    //   "the plugin is already on the classpath with an unknown version"
+    // The version lives in the catalog, declared once at the root with `apply false`.
+    alias(libs.plugins.kotlin.jvm)
 }
 
 // Pure JVM module: no Android dependencies, so the measurement and programming logic can

@@ -27,9 +27,9 @@ object AppModule {
     @Singleton
     fun provideContext(@ApplicationContext context: Context): Context = context
 
-    @Provides
-    @Singleton
-    fun provideKeyManager(context: Context): DatabaseKeyManager = DatabaseKeyManager(context)
+    // DatabaseKeyManager, Entitlements, BillingManager, AdGate and BodyCompositionRepository
+    // all carry @Inject constructors, so Dagger builds them itself. Adding @Provides methods
+    // for them as well would bind each type twice and fail the build.
 
     @Provides
     @Singleton

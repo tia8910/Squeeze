@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground. Drawn as a vector so the app needs no density-specific PNGs;
+     minSdk is 26, so mipmap-anydpi-v26 covers every supported device.
+
+     The mark is a caliper closing on a form: the measurement the app is built around. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Body: a tapered torso silhouette, centred in the 72dp safe zone. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,32c5.6,0 10,4.2 10,9.4c0,3.4 -1.6,6.2 -3.2,8.8c-1.4,2.4 -2.4,4.4 -2.4,7.2l0,14.2c0,3.4 -1.8,5.4 -4.4,5.4c-2.6,0 -4.4,-2 -4.4,-5.4l0,-14.2c0,-2.8 -1,-4.8 -2.4,-7.2c-1.6,-2.6 -3.2,-5.4 -3.2,-8.8C44,36.2 48.4,32 54,32z" />
+
+    <!-- Caliper arms closing on the form from both sides. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,40l4,0l0,28l-4,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M70,40l4,0l0,28l-4,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,52l12,0l0,4l-12,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,52l12,0l0,4l-12,0z" />
+</vector>
