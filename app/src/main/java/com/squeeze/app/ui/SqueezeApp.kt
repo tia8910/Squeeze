@@ -27,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import com.squeeze.app.ads.AdSurface
 import com.squeeze.app.ui.ads.AdBanner
 import com.squeeze.app.ui.composition.CompositionScreen
+import com.squeeze.app.ui.settings.SettingsScreen
 
 private enum class Destination(
     val route: String,
@@ -96,7 +97,11 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 TrainingPlaceholder()
             }
             composable(Destination.SETTINGS.route) {
-                SettingsPlaceholder()
+                val blockScreenshots by viewModel.blockScreenshots.collectAsStateWithLifecycle()
+                SettingsScreen(
+                    blockScreenshots = blockScreenshots,
+                    onBlockScreenshotsChange = viewModel::setBlockScreenshots,
+                )
             }
         }
     }
@@ -105,9 +110,4 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 @Composable
 private fun TrainingPlaceholder() {
     Text("Workout logging and generated programmes land here.", Modifier.padding(16.dp))
-}
-
-@Composable
-private fun SettingsPlaceholder() {
-    Text("Profile, calibration, export and purchases land here.", Modifier.padding(16.dp))
 }

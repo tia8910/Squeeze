@@ -65,8 +65,11 @@ a number a user might act on lives in `core/` and is covered by tests.
 - **Envelope-encrypted key.** A random passphrase, wrapped by a hardware-backed Android
   Keystore AES-GCM key. Only the wrapped blob is stored.
   (`androidx.security:security-crypto` is deprecated and deliberately not used.)
-- **`FLAG_SECURE`** app-wide: no screenshots, no screen recording, nothing in the
-  recent-apps thumbnail.
+- **`FLAG_SECURE` available as a one-tap setting** (Settings → Block screenshots): blocks
+  screenshots, screen recording and the recent-apps thumbnail. Off by default, because the
+  flag is all-or-nothing — leaving it on would stop users capturing their own progress and
+  make store listing screenshots impossible to produce. Screens rendering a captured body
+  photo should set it unconditionally regardless of the preference.
 - **Biometric gate** on launch and on every return to the foreground.
 - **Backup and device transfer disabled.** Cloud backup would put the database on someone
   else's server, which contradicts the guarantee. The user's route to a backup is the

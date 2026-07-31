@@ -12,10 +12,16 @@ import androidx.core.content.ContextCompat
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.app.ui.SqueezeApp
 import com.squeeze.app.ui.lock.LockScreen
 import com.squeeze.app.ui.theme.SqueezeTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Hosts the whole app.
@@ -23,15 +29,27 @@ import dagger.hilt.android.AndroidEntryPoint
  * Two window-level protections are applied here rather than per screen, because getting
  * them wrong on one screen is the same as not having them:
  *
- *  - [WindowManager.LayoutParams.FLAG_SECURE] blocks screenshots and screen recording, and
- *    keeps the app's contents out of the recent-apps thumbnail. On an app that displays
- *    body photos, that thumbnail is the most likely accidental disclosure.
+ *  - [WindowManager.LayoutParams.FLAG_SECURE], applied when the user has asked for it via
+ *    [SecuritySettings.blockScreenshots]. It blocks screenshots and screen recording, and
+ *    keeps the app's contents out of the recent-apps thumbnail.
  *  - A biometric gate stands in front of the UI whenever the device has one enrolled.
+ *
+ * Screenshots are permitted by default. `FLAG_SECURE` is all-or-nothing, so leaving it on
+ * unconditionally would stop the user capturing their own progress to share and would make
+ * store listing screenshots impossible to produce. It stays one tap away in Settings for
+ * anyone who wants it.
+ *
+ * A screen that renders a captured body photo should set `FLAG_SECURE` on itself regardless
+ * of this preference. The user opting into screenshots of their charts is not the same as
+ * opting into screenshots of their body, and the recents thumbnail — which they never chose
+ * to create — is the disclosure that actually matters.
  *
  * Extends [FragmentActivity] because BiometricPrompt requires a fragment host.
  */
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+
+    @Inject lateinit var securitySettings: SecuritySettings
 
     private var unlocked by mutableStateOf(false)
 
@@ -39,7 +57,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenshotPolicy()
 
         val biometricsAvailable = BiometricManager.from(this)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
@@ -61,6 +79,27 @@ class MainActivity : FragmentActivity() {
         }
 
         if (biometricsAvailable) promptForBiometric()
+    }
+
+    /**
+     * Keeps the window's secure flag in step with the user's preference.
+     *
+     * Collected for the lifetime of the activity rather than read once, so toggling the
+     * setting takes effect immediately instead of on the next launch — a setting that
+     * appears not to work is worse than no setting.
+     */
+    private fun applyScreenshotPolicy() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.CREATED) {
+                securitySettings.blockScreenshots.collect { block ->
+                    if (block) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+            }
+        }
     }
 
     private fun promptForBiometric() {
