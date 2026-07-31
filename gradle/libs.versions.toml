@@ -17,6 +17,7 @@ adsMobile = "23.6.0"
 healthConnect = "1.1.0-alpha07"
 mediapipe = "0.10.18"
 cameraX = "1.4.1"
+exifinterface = "1.3.7"
 coreKtx = "1.15.0"
 activityCompose = "1.9.3"
 hiltNavigation = "1.2.0"
@@ -71,6 +72,10 @@ camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraX" 
 camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraX" }
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraX" }
 camera-view = { module = "androidx.camera:camera-view", version.ref = "cameraX" }
+
+# Gallery photos carry their rotation in EXIF rather than in the pixels. Without applying
+# it, a portrait shot is analysed sideways and pose detection simply fails.
+androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }

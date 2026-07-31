@@ -2,9 +2,11 @@ package com.squeeze.app.ui.scan
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -26,8 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,11 +40,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.scan.DetectionFailure
+import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.scan.ScanWarning
 
 /**
@@ -71,17 +77,11 @@ fun ScanScreen(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> hasCameraPermission = granted }
 
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
-    }
+    // Deliberately not requesting on entry. Uploading needs no camera, so prompting
+    // immediately risks a reflexive denial that then blocks the camera path for good.
 
     LaunchedEffect(state.saved) {
         if (state.saved) onFinished()
-    }
-
-    if (!hasCameraPermission) {
-        CameraPermissionRequired(onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) })
-        return
     }
 
     when (state.step) {
@@ -89,6 +89,8 @@ fun ScanScreen(
             step = state.step,
             failure = state.failure,
             profileMissing = state.profileMissing,
+            hasCameraPermission = hasCameraPermission,
+            onRequestCamera = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onCapture = viewModel::onPhotoCaptured,
         )
 
@@ -109,10 +111,11 @@ private fun CameraPermissionRequired(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Camera access needed", style = MaterialTheme.typography.titleMedium)
+        Text("Camera access", style = MaterialTheme.typography.titleMedium)
         Text(
-            text = "The scan runs entirely on this device. Photos are never saved and never " +
-                "leave your phone — only the measurements are kept.",
+            text = "Allow the camera to take the scan photos here, or upload two photos you " +
+                "already have. Either way the scan runs entirely on this device — images are " +
+                "never saved by the app and never leave your phone.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -125,34 +128,56 @@ private fun CaptureStep(
     step: ScanStep,
     failure: DetectionFailure?,
     profileMissing: Boolean,
+    hasCameraPermission: Boolean,
+    onRequestCamera: () -> Unit,
     onCapture: (Bitmap) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val scope = rememberCoroutineScope()
+
+    // The system photo picker needs no storage permission on any supported version, and
+    // grants access to exactly the one image chosen rather than to the whole gallery.
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                // Decoding and EXIF rotation are file I/O plus a full-bitmap copy; on the
+                // main thread that drops frames on a large photo.
+                val bitmap = withContext(Dispatchers.IO) { PhotoLoader.load(context, uri) }
+                bitmap?.let(onCapture)
+            }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                PreviewView(ctx).also { previewView ->
-                    val providerFuture = ProcessCameraProvider.getInstance(ctx)
-                    providerFuture.addListener({
-                        val provider = providerFuture.get()
-                        val preview = CameraPreview.Builder().build().also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-                        provider.unbindAll()
-                        provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageCapture,
-                        )
-                    }, ContextCompat.getMainExecutor(ctx))
-                }
-            },
-        )
+        if (hasCameraPermission) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    PreviewView(ctx).also { previewView ->
+                        val providerFuture = ProcessCameraProvider.getInstance(ctx)
+                        providerFuture.addListener({
+                            val provider = providerFuture.get()
+                            val preview = CameraPreview.Builder().build().also {
+                                it.surfaceProvider = previewView.surfaceProvider
+                            }
+                            provider.unbindAll()
+                            provider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                imageCapture,
+                            )
+                        }, ContextCompat.getMainExecutor(ctx))
+                    }
+                },
+            )
+        } else {
+            CameraPermissionRequired(onRequest = onRequestCamera)
+        }
 
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
@@ -167,11 +192,11 @@ private fun CaptureStep(
                     )
                     Text(
                         // Framing advice is measurement advice: the whole body must be in
-                        // shot because height is what converts pixels into centimetres,
-                        // and standing back reduces perspective distortion.
-                        text = "Stand a few steps back so your whole body from head to feet " +
-                            "is in frame, against a plain background, in even light. Wear " +
-                            "close-fitting clothing — loose fabric is measured as body.",
+                        // shot because height is what converts pixels into centimetres, and
+                        // standing back reduces perspective distortion. It applies equally
+                        // to an uploaded photo, which is why it is stated once here.
+                        text = "Whole body from head to feet in frame, plain background, even " +
+                            "light, close-fitting clothing — loose fabric is measured as body.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -191,27 +216,46 @@ private fun CaptureStep(
             }
         }
 
-        Button(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp),
-            onClick = {
-                imageCapture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            image.decodeToBitmap()?.let(onCapture)
-                            image.close()
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            // A failed shutter leaves the step unchanged, so the user simply
-                            // taps again; there is no partial state to unwind.
-                            exception.printStackTrace()
-                        }
-                    },
-                )
-            },
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(if (step == ScanStep.FRONT) "Capture front" else "Capture side")
+            if (hasCameraPermission) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        imageCapture.takePicture(
+                            ContextCompat.getMainExecutor(context),
+                            object : ImageCapture.OnImageCapturedCallback() {
+                                override fun onCaptureSuccess(image: ImageProxy) {
+                                    image.decodeToBitmap()?.let(onCapture)
+                                    image.close()
+                                }
+
+                                override fun onError(exception: ImageCaptureException) {
+                                    // A failed shutter leaves the step unchanged, so the
+                                    // user simply taps again; no partial state to unwind.
+                                    exception.printStackTrace()
+                                }
+                            },
+                        )
+                    },
+                ) {
+                    Text(if (step == ScanStep.FRONT) "Capture front" else "Capture side")
+                }
+            }
+
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+            ) {
+                Text(if (step == ScanStep.FRONT) "Upload front photo" else "Upload side photo")
+            }
         }
     }
 }
