@@ -109,8 +109,66 @@ patched APK — see `PurchaseVerifier` for why that exposure is accepted rather 
 ./gradlew :app:assembleDebug  # requires the Android SDK
 ```
 
-Before release, replace the Google test AdMob IDs in `app/build.gradle.kts` and
-`res/values/strings.xml`, and set `PLAY_PUBLIC_KEY` from the Play Console.
+A fresh clone builds and runs without any credentials. Ad units fall back to Google's
+public test IDs, and an absent Play licensing key makes `PurchaseVerifier` defer to the
+Play Store's own response — both are the correct behaviour for a development build, and
+both mean a build that *should* have carried real credentials degrades to test traffic
+rather than live traffic.
+
+### Local release builds
+
+Create `keystore.properties` at the repository root (gitignored):
+
+```properties
+KEYSTORE_FILE=/absolute/path/to/release.jks
+KEYSTORE_PASSWORD=...
+KEY_ALIAS=...
+KEY_PASSWORD=...
+PLAY_PUBLIC_KEY=...
+ADMOB_APP_ID=ca-app-pub-.../...
+AD_UNIT_BANNER=ca-app-pub-.../...
+AD_UNIT_INTERSTITIAL=ca-app-pub-.../...
+```
+
+Without it, `:app:assembleRelease` still succeeds and produces an **unsigned** APK, which
+is useful for checking that R8 and resource shrinking behave.
+
+## Releasing
+
+`.github/workflows/release.yml` builds a signed AAB for Play and a signed APK for direct
+install. Push a version tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+That runs the `:core` tests, builds both artifacts, **verifies the signatures**
+(`apksigner` for the APK, `jarsigner` for the AAB — an unsigned artifact is otherwise a
+silent build success that only fails at Play upload), and opens a **draft** GitHub release
+with them attached.
+
+`workflow_dispatch` runs the same build as a dry run without publishing anything.
+
+### Required repository secrets
+
+| Secret | Notes |
+|---|---|
+| `KEYSTORE_BASE64` | `base64 -w0 release.jks` |
+| `KEYSTORE_PASSWORD` | |
+| `KEY_ALIAS` | |
+| `KEY_PASSWORD` | |
+| `PLAY_PUBLIC_KEY` | Play Console → Monetisation setup → licensing key |
+| `ADMOB_APP_ID` | |
+| `AD_UNIT_BANNER` | |
+| `AD_UNIT_INTERSTITIAL` | |
+
+`versionCode` comes from the workflow run number, which is monotonic — re-running a tag
+produces a higher code rather than one Play will reject as a duplicate. `versionName`
+comes from the tag.
+
+`mapping.txt` is kept as a build artifact but deliberately **not** attached to the release:
+it belongs in Play Console for deobfuscating crash reports, not on a public page where it
+hands anyone a map of the obfuscated build.
 
 ## Status
 
