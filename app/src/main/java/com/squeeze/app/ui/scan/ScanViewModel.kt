@@ -1,6 +1,8 @@
 package com.squeeze.app.ui.scan
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.db.MeasurementDao
@@ -10,6 +12,7 @@ import com.squeeze.app.scan.BodyDetector
 import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
+import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AutomaticScanBuilder
@@ -18,6 +21,7 @@ import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScanResult
 import com.squeeze.core.scan.ScanWarning
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,12 +46,16 @@ data class ScanUiState(
  * Drives a two-photograph body scan.
  *
  * Photographs are held in memory for the duration of the scan and never written to disk.
- * That is the whole point: the measurements are what the user wants kept, and a stored
- * photo of someone in their underwear is a liability with no corresponding benefit. Once
- * the circumferences are extracted the bitmaps are dropped.
+ * Once the circumferences are extracted the bitmaps are dropped.
+ *
+ * Every path through here ends in a visible state change. An upload that fails to decode,
+ * a photo with no person in it, and a crashed inference all land back on the capture step
+ * with a named failure — a button that does nothing is indistinguishable from a broken
+ * app, because to the user it *is* one.
  */
 @HiltViewModel
 class ScanViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val detector: BodyDetector,
     private val measurementDao: MeasurementDao,
     private val profileDao: ProfileDao,
@@ -59,40 +67,58 @@ class ScanViewModel @Inject constructor(
     private var frontBody: DetectedBody? = null
     private var frontAspectRatio: Double = 1.0
 
-    /**
-     * Feeds one captured frame into the scan.
-     *
-     * @param bitmap recycled by the caller once this returns; nothing here retains it
-     */
-    fun onPhotoCaptured(bitmap: Bitmap) {
+    /** Entry point for the upload path: decode off the main thread, then process. */
+    fun onPhotoPicked(uri: Uri) {
         val step = _state.value.step
         if (step != ScanStep.FRONT && step != ScanStep.SIDE) return
 
         _state.value = _state.value.copy(step = ScanStep.ANALYSING, failure = null)
 
         viewModelScope.launch {
-            val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+            val bitmap = withContext(Dispatchers.IO) { PhotoLoader.load(context, uri) }
+            if (bitmap == null) {
+                // A revoked URI grant or an unsupported format. Without this branch the
+                // upload button silently does nothing, which reads as "upload is broken".
+                _state.value = _state.value.copy(
+                    step = if (frontBody == null) ScanStep.FRONT else ScanStep.SIDE,
+                    failure = DetectionFailure.PhotoUnreadable,
+                )
+                return@launch
+            }
+            process(bitmap)
+        }
+    }
 
-            // Inference is heavy and synchronous; keeping it off the main thread is what
-            // stops the shutter feeling broken.
-            val detection = withContext(Dispatchers.Default) { detector.detect(bitmap) }
+    /** Entry point for the live-capture path. */
+    fun onPhotoCaptured(bitmap: Bitmap) {
+        val step = _state.value.step
+        if (step != ScanStep.FRONT && step != ScanStep.SIDE) return
 
-            when (detection) {
-                is DetectionResult.Failure -> {
-                    _state.value = _state.value.copy(
-                        step = if (frontBody == null) ScanStep.FRONT else ScanStep.SIDE,
-                        failure = detection.reason,
-                    )
-                }
+        _state.value = _state.value.copy(step = ScanStep.ANALYSING, failure = null)
+        viewModelScope.launch { process(bitmap) }
+    }
 
-                is DetectionResult.Success -> {
-                    if (frontBody == null) {
-                        frontBody = detection.body
-                        frontAspectRatio = aspectRatio
-                        _state.value = _state.value.copy(step = ScanStep.SIDE)
-                    } else {
-                        analyse(frontBody!!, detection.body)
-                    }
+    private suspend fun process(bitmap: Bitmap) {
+        val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+
+        // Inference is heavy and synchronous; off the main thread or the UI freezes.
+        val detection = withContext(Dispatchers.Default) { detector.detect(bitmap) }
+
+        when (detection) {
+            is DetectionResult.Failure -> {
+                _state.value = _state.value.copy(
+                    step = if (frontBody == null) ScanStep.FRONT else ScanStep.SIDE,
+                    failure = detection.reason,
+                )
+            }
+
+            is DetectionResult.Success -> {
+                if (frontBody == null) {
+                    frontBody = detection.body
+                    frontAspectRatio = aspectRatio
+                    _state.value = _state.value.copy(step = ScanStep.SIDE, failure = null)
+                } else {
+                    analyse(frontBody!!, detection.body)
                 }
             }
         }
@@ -101,8 +127,7 @@ class ScanViewModel @Inject constructor(
     private suspend fun analyse(front: DetectedBody, side: DetectedBody) {
         val profile = profileDao.get()
         if (profile == null) {
-            // Height is the scale reference, so without a profile there is nothing to
-            // convert pixels into centimetres with.
+            // Height is the scale reference; without it pixels cannot become centimetres.
             _state.value = _state.value.copy(step = ScanStep.FRONT, profileMissing = true)
             return
         }
@@ -124,9 +149,8 @@ class ScanViewModel @Inject constructor(
 
         val result = analyser.analyse(markers)
 
-        // The female Navy equation needs a hip measurement; the male one does not. Reporting
-        // a missing hip to a man would be noise, so the warning is filtered by profile here
-        // rather than in :core, which has no reason to know the user's sex at this point.
+        // The female Navy equation needs a hip; the male one does not. Reporting a missing
+        // hip to a man would be noise, so the warning is filtered by profile here.
         val relevantWarnings = result.warnings.filterNot { warning ->
             warning is ScanWarning.MissingRequiredSite &&
                 warning.site == com.squeeze.core.scan.ScanSite.HIP &&

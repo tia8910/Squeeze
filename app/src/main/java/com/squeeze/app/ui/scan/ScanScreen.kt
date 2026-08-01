@@ -59,12 +59,9 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.scan.DetectionFailure
-import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.scan.ScanWarning
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Guided two-photograph body scan.
@@ -79,6 +76,8 @@ fun ScanScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Kept for permission checks only; photo decoding lives in the ViewModel now so the
+    // upload path has visible states end to end.
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -104,6 +103,7 @@ fun ScanScreen(
             hasCameraPermission = hasCameraPermission,
             onRequestCamera = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onCapture = viewModel::onPhotoCaptured,
+            onPhotoPicked = viewModel::onPhotoPicked,
         )
 
         ScanStep.ANALYSING -> AnalysingStep()
@@ -124,6 +124,7 @@ private fun CaptureStep(
     hasCameraPermission: Boolean,
     onRequestCamera: () -> Unit,
     onCapture: (Bitmap) -> Unit,
+    onPhotoPicked: (Uri) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -136,14 +137,7 @@ private fun CaptureStep(
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                val bitmap = withContext(Dispatchers.IO) { PhotoLoader.load(context, uri) }
-                bitmap?.let(onCapture)
-            }
-        }
-    }
+    ) { uri: Uri? -> uri?.let(onPhotoPicked) }
 
     fun shoot() {
         imageCapture.takePicture(
@@ -364,6 +358,10 @@ private fun FailureCard(failure: DetectionFailure) {
                     DetectionFailure.SegmentationFailed ->
                         "Your outline could not be separated from the background. A plainer " +
                             "background and more even lighting will help."
+
+                    DetectionFailure.PhotoUnreadable ->
+                        "That photo could not be opened. Try picking it again, or choose a " +
+                            "JPEG or PNG from your gallery."
                 },
                 style = MaterialTheme.typography.bodySmall,
             )

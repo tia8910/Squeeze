@@ -1,5 +1,7 @@
 package com.squeeze.app.ui.composition
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,21 +15,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.ui.theme.chartPalette
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
@@ -48,8 +54,10 @@ fun CompositionScreen(
     leanMassTrend: List<TrendPoint>,
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
+    measurements: List<MeasurementEntity>,
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
+    onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = chartPalette
@@ -65,11 +73,17 @@ fun CompositionScreen(
 
         if (latest == null) {
             EmptyState(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
+            if (measurements.isNotEmpty()) {
+                // Entries exist but none carries enough sites for an estimate — show them,
+                // so the user can see their data went somewhere and fix what is missing.
+                HistorySection(measurements, onDelete)
+            }
             return@Column
         }
 
         HeroEstimate(latest, calibration, palette.bodyFat)
         TrendVerdictCard(latest)
+        StatsRow(measurements)
 
         ActionRow(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
 
@@ -93,8 +107,125 @@ fun CompositionScreen(
         }
 
         repeatability?.let { RepeatabilityCard(it) }
+
+        HistorySection(measurements, onDelete)
     }
 }
+
+/**
+ * Momentum at a glance: how much data exists and how consistently it arrives.
+ *
+ * Consistency is the input the trend engine actually needs, so it is the behaviour worth
+ * celebrating — not streaks for their own sake.
+ */
+@Composable
+private fun StatsRow(measurements: List<MeasurementEntity>) {
+    if (measurements.isEmpty()) return
+
+    val daysTracked = (measurements.maxOf { it.epochDay } - measurements.minOf { it.epochDay }) + 1
+    val daysSinceLast = java.time.LocalDate.now().toEpochDay() - measurements.maxOf { it.epochDay }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatTile("Entries", measurements.size.toString(), Modifier.weight(1f))
+        StatTile("Days tracked", daysTracked.toString(), Modifier.weight(1f))
+        StatTile(
+            label = "Last entry",
+            value = when (daysSinceLast) {
+                0L -> "Today"
+                1L -> "1 day ago"
+                else -> "$daysSinceLast days"
+            },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Card(modifier) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * The raw log, newest first, with one-tap delete.
+ *
+ * Delete lives here because a single mis-entered reading — a waist typed as 850 instead
+ * of 85.0 — visibly bends the trend, and the fix belongs next to where the damage shows.
+ */
+@Composable
+private fun HistorySection(
+    measurements: List<MeasurementEntity>,
+    onDelete: (MeasurementEntity) -> Unit,
+) {
+    if (measurements.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("History", style = MaterialTheme.typography.titleSmall)
+
+        measurements.take(HISTORY_LIMIT).forEach { entry ->
+            Card(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = java.time.LocalDate.ofEpochDay(entry.epochDay)
+                                .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = entrySummary(entry),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { onDelete(entry) }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete this measurement",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (measurements.size > HISTORY_LIMIT) {
+            Text(
+                text = "${measurements.size - HISTORY_LIMIT} older entries not shown",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun entrySummary(entry: MeasurementEntity): String {
+    val parts = buildList {
+        entry.referenceBodyFatPercent?.let { add("DEXA %.1f%%".format(it)) }
+        entry.waistCm?.let { add("waist %.1f".format(it)) }
+        entry.weightKg?.let { add("%.1f kg".format(it)) }
+        entry.neckCm?.let { add("neck %.1f".format(it)) }
+    }
+    val source = if (entry.source == "PHOTO") "Scan" else "Tape"
+    return if (parts.isEmpty()) source else "$source · " + parts.joinToString(" · ")
+}
+
+private const val HISTORY_LIMIT = 14
 
 /**
  * The one number worth reading at a glance, with its uncertainty attached.
@@ -121,9 +252,18 @@ private fun HeroEstimate(
                 )
             }
 
+            // The number animates to its new value on each refresh. Beyond feel, this is
+            // a state-change cue: after a save the user sees the estimate move, which
+            // confirms the new measurement was absorbed without reading anything.
+            val animatedLevel by animateFloatAsState(
+                targetValue = latest.level.toFloat(),
+                animationSpec = tween(durationMillis = 700),
+                label = "heroLevel",
+            )
+
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = "%.1f".format(latest.level),
+                    text = "%.1f".format(animatedLevel),
                     style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                 )

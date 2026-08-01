@@ -1,5 +1,9 @@
 package com.squeeze.app.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -119,6 +123,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
             navController = navController,
             startDestination = Destination.COMPOSITION.route,
             modifier = Modifier.padding(padding),
+            // A short fade with a slight rise. Enough motion that the app feels alive and
+            // a screen change registers, short enough never to make navigation feel slower.
+            enterTransition = {
+                fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 24 }
+            },
+            exitTransition = { fadeOut(tween(120)) },
+            popEnterTransition = { fadeIn(tween(220)) },
+            popExitTransition = { fadeOut(tween(120)) },
         ) {
             composable(Destination.COMPOSITION.route) {
                 CompositionScreen(
@@ -126,8 +138,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                     leanMassTrend = state.leanMassTrend,
                     repeatability = state.repeatability,
                     calibration = state.calibration,
+                    measurements = state.measurements,
                     onStartScan = { navController.navigate(ROUTE_SCAN) },
                     onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
+                    onDelete = viewModel::deleteMeasurement,
                 )
             }
 
