@@ -3,6 +3,8 @@ package com.squeeze.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.BodyCompositionRepository
+import com.squeeze.app.data.db.MeasurementDao
+import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.settings.SecuritySettings
@@ -24,6 +26,8 @@ import javax.inject.Inject
 
 data class SqueezeUiState(
     val profile: Profile? = null,
+    /** Raw history, newest first, for the log and for delete. */
+    val measurements: List<MeasurementEntity> = emptyList(),
     val bodyFatTrend: List<TrendPoint> = emptyList(),
     val leanMassTrend: List<TrendPoint> = emptyList(),
     val repeatability: RepeatabilityScore? = null,
@@ -35,6 +39,7 @@ data class SqueezeUiState(
 class SqueezeViewModel @Inject constructor(
     private val repository: BodyCompositionRepository,
     private val profileDao: ProfileDao,
+    private val measurementDao: MeasurementDao,
     private val securitySettings: SecuritySettings,
 ) : ViewModel() {
 
@@ -81,23 +86,40 @@ class SqueezeViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
+            // History is loaded before the profile check: measurements a user entered
+            // should be visible and deletable even while the profile is incomplete.
+            val measurements = measurementDao.since(Long.MIN_VALUE).sortedByDescending { it.epochDay }
+
             val profile = profileDao.get()?.toDomain()
             if (profile == null) {
-                // No profile yet means onboarding has not run; there is nothing to compute
-                // because every equation needs height and sex at minimum.
-                _state.value = SqueezeUiState(loading = false)
+                _state.value = SqueezeUiState(measurements = measurements, loading = false)
                 return@launch
             }
 
             val snapshot = repository.snapshot(profile)
             _state.value = SqueezeUiState(
                 profile = profile,
+                measurements = measurements,
                 bodyFatTrend = snapshot.bodyFatTrend,
                 leanMassTrend = snapshot.leanMassTrend,
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
                 loading = false,
             )
+        }
+    }
+
+    /**
+     * Removes one measurement and recomputes everything derived from it.
+     *
+     * Deletion is worth having on the dashboard because a single mis-entered reading — a
+     * waist typed as 850 instead of 85.0 — visibly bends the trend, and the fix should be
+     * one tap away from where the damage shows.
+     */
+    fun deleteMeasurement(measurement: MeasurementEntity) {
+        viewModelScope.launch {
+            measurementDao.delete(measurement)
+            refresh()
         }
     }
 }

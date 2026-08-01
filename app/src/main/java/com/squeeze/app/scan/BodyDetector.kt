@@ -33,6 +33,9 @@ sealed interface DetectionFailure {
 
     /** The segmentation mask was too sparse to measure. */
     data object SegmentationFailed : DetectionFailure
+
+    /** The picked file could not be decoded into an image at all. */
+    data object PhotoUnreadable : DetectionFailure
 }
 
 sealed interface DetectionResult {
@@ -49,9 +52,8 @@ sealed interface DetectionResult {
  * natural waist, while a mask has no idea which part of a silhouette is a waist. Together
  * the joints bound the search and the silhouette decides the exact level.
  *
- * Nothing here touches the network. The models are packaged in the APK and inference is
- * local, so a body photo never leaves the device — the scan does not weaken the guarantee
- * the rest of the app makes.
+ * Nothing here touches the network — the models ship inside the APK and the app holds no
+ * INTERNET permission, so a body photo cannot leave the device.
  *
  * Not thread-safe: MediaPipe tasks hold native state. Callers should serialise access, and
  * must [close] to release the native handles.
@@ -98,7 +100,14 @@ class BodyDetector @Inject constructor(
         }
     }
 
-    fun detect(bitmap: Bitmap): DetectionResult {
+    /**
+     * Never throws. MediaPipe surfaces problems as native exceptions, and a scan that
+     * crashes the app teaches the user nothing; a named failure tells them what to change.
+     */
+    fun detect(bitmap: Bitmap): DetectionResult = runCatching { detectOrThrow(bitmap) }
+        .getOrElse { DetectionResult.Failure(DetectionFailure.SegmentationFailed) }
+
+    private fun detectOrThrow(bitmap: Bitmap): DetectionResult {
         ensureLoaded()
 
         val image = BitmapImageBuilder(bitmap).build()
@@ -109,17 +118,26 @@ class BodyDetector @Inject constructor(
             return DetectionResult.Failure(DetectionFailure.NoPersonDetected)
         }
 
-        val anchors = buildAnchors(poseResult, bitmap.height)
-            ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
-
         val segmentation = segmenter?.segment(image)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
         val mask = segmentation.categoryMask().orElse(null)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
-        val profile = MaskWidthExtractor.extract(mask, bitmap.width, bitmap.height)
+        // Every row index from here on lives in the MASK's coordinate space, not the
+        // photo's. A segmenter is free to emit its mask at the model's own resolution
+        // rather than the input's; assuming they match walks the buffer at the wrong
+        // stride and reads garbage widths from a perfectly good mask. Pose landmarks are
+        // normalised 0..1, so they project into the same space by scaling with the mask
+        // height — which keeps the anchors and the profile consistent by construction.
+        val maskWidth = mask.width
+        val maskHeight = mask.height
+
+        val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
+
+        val anchors = buildAnchors(poseResult, maskHeight)
+            ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
 
         // Scale comes from the subject's full height, so a cropped body would silently
         // scale every circumference wrong rather than simply measuring less.
@@ -131,16 +149,16 @@ class BodyDetector @Inject constructor(
     }
 
     /**
-     * Converts normalised pose landmarks into image rows.
+     * Converts normalised pose landmarks into mask rows.
      *
      * Left and right landmarks are averaged, which both stabilises the estimate and
      * tolerates one side being slightly occluded in a side-on photo.
      */
-    private fun buildAnchors(result: PoseLandmarkerResult, imageHeight: Int): PoseAnchors? {
+    private fun buildAnchors(result: PoseLandmarkerResult, maskHeight: Int): PoseAnchors? {
         val landmarks = result.landmarks().firstOrNull() ?: return null
 
         fun row(index: Int): Int? =
-            landmarks.getOrNull(index)?.let { (it.y() * imageHeight).toInt() }
+            landmarks.getOrNull(index)?.let { (it.y() * maskHeight).toInt() }
 
         fun midRow(left: Int, right: Int): Int? {
             val l = row(left)
