@@ -93,14 +93,12 @@ class BillingManager @Inject constructor(
 
         val valid = result.purchasesList.filter { it.isTrustworthy() }
 
-        var adFree = false
         var pro = false
         var credits = entitlements.state.value.blockCredits
 
         for (purchase in valid) {
             for (productId in purchase.products) {
                 when (productId) {
-                    Products.AD_FREE -> adFree = true
                     Products.PRO_LIFETIME -> pro = true
                     Products.TRAINING_BLOCK -> {
                         // Consumables must be consumed before they can be bought again;
@@ -112,7 +110,7 @@ class BillingManager @Inject constructor(
             acknowledgeIfNeeded(purchase)
         }
 
-        entitlements.update(adFree = adFree, pro = pro, blockCredits = credits)
+        entitlements.update(pro = pro, blockCredits = credits)
     }
 
     /** Launches the purchase flow for [productId]. */

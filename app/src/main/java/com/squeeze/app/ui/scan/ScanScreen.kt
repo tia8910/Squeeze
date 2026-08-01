@@ -2,9 +2,9 @@ package com.squeeze.app.ui.scan
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,27 +12,41 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.core.Preview as CameraPreview
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,9 +54,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,13 +61,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.scan.ScanWarning
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Guided two-photograph body scan.
  *
- * The screen deliberately never displays a captured photo back to the user, and never
- * writes one to disk. Photographs exist only long enough for inference to run; what
- * survives is a set of circumferences.
+ * No captured photo is ever displayed back or written to disk. Images exist only long
+ * enough for inference; what survives is a set of circumferences.
  */
 @Composable
 fun ScanScreen(
@@ -77,12 +91,10 @@ fun ScanScreen(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> hasCameraPermission = granted }
 
-    // Deliberately not requesting on entry. Uploading needs no camera, so prompting
-    // immediately risks a reflexive denial that then blocks the camera path for good.
+    // Deliberately not requested on entry: uploading needs no camera, and a reflexive denial
+    // would block the capture path permanently.
 
-    LaunchedEffect(state.saved) {
-        if (state.saved) onFinished()
-    }
+    LaunchedEffect(state.saved) { if (state.saved) onFinished() }
 
     when (state.step) {
         ScanStep.FRONT, ScanStep.SIDE -> CaptureStep(
@@ -105,25 +117,6 @@ fun ScanScreen(
 }
 
 @Composable
-private fun CameraPermissionRequired(onRequest: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Camera access", style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = "Allow the camera to take the scan photos here, or upload two photos you " +
-                "already have. Either way the scan runs entirely on this device — images are " +
-                "never saved by the app and never leave your phone.",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        Button(onClick = onRequest) { Text("Allow camera") }
-    }
-}
-
-@Composable
 private fun CaptureStep(
     step: ScanStep,
     failure: DetectionFailure?,
@@ -137,44 +130,66 @@ private fun CaptureStep(
     val imageCapture = remember { ImageCapture.Builder().build() }
     val scope = rememberCoroutineScope()
 
-    // The system photo picker needs no storage permission on any supported version, and
-    // grants access to exactly the one image chosen rather than to the whole gallery.
+    var useFrontCamera by remember { mutableStateOf(false) }
+    var timerSeconds by remember { mutableIntStateOf(DEFAULT_TIMER_SECONDS) }
+    var countdown by remember { mutableIntStateOf(0) }
+
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri: Uri? ->
         if (uri != null) {
             scope.launch {
-                // Decoding and EXIF rotation are file I/O plus a full-bitmap copy; on the
-                // main thread that drops frames on a large photo.
                 val bitmap = withContext(Dispatchers.IO) { PhotoLoader.load(context, uri) }
                 bitmap?.let(onCapture)
             }
         }
     }
 
+    fun shoot() {
+        imageCapture.takePicture(
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    image.decodeToBitmap()?.let(onCapture)
+                    image.close()
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    // The step is unchanged, so the user simply taps again.
+                    exception.printStackTrace()
+                }
+            },
+        )
+    }
+
     Box(Modifier.fillMaxSize()) {
         if (hasCameraPermission) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    PreviewView(ctx).also { previewView ->
-                        val providerFuture = ProcessCameraProvider.getInstance(ctx)
-                        providerFuture.addListener({
-                            val provider = providerFuture.get()
-                            val preview = CameraPreview.Builder().build().also {
-                                it.surfaceProvider = previewView.surfaceProvider
-                            }
-                            provider.unbindAll()
-                            provider.bindToLifecycle(
-                                lifecycleOwner,
-                                CameraSelector.DEFAULT_BACK_CAMERA,
-                                preview,
-                                imageCapture,
-                            )
-                        }, ContextCompat.getMainExecutor(ctx))
-                    }
+                // Keyed on the lens so flipping rebinds the provider rather than leaving
+                // the old camera attached.
+                factory = { ctx -> PreviewView(ctx) },
+                update = { previewView ->
+                    val providerFuture = ProcessCameraProvider.getInstance(context)
+                    providerFuture.addListener({
+                        val provider = providerFuture.get()
+                        val preview = CameraPreview.Builder().build().also {
+                            it.surfaceProvider = previewView.surfaceProvider
+                        }
+                        provider.unbindAll()
+                        provider.bindToLifecycle(
+                            lifecycleOwner,
+                            if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA
+                            else CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            imageCapture,
+                        )
+                    }, ContextCompat.getMainExecutor(context))
                 },
             )
+
+            CaptureGuideOverlay()
+            if (countdown > 0) CountdownOverlay(countdown)
         } else {
             CameraPermissionRequired(onRequest = onRequestCamera)
         }
@@ -183,66 +198,72 @@ private fun CaptureStep(
             modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = if (step == ScanStep.FRONT) "Step 1 of 2 — facing the camera"
-                        else "Step 2 of 2 — turn to your side",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        // Framing advice is measurement advice: the whole body must be in
-                        // shot because height is what converts pixels into centimetres, and
-                        // standing back reduces perspective distortion. It applies equally
-                        // to an uploaded photo, which is why it is stated once here.
-                        text = "Whole body from head to feet in frame, plain background, even " +
-                            "light, close-fitting clothing — loose fabric is measured as body.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-
+            StepCard(step)
             failure?.let { FailureCard(it) }
-
             if (profileMissing) {
-                Card(Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Set your height in Settings first — the scan uses it to " +
-                            "convert the photo into real measurements.",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                InfoCard(
+                    "Set your height in Settings first — the scan uses it to convert the " +
+                        "photo into real measurements.",
+                )
             }
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (hasCameraPermission) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        imageCapture.takePicture(
-                            ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    image.decodeToBitmap()?.let(onCapture)
-                                    image.close()
-                                }
-
-                                override fun onError(exception: ImageCaptureException) {
-                                    // A failed shutter leaves the step unchanged, so the
-                                    // user simply taps again; no partial state to unwind.
-                                    exception.printStackTrace()
-                                }
+                // A self-timer is not a nicety here: the framing that produces a good
+                // measurement puts the user metres from the phone, where the shutter is out
+                // of reach. Without it, every self-captured scan is taken at arm's length,
+                // which is exactly the framing the method handles worst.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TIMER_OPTIONS.forEach { seconds ->
+                        FilterChip(
+                            selected = timerSeconds == seconds,
+                            onClick = { timerSeconds = seconds },
+                            leadingIcon = if (timerSeconds == seconds) {
+                                { Icon(Icons.Default.Timer, null, Modifier.size(16.dp)) }
+                            } else {
+                                null
                             },
+                            label = { Text(if (seconds == 0) "Off" else "${seconds}s") },
                         )
-                    },
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(if (step == ScanStep.FRONT) "Capture front" else "Capture side")
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        enabled = countdown == 0,
+                        onClick = {
+                            if (timerSeconds == 0) {
+                                shoot()
+                            } else {
+                                scope.launch {
+                                    countdown = timerSeconds
+                                    while (countdown > 0) {
+                                        delay(1000)
+                                        countdown--
+                                    }
+                                    shoot()
+                                }
+                            }
+                        },
+                    ) {
+                        Text(
+                            if (countdown > 0) "Get into position…"
+                            else if (step == ScanStep.FRONT) "Capture front" else "Capture side",
+                        )
+                    }
+
+                    FilledTonalButton(onClick = { useFrontCamera = !useFrontCamera }) {
+                        Icon(Icons.Default.Cameraswitch, contentDescription = "Switch camera")
+                    }
                 }
             }
 
@@ -254,15 +275,77 @@ private fun CaptureStep(
                     )
                 },
             ) {
-                Text(if (step == ScanStep.FRONT) "Upload front photo" else "Upload side photo")
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, Modifier.size(18.dp))
+                Text(
+                    text = if (step == ScanStep.FRONT) "Upload front photo" else "Upload side photo",
+                    modifier = Modifier.padding(start = 8.dp),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FailureCard(failure: DetectionFailure) {
+private fun StepCard(step: ScanStep) {
     Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LinearProgressIndicator(
+                progress = { if (step == ScanStep.FRONT) 0.5f else 1f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = if (step == ScanStep.FRONT) "Step 1 of 2 — face the camera"
+                else "Step 2 of 2 — turn side-on",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "Stand inside the guide, whole body from head to feet, plain background, " +
+                    "even light, close-fitting clothing. Loose fabric is measured as body.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CameraPermissionRequired(onRequest: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Camera access", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Allow the camera to take the scan photos here, or upload two photos you " +
+                "already have. Either way the scan runs entirely on this device — this app " +
+                "has no internet permission at all, so nothing can be uploaded.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+        )
+        Button(onClick = onRequest) { Text("Allow camera") }
+    }
+}
+
+@Composable
+private fun InfoCard(body: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Text(body, Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun FailureCard(failure: DetectionFailure) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Could not measure that photo", style = MaterialTheme.typography.titleSmall)
             Text(
@@ -276,8 +359,7 @@ private fun FailureCard(failure: DetectionFailure) {
                         "Your whole body needs to be visible, head to feet. Step further back."
 
                     DetectionFailure.PoseImplausible ->
-                        "Stand upright and face the camera squarely, with arms slightly away " +
-                            "from your sides."
+                        "Stand upright and square to the camera, arms slightly away from your sides."
 
                     DetectionFailure.SegmentationFailed ->
                         "Your outline could not be separated from the background. A plainer " +
@@ -299,7 +381,7 @@ private fun AnalysingStep() {
         CircularProgressIndicator()
         Text("Measuring", style = MaterialTheme.typography.titleMedium)
         Text(
-            text = "Running on this device. Nothing is uploaded.",
+            text = "Running on this device.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -311,10 +393,13 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
     val result = state.result ?: return
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Scan results", style = MaterialTheme.typography.titleLarge)
+        Text("Scan results", style = MaterialTheme.typography.headlineSmall)
 
         val c = result.circumferences
         listOfNotNull(
@@ -325,16 +410,23 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
             c.thighCm?.let { "Thigh" to it },
         ).forEach { (label, value) ->
             Card(Modifier.fillMaxWidth()) {
-                Text(
-                    text = "%s   %.1f cm".format(label, value),
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    Text("%.1f cm".format(value), style = MaterialTheme.typography.bodyLarge)
+                }
             }
         }
 
         if (result.warnings.isNotEmpty()) {
-            Card(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ),
+            ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Worth checking", style = MaterialTheme.typography.titleSmall)
                     result.warnings.forEach { warning ->
@@ -351,7 +443,7 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
 
                                 is ScanWarning.ImplausibleShape ->
                                     "The ${warning.site.name.lowercase()} shape looks off, " +
-                                        "which usually means the side photo was not square-on."
+                                        "usually meaning the side photo was not square-on."
 
                                 is ScanWarning.MissingRequiredSite ->
                                     "Could not find your ${warning.site.name.lowercase()}."
@@ -378,18 +470,16 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
 }
 
 /**
- * Decodes a captured frame into a bitmap.
+ * Decodes a captured frame in memory.
  *
- * CameraX hands back JPEG bytes for [ImageCapture]; decoding here keeps the bitmap in
- * memory and off the filesystem, which is the point — a captured body photo is never
- * written to disk.
+ * Named to avoid colliding with CameraX's own `ImageProxy.toBitmap()` extension.
  */
 private fun ImageProxy.decodeToBitmap(): Bitmap? {
     val plane = planes.firstOrNull() ?: return null
     val buffer = plane.buffer
     val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
-
-    return runCatching {
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-    }.getOrNull()
+    return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
 }
+
+private val TIMER_OPTIONS = listOf(0, 5, 10, 15)
+private const val DEFAULT_TIMER_SECONDS = 10

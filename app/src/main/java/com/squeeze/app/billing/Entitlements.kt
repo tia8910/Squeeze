@@ -9,10 +9,7 @@ import javax.inject.Singleton
 
 /** Products this app sells. */
 object Products {
-    /** One-time purchase: removes advertising permanently. */
-    const val AD_FREE = "squeeze_ad_free"
-
-    /** One-time purchase: unlocks programme generation, and removes ads with it. */
+    /** One-time purchase: unlocks programme generation. */
     const val PRO_LIFETIME = "squeeze_pro_lifetime"
 
     /**
@@ -26,7 +23,7 @@ object Products {
      */
     const val TRAINING_BLOCK = "squeeze_training_block"
 
-    val ONE_TIME = listOf(AD_FREE, PRO_LIFETIME)
+    val ONE_TIME = listOf(PRO_LIFETIME)
     val CONSUMABLE = listOf(TRAINING_BLOCK)
 }
 
@@ -51,15 +48,12 @@ class Entitlements @Inject constructor(
     private val _state = MutableStateFlow(load())
     val state: StateFlow<EntitlementState> = _state.asStateFlow()
 
-    fun isAdFree(): Boolean = _state.value.let { it.adFree || it.pro }
-
     fun canGenerateProgram(): Boolean = _state.value.let { it.pro || it.blockCredits > 0 }
 
     /** Called by [BillingManager] after reconciling with the Play Store. */
-    fun update(adFree: Boolean, pro: Boolean, blockCredits: Int) {
-        val next = EntitlementState(adFree = adFree, pro = pro, blockCredits = blockCredits)
+    fun update(pro: Boolean, blockCredits: Int) {
+        val next = EntitlementState(pro = pro, blockCredits = blockCredits)
         prefs.edit()
-            .putBoolean(KEY_AD_FREE, next.adFree)
             .putBoolean(KEY_PRO, next.pro)
             .putInt(KEY_CREDITS, next.blockCredits)
             .apply()
@@ -71,26 +65,23 @@ class Entitlements @Inject constructor(
         val current = _state.value
         if (current.pro) return true
         if (current.blockCredits <= 0) return false
-        update(current.adFree, current.pro, current.blockCredits - 1)
+        update(current.pro, current.blockCredits - 1)
         return true
     }
 
     private fun load() = EntitlementState(
-        adFree = prefs.getBoolean(KEY_AD_FREE, false),
         pro = prefs.getBoolean(KEY_PRO, false),
         blockCredits = prefs.getInt(KEY_CREDITS, 0),
     )
 
     private companion object {
         const val PREFS = "squeeze_entitlements"
-        const val KEY_AD_FREE = "ad_free"
         const val KEY_PRO = "pro"
         const val KEY_CREDITS = "block_credits"
     }
 }
 
 data class EntitlementState(
-    val adFree: Boolean = false,
     val pro: Boolean = false,
     val blockCredits: Int = 0,
 )

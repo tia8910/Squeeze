@@ -49,10 +49,11 @@ reference method's own precision.
 ```
 core/    Pure Kotlin/JVM. No Android dependencies.
          Body fat equations, personal calibration, Kalman trend filter,
-         repeatability scoring, programme generation, composition feedback.
-         65 unit tests, runnable on any machine without an SDK or emulator.
+         repeatability scoring, programme generation, composition feedback,
+         and the body-scan geometry.
+         98 unit tests, runnable on any machine without an SDK or emulator.
 
-app/     Android. Compose UI, encrypted Room storage, billing, ads.
+app/     Android. Compose UI, encrypted Room storage, on-device vision, billing.
 ```
 
 Keeping the maths in a plain JVM module is what makes it testable. Everything that decides
@@ -70,30 +71,18 @@ a number a user might act on lives in `core/` and is covered by tests.
   flag is all-or-nothing — leaving it on would stop users capturing their own progress and
   make store listing screenshots impossible to produce. Screens rendering a captured body
   photo should set it unconditionally regardless of the preference.
+- **No `INTERNET` permission.** The app cannot open a socket, so no photograph and no
+  measurement can leave the device even if a bug or a dependency tried to send one. This is
+  enforced by the OS rather than promised, and any user can verify it in the permission
+  list. Body scanning uses models packaged in the APK; Play Billing reaches the Play Store
+  over binder IPC, not this process's network stack.
 - **Biometric gate** on launch and on every return to the foreground.
 - **Backup and device transfer disabled.** Cloud backup would put the database on someone
   else's server, which contradicts the guarantee. The user's route to a backup is the
   app's own passphrase-encrypted export.
 
-### Ads and health data
-
-`INTERNET` is required by the AdMob SDK and by nothing else. No measurement, photo, or
-training record is transmitted — there is no backend to receive one.
-
-Ad policy is enforced structurally by `AdGate`, not by convention:
-
-- Body composition, photo capture and programme screens can **never** show ads, for anyone.
-- Paying users see no ads anywhere.
-- No custom targeting is attached to any ad request — nothing derived from weight, goal,
-  measurements or training history reaches the ad stack.
-- Ad ID collection is off; serving is contextual.
-
-Google Play's Health Apps policy prohibits advertising on health data. The only reliable
-way to comply is to keep advertising out of the screens where health data lives.
-
 ### Monetisation
 
-- **Ad-free** — one-time purchase, removes advertising.
 - **Pro lifetime** — one-time purchase, unlocks programme generation.
 - **Training block** — consumable, one generated mesocycle.
 
@@ -112,11 +101,9 @@ patched APK — see `PurchaseVerifier` for why that exposure is accepted rather 
 ./gradlew :app:assembleDebug  # requires the Android SDK
 ```
 
-A fresh clone builds and runs without any credentials. Ad units fall back to Google's
-public test IDs, and an absent Play licensing key makes `PurchaseVerifier` defer to the
-Play Store's own response — both are the correct behaviour for a development build, and
-both mean a build that *should* have carried real credentials degrades to test traffic
-rather than live traffic.
+A fresh clone builds and runs without any credentials. An absent Play licensing key makes
+`PurchaseVerifier` defer to the Play Store's own response, which is the correct behaviour
+for a development build with no Play Console behind it.
 
 ### Local release builds
 
@@ -128,9 +115,6 @@ KEYSTORE_PASSWORD=...
 KEY_ALIAS=...
 KEY_PASSWORD=...
 PLAY_PUBLIC_KEY=...
-ADMOB_APP_ID=ca-app-pub-.../...
-AD_UNIT_BANNER=ca-app-pub-.../...
-AD_UNIT_INTERSTITIAL=ca-app-pub-.../...
 ```
 
 Without it, `:app:assembleRelease` still succeeds and produces an **unsigned** APK, which
@@ -161,9 +145,6 @@ with them attached.
 | `KEY_ALIAS` | |
 | `KEY_PASSWORD` | |
 | `PLAY_PUBLIC_KEY` | Play Console → Monetisation setup → licensing key |
-| `ADMOB_APP_ID` | |
-| `AD_UNIT_BANNER` | |
-| `AD_UNIT_INTERSTITIAL` | |
 
 `versionCode` comes from the workflow run number, which is monotonic — re-running a tag
 produces a higher code rather than one Play will reject as a duplicate. `versionName`
@@ -175,9 +156,12 @@ hands anyone a map of the obfuscated build.
 
 ## Status
 
-`core/` is complete and tested. The Android module has its storage, billing, ad-policy and
-body composition dashboard in place; workout logging, onboarding, photo capture and
-encrypted export are not yet built.
+Working: profile setup, manual measurement entry, automatic body scanning from the camera
+or uploaded photos, the composition dashboard with trend and confidence bands, and training
+block generation that adapts to the composition trend.
+
+Not built yet: workout logging against a generated block, measurement history browsing, and
+encrypted export/import.
 
 ## Licence
 

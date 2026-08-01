@@ -3,25 +3,26 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      INTERNET is required by the AdMob SDK and by nothing else in this app.
+      There is deliberately no INTERNET permission.
 
-      It is worth being precise about what that does and does not change. No measurement,
-      photo, or training record is ever transmitted: there is no backend to receive one,
-      and no code path that opens a socket outside the ad and billing SDKs. What the
-      permission does cost is verifiability — a user can no longer confirm the claim by
-      reading the permission list alone, which is why the source is published under the
-      GPL and builds are reproducible.
+      This is the app's strongest guarantee, and it is the reason to read the permission
+      list rather than the marketing: without this permission the operating system will not
+      let the process open a socket, so no photograph and no measurement can leave the
+      device even if a bug, a dependency, or a future contributor tried to send one. The
+      claim is enforced rather than promised, and any user can check it.
 
-      Ads are also kept structurally away from health data: see AdGate, which refuses to
-      serve on any screen showing body composition. Google Play's Health Apps policy
-      prohibits using health data for advertising, and the cleanest way to comply is to
-      never put the two in the same place.
+      Everything the app does is compatible with that:
+        - Body scanning runs on models packaged in the APK; inference is local.
+        - Health Connect is an on-device datastore.
+        - Play Billing communicates with the Play Store app over binder IPC, not through
+          this process's network stack, so purchases still work.
+
+      Adding INTERNET later would silently void the guarantee. Anything that seems to need
+      it should be treated as a design question first.
     -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Photo capture for silhouette measurement. Declared optional so the app still
-         installs on devices without a camera, where tape entry remains fully functional. -->
+    <!-- Photo capture for body scanning. Optional so the app still installs on devices
+         without a camera, where uploading photos and tape entry both remain available. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -35,6 +36,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Squeeze"
@@ -51,24 +53,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="@string/admob_app_id" />
-
-        <!--
-          Ad ID collection is disabled. The advertising identifier is a cross-app tracking
-          key, and an app holding body composition data has no business contributing to
-          one. Ads still serve; they serve contextually rather than behaviourally, which
-          is also the only defensible position under the Health Apps policy.
-        -->
-        <meta-data
-            android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
-            android:value="true" />
-        <property
-            android:name="android.adservices.AD_SERVICES_CONFIG"
-            android:resource="@xml/gma_ad_services_config"
-            tools:replace="android:resource" />
     </application>
 
 </manifest>

@@ -128,9 +128,6 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           PLAY_PUBLIC_KEY: ${{ secrets.PLAY_PUBLIC_KEY }}
-          ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}
-          AD_UNIT_BANNER: ${{ secrets.AD_UNIT_BANNER }}
-          AD_UNIT_INTERSTITIAL: ${{ secrets.AD_UNIT_INTERSTITIAL }}
           # github.run_number is monotonic per workflow, which is what Play requires of
           # versionCode. Re-running a tag therefore produces a higher code, not a clash.
           VERSION_CODE: ${{ github.run_number }}
