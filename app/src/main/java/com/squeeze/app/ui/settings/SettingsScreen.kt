@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.squeeze.app.BuildConfig
 import com.squeeze.core.model.Sex
 
 @Composable
@@ -62,6 +63,30 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        AboutCard()
+    }
+}
+
+/**
+ * Which build is installed, stated where the user can read it back.
+ *
+ * Debug builds otherwise all claim the same version, which makes "is the new build
+ * actually installed?" unanswerable — a question that has already cost a debugging round
+ * on this project. The name carries the commit; the code carries the CI run.
+ */
+@Composable
+private fun AboutCard() {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Squeeze ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
+                    "under App info › Permissions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

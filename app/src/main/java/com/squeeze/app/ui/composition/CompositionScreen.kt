@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -142,7 +144,12 @@ private fun StatsRow(measurements: List<MeasurementEntity>) {
 
 @Composable
 private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier) {
+    Card(
+        modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = value,
@@ -241,7 +248,20 @@ private fun HeroEstimate(
     accent: Color,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            // A wash of the series colour fading into the surface. This is the one place
+            // colour is allowed to be loud, because it is the same hue that identifies
+            // body fat in the chart below — the card and the line read as one thing.
+            Modifier
+                .background(
+                    Brush.verticalGradient(
+                        0f to accent.copy(alpha = 0.28f),
+                        1f to Color.Transparent,
+                    ),
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(color = accent, shape = CircleShape, modifier = Modifier.size(10.dp)) {}
                 Text(
@@ -316,11 +336,43 @@ private fun ActionRow(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
  */
 @Composable
 private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+    val palette = chartPalette
+
+    Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // The first screen a new user ever sees carries the identity: wordmark over a
+            // gradient of the two data colours, and the one-line reason this app exists.
+            Card(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                0f to palette.bodyFat.copy(alpha = 0.35f),
+                                1f to palette.leanMass.copy(alpha = 0.35f),
+                            ),
+                        )
+                        .padding(horizontal = 20.dp, vertical = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "SQUEEZE",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = androidx.compose.ui.unit.TextUnit(
+                            4f, androidx.compose.ui.unit.TextUnitType.Sp,
+                        ),
+                    )
+                    Text(
+                        text = "Track what's really changing. Nothing leaves this phone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
             Text("Take your first measurement", style = MaterialTheme.typography.headlineSmall)
             Text(
                 text = "Two measurements are needed before a trend appears, and about three " +
