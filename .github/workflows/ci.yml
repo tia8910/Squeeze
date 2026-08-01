@@ -79,6 +79,15 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-35" "build-tools;35.0.0" > /dev/null
 
+      # Every build is stamped with the run number and commit, and Settings displays it.
+      # Debug builds otherwise all claim to be the same version, which makes "is the new
+      # build actually installed?" unanswerable — a question that has already cost a
+      # debugging round on this project.
+      - name: Stamp version
+        run: |
+          echo "VERSION_NAME=0.2.0-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 

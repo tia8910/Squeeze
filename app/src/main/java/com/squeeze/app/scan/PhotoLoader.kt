@@ -41,9 +41,12 @@ object PhotoLoader {
      */
     fun load(context: Context, uri: Uri, maxDimension: Int = MAX_DIMENSION): Bitmap? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        } ?: return null
+        val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
+        // With inJustDecodeBounds set, decodeStream returns null BY DESIGN — the result
+        // arrives through the options object, not the return value. An elvis on this call
+        // fires on every photo and made the entire upload path fail; success or failure is
+        // judged solely by whether the options carry plausible dimensions afterwards.
+        boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
 
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 

@@ -39,7 +39,7 @@ android {
 
         // Overridable from CI so a tagged release can stamp a build number without a commit.
         versionCode = secret("VERSION_CODE", "1").toInt()
-        versionName = secret("VERSION_NAME", "0.1.0")
+        versionName = secret("VERSION_NAME", "0.2.0-local")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
