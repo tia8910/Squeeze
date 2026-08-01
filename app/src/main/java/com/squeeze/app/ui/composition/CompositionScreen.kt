@@ -1,22 +1,34 @@
 package com.squeeze.app.ui.composition
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squeeze.app.ui.theme.chartPalette
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
 import com.squeeze.core.trend.TrendPoint
@@ -25,18 +37,23 @@ import kotlin.math.abs
 /**
  * The body composition dashboard.
  *
- * Note there is no [com.squeeze.app.ui.ads.AdBanner] anywhere on this screen, and there
- * must never be: [com.squeeze.app.ads.AdSurface.BODY_COMPOSITION] is permanently barred in
- * [com.squeeze.app.ads.AdGate].
+ * Structured so the most important thing is the largest thing: the current estimate is a
+ * hero number, the verdict on whether it is moving sits directly beneath it, and the charts
+ * are supporting evidence rather than the headline. A user glancing at this for two seconds
+ * should get "18.4%, down 0.3 a week, that's real" without reading a chart.
  */
 @Composable
 fun CompositionScreen(
     trend: List<TrendPoint>,
+    leanMassTrend: List<TrendPoint>,
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
     onStartScan: () -> Unit,
+    onAddMeasurement: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val palette = chartPalette
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -44,44 +61,82 @@ fun CompositionScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Button(onClick = onStartScan, modifier = Modifier.fillMaxWidth()) {
-            Text("Scan with camera")
-        }
-
         val latest = trend.lastOrNull()
 
-        if (latest != null) {
-            CurrentEstimateCard(latest, calibration)
-            TrendVerdictCard(latest)
+        if (latest == null) {
+            EmptyState(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
+            return@Column
         }
 
-        TrendChart(points = trend)
+        HeroEstimate(latest, calibration, palette.bodyFat)
+        TrendVerdictCard(latest)
+
+        ActionRow(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
+
+        TrendChart(
+            title = "Body fat",
+            unitSuffix = "%",
+            points = trend,
+            lineColor = palette.bodyFat,
+        )
+
+        // A separate chart rather than a second axis. Body fat and lean mass are different
+        // quantities on different scales; sharing an axis would let the apparent crossing
+        // point be decided by axis choice instead of by the data.
+        if (leanMassTrend.size >= 2) {
+            TrendChart(
+                title = "Lean mass",
+                unitSuffix = " kg",
+                points = leanMassTrend,
+                lineColor = palette.leanMass,
+            )
+        }
 
         repeatability?.let { RepeatabilityCard(it) }
     }
 }
 
+/**
+ * The one number worth reading at a glance, with its uncertainty attached.
+ *
+ * The interval is never omitted. An estimate shown without it is the central dishonesty of
+ * this app category, and it is what destroys trust the first time the app disagrees with a
+ * scan the user has paid for.
+ */
 @Composable
-private fun CurrentEstimateCard(latest: TrendPoint, calibration: PersonalCalibration) {
+private fun HeroEstimate(
+    latest: TrendPoint,
+    calibration: PersonalCalibration,
+    accent: Color,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Body fat", style = MaterialTheme.typography.labelMedium)
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(color = accent, shape = CircleShape, modifier = Modifier.size(10.dp)) {}
+                Text(
+                    text = "Body fat",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
 
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "%.1f".format(latest.level),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("%", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 6.dp))
+                Text(
+                    text = "%",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(bottom = 8.dp, start = 2.dp),
+                )
             }
 
-            // The interval is shown next to every number, always. An estimate presented
-            // without its uncertainty is the central dishonesty of this app category, and
-            // it is what makes users distrust the app the first time it disagrees with a scan.
             Text(
-                text = "± %.1f points (95%% confidence)".format(latest.levelConfidence95),
-                style = MaterialTheme.typography.bodySmall,
+                text = "± %.1f points, 95%% confidence".format(latest.levelConfidence95),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
@@ -89,7 +144,7 @@ private fun CurrentEstimateCard(latest: TrendPoint, calibration: PersonalCalibra
                 text = if (calibration.isActive) {
                     "Calibrated to your own scan results."
                 } else {
-                    "Uncalibrated. Enter a DEXA or BodPod result to anchor this to your body."
+                    "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -99,31 +154,87 @@ private fun CurrentEstimateCard(latest: TrendPoint, calibration: PersonalCalibra
 }
 
 @Composable
-private fun TrendVerdictCard(latest: TrendPoint) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Trend", style = MaterialTheme.typography.labelMedium)
+private fun ActionRow(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onStartScan, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+            Text("Scan", Modifier.padding(start = 8.dp))
+        }
+        OutlinedButton(onClick = onAddMeasurement, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
+            Text("Enter", Modifier.padding(start = 8.dp))
+        }
+    }
+}
 
+/**
+ * What a new user sees.
+ *
+ * Two concrete actions rather than an explanation of why the screen is blank. The tape
+ * option is presented as the more accurate one because it is — the scan is the convenient
+ * path, not the precise one, and saying so up front sets an honest expectation.
+ */
+@Composable
+private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
+    Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text("Take your first measurement", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                text = "Two measurements are needed before a trend appears, and about three " +
+                    "weeks before the app can tell a real change from measurement noise.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Button(onClick = onStartScan, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+                Text("Scan with camera or photos", Modifier.padding(start = 8.dp))
+            }
+            OutlinedButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
+                Text("Enter tape measurements", Modifier.padding(start = 8.dp))
+            }
+
+            Text(
+                text = "A tape is more repeatable than any photo method. The scan is faster; " +
+                    "the tape is more precise.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrendVerdictCard(latest: TrendPoint) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (latest.isChangeSignificant) {
                 val direction = if (latest.weeklyChange < 0) "down" else "up"
                 Text(
-                    text = "%.2f points/week %s".format(abs(latest.weeklyChange), direction),
+                    text = "%.2f points per week %s".format(abs(latest.weeklyChange), direction),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    text = "This change is larger than your measurement noise, so it is real.",
+                    text = "Larger than your measurement noise, so this is a real change.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                // Saying "not yet" is more useful than drawing a confident arrow through
-                // scatter, and it is the claim the data actually supports.
+                // "Not yet" is more useful than a confident arrow through scatter, and it is
+                // the only claim the data actually supports.
                 Text("No confirmed change yet", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    text = "Any movement so far is within measurement noise. Keep measuring — " +
-                        "a real trend usually separates out after two to three more weeks.",
+                    text = "Movement so far is within measurement noise. A real trend usually " +
+                        "separates out after two to three more weekly measurements.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -134,7 +245,11 @@ private fun TrendVerdictCard(latest: TrendPoint) {
 private fun RepeatabilityCard(score: RepeatabilityScore) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Your measurement precision", style = MaterialTheme.typography.labelMedium)
+            Text(
+                text = "Your measurement precision",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             Text(
                 text = when (score.grade) {
@@ -155,9 +270,11 @@ private fun RepeatabilityCard(score: RepeatabilityScore) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (score.grade == RepeatabilityScore.Grade.FAIR || score.grade == RepeatabilityScore.Grade.POOR) {
+            if (score.grade == RepeatabilityScore.Grade.FAIR ||
+                score.grade == RepeatabilityScore.Grade.POOR
+            ) {
                 // Precision is the one error source the user directly controls, so coaching
-                // protocol here improves every future reading more than any algorithm change.
+                // protocol improves every future reading more than any algorithm change would.
                 Text(
                     text = "Measure at the same time of day, before eating, with the tape at " +
                         "the same tension. This is the fastest way to make your trend readable.",

@@ -2,7 +2,6 @@ package com.squeeze.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.squeeze.app.ads.AdGate
 import com.squeeze.app.data.BodyCompositionRepository
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
@@ -37,8 +36,6 @@ class SqueezeViewModel @Inject constructor(
     private val repository: BodyCompositionRepository,
     private val profileDao: ProfileDao,
     private val securitySettings: SecuritySettings,
-    /** Exposed so composables can consult ad policy without reaching for a singleton. */
-    val adGate: AdGate,
 ) : ViewModel() {
 
     /** Whether FLAG_SECURE is applied; see [SecuritySettings.blockScreenshots]. */

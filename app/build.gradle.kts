@@ -24,13 +24,6 @@ val localProperties = Properties().apply {
 fun secret(name: String, default: String = ""): String =
     System.getenv(name) ?: localProperties.getProperty(name) ?: default
 
-// Google's documented test IDs. They are the default so that a fresh clone builds and runs
-// without credentials, and — more importantly — so a build that was *meant* to carry real
-// IDs but lost them falls back to test traffic rather than live traffic. Serving live ads
-// from a debug or CI build is how AdMob accounts get suspended for invalid traffic.
-val testAdAppId = "ca-app-pub-3940256099942544~3347511713"
-val testAdBanner = "ca-app-pub-3940256099942544/6300978111"
-val testAdInterstitial = "ca-app-pub-3940256099942544/1033173712"
 
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()
@@ -50,21 +43,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "AD_UNIT_BANNER", "\"${secret("AD_UNIT_BANNER", testAdBanner)}\"")
-        buildConfigField(
-            "String",
-            "AD_UNIT_INTERSTITIAL",
-            "\"${secret("AD_UNIT_INTERSTITIAL", testAdInterstitial)}\"",
-        )
 
         // Play Console licensing key, used by PurchaseVerifier. Blank disables local
         // verification and falls back to trusting the Play Store's own response, which is
         // the right behaviour for a debug build with no Play Console behind it.
         buildConfigField("String", "PLAY_PUBLIC_KEY", "\"${secret("PLAY_PUBLIC_KEY")}\"")
 
-        // Injected as a resource rather than hardcoded in strings.xml so CI can supply the
-        // real application ID; the manifest reads @string/admob_app_id either way.
-        resValue("string", "admob_app_id", secret("ADMOB_APP_ID", testAdAppId))
     }
 
     signingConfigs {
@@ -151,7 +135,6 @@ dependencies {
     implementation(libs.androidx.fragment)
 
     implementation(libs.billing.ktx)
-    implementation(libs.play.services.ads)
     implementation(libs.health.connect)
 
     implementation(libs.mediapipe.tasks.vision)
