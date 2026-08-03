@@ -16,6 +16,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.squeeze.app.data.settings.SecuritySettings
+import com.squeeze.app.data.settings.UiSettings
+import androidx.compose.runtime.collectAsState
 import com.squeeze.app.ui.SqueezeApp
 import com.squeeze.app.ui.lock.LockScreen
 import com.squeeze.app.ui.theme.SqueezeTheme
@@ -50,6 +52,7 @@ import javax.inject.Inject
 class MainActivity : FragmentActivity() {
 
     @Inject lateinit var securitySettings: SecuritySettings
+    @Inject lateinit var uiSettings: UiSettings
 
     private var unlocked by mutableStateOf(false)
 
@@ -69,7 +72,11 @@ class MainActivity : FragmentActivity() {
         unlocked = !biometricsAvailable
 
         setContent {
-            SqueezeTheme {
+            // Read here rather than inside SqueezeApp so the lock screen — which renders
+            // before the main UI exists — already wears the user's chosen theme.
+            val themeMode by uiSettings.themeMode.collectAsState()
+
+            SqueezeTheme(themeMode = themeMode) {
                 if (unlocked) {
                     SqueezeApp()
                 } else {
