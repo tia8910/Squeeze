@@ -42,7 +42,7 @@ import com.squeeze.app.ui.theme.LocalIsDarkTheme
  * 1px difference between a 16 tile and a 15 row is what keeps a row from reading as a
  * tappable tile, and the values are kept distinct here for that reason.
  */
-object Squeeze {
+object SqueezeShape {
     val CardRadius = 24.dp
     val TileRadius = 16.dp
     val RowRadius = 15.dp
@@ -75,10 +75,10 @@ private fun iceFill(): Color = if (LocalIsDarkTheme.current) Brand.DarkIce else 
 @Composable
 fun BrandCard(
     modifier: Modifier = Modifier,
-    contentPadding: Dp = Squeeze.CardPadding,
+    contentPadding: Dp = SqueezeShape.CardPadding,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(Squeeze.CardRadius)
+    val shape = RoundedCornerShape(SqueezeShape.CardRadius)
 
     Column(
         modifier = modifier
@@ -110,7 +110,7 @@ fun StatTile(
     modifier: Modifier = Modifier,
     tinted: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(Squeeze.TileRadius)
+    val shape = RoundedCornerShape(SqueezeShape.TileRadius)
 
     Column(
         modifier = modifier
@@ -161,7 +161,7 @@ fun NoticePill(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Squeeze.RowRadius))
+            .clip(RoundedCornerShape(SqueezeShape.RowRadius))
             .background(iceFill())
             .padding(12.dp),
         contentAlignment = Alignment.Center,
@@ -195,7 +195,7 @@ fun PrimaryButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().height(52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(Squeeze.TileRadius),
+        shape = RoundedCornerShape(SqueezeShape.TileRadius),
         contentPadding = PaddingValues(),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.Transparent,
@@ -241,7 +241,7 @@ fun SecondaryButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().height(52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(Squeeze.TileRadius),
+        shape = RoundedCornerShape(SqueezeShape.TileRadius),
         border = BorderStroke(
             width = 1.5.dp,
             color = if (LocalIsDarkTheme.current) {
@@ -275,7 +275,7 @@ fun BrandRow(
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(Squeeze.RowRadius)
+    val shape = RoundedCornerShape(SqueezeShape.RowRadius)
 
     Row(
         modifier = modifier
