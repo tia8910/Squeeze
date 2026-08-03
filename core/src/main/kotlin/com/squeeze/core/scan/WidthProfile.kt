@@ -1,50 +1,68 @@
 package com.squeeze.core.scan
 
 /**
- * A body silhouette reduced to its width at every row of the image.
+ * A body silhouette reduced to per-row widths.
  *
- * This is what a segmentation mask becomes once the pixels stop mattering: for each row,
- * how wide the body is, as a fraction of image width. Reducing the mask to this before any
- * anatomy is inferred is what lets the hard part — deciding *where* the waist is — be
- * ordinary numeric code that can be tested against synthetic bodies, with no model, camera
- * or device involved.
+ * Two arrays, because a silhouette row does not have one meaningful width.
  *
- * @param widths one entry per image row, 0.0 where no body pixels were found
+ * At chest height a front-on person is not a single blob: there is a torso with an arm
+ * either side of it. Measuring leftmost-to-rightmost there returns the shoulder-and-arms
+ * span, which is roughly twice a chest diameter and produces a chest circumference no human
+ * has. At thigh height the same measurement spans both legs plus the gap between them.
+ *
+ * So [torsoWidths] holds the width of the run containing the body's midline — the torso
+ * alone, arms excluded whenever a gap separates them — and [legWidths] holds the width of a
+ * single leg. Anatomy is measured on whichever is actually the body part in question.
+ *
+ * @param torsoWidths central-run width per row, as a fraction of image width
+ * @param legWidths width of one leg per row, 0 where a single leg cannot be isolated
  * @param topRow first row containing the body, i.e. the crown of the head
  * @param bottomRow last row containing the body, normally the feet
  */
 data class WidthProfile(
-    val widths: DoubleArray,
+    val torsoWidths: DoubleArray,
+    val legWidths: DoubleArray,
     val topRow: Int,
     val bottomRow: Int,
 ) {
     init {
-        require(widths.isNotEmpty()) { "profile cannot be empty" }
-        require(topRow in widths.indices) { "topRow $topRow outside profile" }
-        require(bottomRow in widths.indices) { "bottomRow $bottomRow outside profile" }
+        require(torsoWidths.isNotEmpty()) { "profile cannot be empty" }
+        require(legWidths.size == torsoWidths.size) { "width arrays must be the same length" }
+        require(topRow in torsoWidths.indices) { "topRow $topRow outside profile" }
+        require(bottomRow in torsoWidths.indices) { "bottomRow $bottomRow outside profile" }
         require(topRow < bottomRow) { "topRow must be above bottomRow" }
     }
 
     /** How much of the frame the body occupies vertically; the basis of scale recovery. */
     val bodyHeightFraction: Double
-        get() = (bottomRow - topRow).toDouble() / widths.size.toDouble()
+        get() = (bottomRow - topRow).toDouble() / torsoWidths.size.toDouble()
 
-    fun widthAt(row: Int): Double = widths.getOrElse(row) { 0.0 }
+    fun torsoWidthAt(row: Int): Double = torsoWidths.getOrElse(row) { 0.0 }
 
-    fun heightFractionOf(row: Int): Double = row.toDouble() / widths.size.toDouble()
+    fun legWidthAt(row: Int): Double = legWidths.getOrElse(row) { 0.0 }
 
-    // Explicit equals/hashCode: the compiler-generated versions for a data class compare
-    // DoubleArray by identity, which would make two identical profiles unequal.
+    fun heightFractionOf(row: Int): Double = row.toDouble() / torsoWidths.size.toDouble()
+
+    // Explicit equals/hashCode: a data class compares DoubleArray by identity, which would
+    // make two identical profiles unequal.
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is WidthProfile) return false
         return topRow == other.topRow &&
             bottomRow == other.bottomRow &&
-            widths.contentEquals(other.widths)
+            torsoWidths.contentEquals(other.torsoWidths) &&
+            legWidths.contentEquals(other.legWidths)
     }
 
     override fun hashCode(): Int =
-        (widths.contentHashCode() * 31 + topRow) * 31 + bottomRow
+        ((torsoWidths.contentHashCode() * 31 + legWidths.contentHashCode()) * 31 + topRow) * 31 +
+            bottomRow
+
+    companion object {
+        /** Convenience for callers with no leg data, e.g. a side-on view. */
+        fun torsoOnly(widths: DoubleArray, topRow: Int, bottomRow: Int) =
+            WidthProfile(widths, DoubleArray(widths.size), topRow, bottomRow)
+    }
 }
 
 /**
@@ -52,8 +70,7 @@ data class WidthProfile(
  *
  * Only the anchors needed to bound an anatomical search are kept. The pose model is good at
  * locating joints and poor at locating soft-tissue landmarks like the natural waist, so it
- * is used to say roughly *where to look* and the silhouette is used to decide exactly where
- * the site is.
+ * says roughly *where to look* and the silhouette decides exactly where the site is.
  */
 data class PoseAnchors(
     val shoulderRow: Int,
@@ -75,33 +92,36 @@ data class PoseAnchors(
  * Each site is found by the geometric property that defines it, rather than by a fixed
  * fraction of height:
  *
- *  - **Neck** — the narrowest point between the chin and the shoulders.
- *  - **Waist** — the narrowest point between the shoulders and the hips. This is what
- *    "natural waist" means anatomically, and searching for it is far more robust than the
- *    common shortcut of taking a fixed proportion between two joints, which lands on the
- *    ribs for a long-torsoed person and on the hips for a short one.
- *  - **Hip** — the widest point at or below the hip joint, which is the gluteal maximum.
- *  - **Chest** — the widest point between the shoulders and the waist.
- *  - **Thigh** — the widest point just below the hip, where a thigh is conventionally taken.
- *
- * Every one of these is a search over the width profile, so they adapt to the individual
- * body rather than assuming average proportions.
+ *  - **Neck** — narrowest torso row between chin and shoulders.
+ *  - **Waist** — narrowest torso row between shoulders and hips. This is what "natural
+ *    waist" means anatomically, and searching for it is far more robust than the common
+ *    shortcut of taking a fixed proportion between two joints, which lands on the ribs for
+ *    a long-torsoed person and on the hips for a short one.
+ *  - **Hip** — widest torso row in the upper part of the hip-to-knee span.
+ *  - **Chest** — widest torso row between shoulders and waist.
+ *  - **Thigh** — widest *single-leg* row, below the hip band so the two cannot collide.
  */
 object AnatomicalLevelFinder {
 
-    /** Thigh measurement sits in the upper portion of the hip-to-knee span. */
-    private const val THIGH_BAND_START = 0.10
-    private const val THIGH_BAND_END = 0.35
+    /**
+     * Hip search stops before the thigh band starts.
+     *
+     * These bands previously overlapped, so the same widest row satisfied both and hip and
+     * thigh came back byte-identical — a bug visible in the app as two sites reporting the
+     * same centimetre value. Disjoint ranges make that impossible by construction.
+     */
+    private const val HIP_BAND_END = 0.18
 
-    /** Hip search continues below the hip joint far enough to include the gluteal maximum. */
-    private const val HIP_SEARCH_EXTENSION = 0.35
+    /** Thigh is measured below the gluteal fold, where the legs have genuinely separated. */
+    private const val THIGH_BAND_START = 0.28
+    private const val THIGH_BAND_END = 0.48
 
     /**
      * Finds every site the silhouette supports.
      *
-     * @return rows keyed by site. A site is absent when its search band is degenerate,
-     *   which happens on a badly cropped photo; callers must treat absence as "not
-     *   measured" rather than substituting a default.
+     * @return rows keyed by site. A site is absent when its search band is degenerate or
+     *   the relevant width is unavailable; callers must treat absence as "not measured"
+     *   rather than substituting a default.
      */
     fun detectSites(profile: WidthProfile, anchors: PoseAnchors): Map<ScanSite, Int> {
         val sites = mutableMapOf<ScanSite, Int>()
@@ -112,21 +132,23 @@ object AnatomicalLevelFinder {
         narrowestBetween(profile, anchors.shoulderRow, anchors.hipRow)
             ?.let { sites[ScanSite.WAIST] = it }
 
-        // Chest is above the waist, so it can only be searched once the waist is known.
+        // Chest sits above the waist, so it can only be searched once the waist is known.
         sites[ScanSite.WAIST]?.let { waistRow ->
             widestBetween(profile, anchors.shoulderRow, waistRow)
                 ?.let { sites[ScanSite.CHEST] = it }
         }
 
         val hipSpan = anchors.kneeRow - anchors.hipRow
-        val hipSearchEnd = anchors.hipRow + (hipSpan * HIP_SEARCH_EXTENSION).toInt()
-        widestBetween(profile, anchors.hipRow, hipSearchEnd)
+
+        widestBetween(profile, anchors.hipRow, anchors.hipRow + (hipSpan * HIP_BAND_END).toInt())
             ?.let { sites[ScanSite.HIP] = it }
 
-        val thighStart = anchors.hipRow + (hipSpan * THIGH_BAND_START).toInt()
-        val thighEnd = anchors.hipRow + (hipSpan * THIGH_BAND_END).toInt()
-        widestBetween(profile, thighStart, thighEnd)
-            ?.let { sites[ScanSite.THIGH] = it }
+        widestBetween(
+            profile = profile,
+            fromRow = anchors.hipRow + (hipSpan * THIGH_BAND_START).toInt(),
+            toRow = anchors.hipRow + (hipSpan * THIGH_BAND_END).toInt(),
+            useLegWidth = true,
+        )?.let { sites[ScanSite.THIGH] = it }
 
         return sites
     }
@@ -134,17 +156,22 @@ object AnatomicalLevelFinder {
     /**
      * Row with the smallest non-zero width in [fromRow, toRow].
      *
-     * Zero-width rows are skipped rather than winning the search: a gap in the mask is
-     * missing data, not an infinitely narrow waist. Ignoring this is how a segmentation
-     * hole becomes a 20 cm waist measurement.
+     * Zero-width rows are skipped rather than winning: a gap in the mask is missing data,
+     * not an infinitely narrow waist. Ignoring this is how a segmentation hole becomes a
+     * 20 cm waist measurement.
      */
-    fun narrowestBetween(profile: WidthProfile, fromRow: Int, toRow: Int): Int? {
+    fun narrowestBetween(
+        profile: WidthProfile,
+        fromRow: Int,
+        toRow: Int,
+        useLegWidth: Boolean = false,
+    ): Int? {
         val range = clampRange(profile, fromRow, toRow) ?: return null
 
         var bestRow: Int? = null
         var bestWidth = Double.MAX_VALUE
         for (row in range) {
-            val width = profile.widthAt(row)
+            val width = if (useLegWidth) profile.legWidthAt(row) else profile.torsoWidthAt(row)
             if (width > 0.0 && width < bestWidth) {
                 bestWidth = width
                 bestRow = row
@@ -154,13 +181,18 @@ object AnatomicalLevelFinder {
     }
 
     /** Row with the largest width in [fromRow, toRow]. */
-    fun widestBetween(profile: WidthProfile, fromRow: Int, toRow: Int): Int? {
+    fun widestBetween(
+        profile: WidthProfile,
+        fromRow: Int,
+        toRow: Int,
+        useLegWidth: Boolean = false,
+    ): Int? {
         val range = clampRange(profile, fromRow, toRow) ?: return null
 
         var bestRow: Int? = null
         var bestWidth = 0.0
         for (row in range) {
-            val width = profile.widthAt(row)
+            val width = if (useLegWidth) profile.legWidthAt(row) else profile.torsoWidthAt(row)
             if (width > bestWidth) {
                 bestWidth = width
                 bestRow = row
@@ -171,7 +203,7 @@ object AnatomicalLevelFinder {
 
     private fun clampRange(profile: WidthProfile, fromRow: Int, toRow: Int): IntRange? {
         val start = maxOf(fromRow, profile.topRow, 0)
-        val end = minOf(toRow, profile.bottomRow, profile.widths.lastIndex)
+        val end = minOf(toRow, profile.bottomRow, profile.torsoWidths.lastIndex)
         return if (start > end) null else start..end
     }
 }

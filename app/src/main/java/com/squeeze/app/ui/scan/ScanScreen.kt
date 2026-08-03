@@ -359,6 +359,12 @@ private fun FailureCard(failure: DetectionFailure) {
                         "Your outline could not be separated from the background. A plainer " +
                             "background and more even lighting will help."
 
+                    DetectionFailure.BodyCropped ->
+                        "Your head or feet are outside the frame. The scan uses your full " +
+                            "height to convert the photo into centimetres, so a cropped body " +
+                            "makes every measurement too large. Step back until you fit " +
+                            "entirely inside the guide."
+
                     DetectionFailure.PhotoUnreadable ->
                         "That photo could not be opened. Try picking it again, or choose a " +
                             "JPEG or PNG from your gallery."
@@ -445,6 +451,14 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
 
                                 is ScanWarning.MissingRequiredSite ->
                                     "Could not find your ${warning.site.name.lowercase()}."
+
+                                is ScanWarning.ImplausibleMeasurement ->
+                                    "Your ${warning.site.name.lowercase()} came out at " +
+                                        "%.0f cm, which is outside human range, so it was " +
+                                        "discarded rather than saved. Usually this means the " +
+                                        "outline picked up the background or your arms — try " +
+                                        "a plainer background with arms clear of your sides."
+                                            .format(warning.centimetres)
                             },
                             style = MaterialTheme.typography.bodySmall,
                         )

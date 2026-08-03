@@ -34,6 +34,16 @@ sealed interface DetectionFailure {
     /** The segmentation mask was too sparse to measure. */
     data object SegmentationFailed : DetectionFailure
 
+    /**
+     * Head or feet are outside the frame.
+     *
+     * Distinct from [BodyNotFullyVisible], which is about the subject being too small.
+     * This is the more dangerous case: a cropped body still fills the frame, so the scale
+     * step happily maps the user's full height onto whatever fraction of them is showing
+     * and inflates every circumference. It has to be caught before measurement, not after.
+     */
+    data object BodyCropped : DetectionFailure
+
     /** The picked file could not be decoded into an image at all. */
     data object PhotoUnreadable : DetectionFailure
 }
@@ -136,6 +146,10 @@ class BodyDetector @Inject constructor(
         val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
+        if (isCropped(poseResult)) {
+            return DetectionResult.Failure(DetectionFailure.BodyCropped)
+        }
+
         val anchors = buildAnchors(poseResult, maskHeight)
             ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
 
@@ -146,6 +160,27 @@ class BodyDetector @Inject constructor(
         }
 
         return DetectionResult.Success(DetectedBody(profile, anchors))
+    }
+
+    /**
+     * True when the head or the feet run past the edge of the frame.
+     *
+     * Pose landmarks are normalised, and the model happily extrapolates joints beyond 0..1
+     * when a limb leaves the picture. Those out-of-range values are the signal: if the
+     * ankles sit at or past the bottom edge, the feet were never in shot, and the height
+     * the scale depends on is not the height that was photographed.
+     */
+    private fun isCropped(result: PoseLandmarkerResult): Boolean {
+        val landmarks = result.landmarks().firstOrNull() ?: return true
+
+        fun y(index: Int): Float? = landmarks.getOrNull(index)?.y()
+
+        val head = y(LANDMARK_NOSE) ?: return true
+        val ankles = listOfNotNull(y(LANDMARK_ANKLE_LEFT), y(LANDMARK_ANKLE_RIGHT))
+        if (ankles.isEmpty()) return true
+
+        val lowest = ankles.max()
+        return head < EDGE_MARGIN || lowest > 1f - EDGE_MARGIN
     }
 
     /**
@@ -199,6 +234,10 @@ class BodyDetector @Inject constructor(
         const val MIN_BODY_HEIGHT_FRACTION = 0.4
 
         // MediaPipe pose landmark indices.
+        /** Fraction of the frame that must remain clear above the head and below the feet. */
+        const val EDGE_MARGIN = 0.02f
+
+        const val LANDMARK_NOSE = 0
         const val LANDMARK_MOUTH_LEFT = 9
         const val LANDMARK_MOUTH_RIGHT = 10
         const val LANDMARK_SHOULDER_LEFT = 11
@@ -207,5 +246,7 @@ class BodyDetector @Inject constructor(
         const val LANDMARK_HIP_RIGHT = 24
         const val LANDMARK_KNEE_LEFT = 25
         const val LANDMARK_KNEE_RIGHT = 26
+        const val LANDMARK_ANKLE_LEFT = 27
+        const val LANDMARK_ANKLE_RIGHT = 28
     }
 }

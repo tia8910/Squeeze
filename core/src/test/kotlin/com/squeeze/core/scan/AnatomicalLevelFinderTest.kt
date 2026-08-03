@@ -36,7 +36,7 @@ class AnatomicalLevelFinderTest {
         }
         for (row in 120..199) widths[row] = 0.16
 
-        return WidthProfile(widths, topRow = 0, bottomRow = 199)
+        return WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199)
     }
 
     private fun anchors() = PoseAnchors(
@@ -76,7 +76,7 @@ class AnatomicalLevelFinderTest {
         for (row in 100..199) widths[row] = 0.24
 
         val sites = AnatomicalLevelFinder.detectSites(
-            WidthProfile(widths, topRow = 0, bottomRow = 199),
+            WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199),
             anchors(),
         )
 
@@ -107,11 +107,11 @@ class AnatomicalLevelFinderTest {
     fun `a hole in the mask never wins the narrowest search`() {
         // Segmentation failures leave zero-width rows. Treating one as an infinitely narrow
         // waist would produce a confident, absurd measurement.
-        val widths = humanFigure().widths.copyOf()
+        val widths = humanFigure().torsoWidths.copyOf()
         widths[65] = 0.0
 
         val sites = AnatomicalLevelFinder.detectSites(
-            WidthProfile(widths, topRow = 0, bottomRow = 199),
+            WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199),
             anchors(),
         )
 
@@ -130,7 +130,7 @@ class AnatomicalLevelFinderTest {
     fun `search is clamped to the body rather than the frame`() {
         val widths = DoubleArray(200)
         for (row in 50..150) widths[row] = 0.20
-        val profile = WidthProfile(widths, topRow = 50, bottomRow = 150)
+        val profile = WidthProfile.torsoOnly(widths, topRow = 50, bottomRow = 150)
 
         // Asking above the body must not return an empty row from the padding.
         val found = AnatomicalLevelFinder.widestBetween(profile, 0, 100)
@@ -141,8 +141,8 @@ class AnatomicalLevelFinderTest {
     @Test
     fun `body height fraction reflects how much of the frame is filled`() {
         val widths = DoubleArray(200) { 0.2 }
-        assertEquals(0.5, WidthProfile(widths, 50, 150).bodyHeightFraction, 1e-9)
-        assertEquals(0.9, WidthProfile(widths, 10, 190).bodyHeightFraction, 1e-9)
+        assertEquals(0.5, WidthProfile.torsoOnly(widths, 50, 150).bodyHeightFraction, 1e-9)
+        assertEquals(0.9, WidthProfile.torsoOnly(widths, 10, 190).bodyHeightFraction, 1e-9)
     }
 
     @Test
@@ -163,8 +163,8 @@ class AnatomicalLevelFinderTest {
     fun `profiles with equal content compare equal`() {
         // DoubleArray defaults to identity comparison in a data class, which would silently
         // break any caching or equality check on a profile.
-        val a = WidthProfile(DoubleArray(10) { 0.2 }, 1, 8)
-        val b = WidthProfile(DoubleArray(10) { 0.2 }, 1, 8)
+        val a = WidthProfile.torsoOnly(DoubleArray(10) { 0.2 }, 1, 8)
+        val b = WidthProfile.torsoOnly(DoubleArray(10) { 0.2 }, 1, 8)
 
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
