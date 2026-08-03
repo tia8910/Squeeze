@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -17,12 +18,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.BuildConfig
+import com.squeeze.app.ui.brand.SqueezeMark
+import com.squeeze.app.ui.theme.ThemeMode
 import com.squeeze.core.model.Sex
 
 @Composable
 fun SettingsScreen(
     blockScreenshots: Boolean,
     onBlockScreenshotsChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     heightCm: Double?,
     birthYear: Int?,
     sex: Sex?,
@@ -42,6 +47,10 @@ fun SettingsScreen(
             sex = sex,
             onProfileChange = onProfileChange,
         )
+
+        Text("Appearance", style = MaterialTheme.typography.titleMedium)
+
+        ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
 
         Text("Privacy", style = MaterialTheme.typography.titleMedium)
 
@@ -75,11 +84,51 @@ fun SettingsScreen(
  * actually installed?" unanswerable — a question that has already cost a debugging round
  * on this project. The name carries the commit; the code carries the CI run.
  */
+/**
+ * Light, dark or follow the system.
+ *
+ * An explicit choice is offered rather than only tracking the system because this app is
+ * used in gyms and bathrooms at 6am — the places where a phone's automatic theme is least
+ * likely to match what the user actually wants to look at.
+ */
+@Composable
+private fun ThemeSection(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Theme", style = MaterialTheme.typography.titleSmall)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemeMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = themeMode == mode,
+                        onClick = { onThemeModeChange(mode) },
+                        label = {
+                            Text(
+                                when (mode) {
+                                    ThemeMode.SYSTEM -> "System"
+                                    ThemeMode.LIGHT -> "Light"
+                                    ThemeMode.DARK -> "Dark"
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AboutCard() {
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Squeeze ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SqueezeMark(size = 28.dp)
+                Text("Squeeze.fit ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
+            }
             Text(
                 text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
                     "under App info › Permissions.",

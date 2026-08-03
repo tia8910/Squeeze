@@ -1,6 +1,5 @@
 package com.squeeze.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
@@ -54,6 +53,11 @@ private val DarkChartPalette = ChartPalette(
     grid = Color(0x1FFFFFFF),
 )
 
+/**
+ * Reads the app's own dark-mode state rather than the system's, so an explicit Light or
+ * Dark choice in Settings repaints the charts too. Asking the system directly would leave
+ * dark chart colours on a light background for anyone who overrode the theme.
+ */
 val chartPalette: ChartPalette
     @Composable @ReadOnlyComposable
-    get() = if (isSystemInDarkTheme()) DarkChartPalette else LightChartPalette
+    get() = if (LocalIsDarkTheme.current) DarkChartPalette else LightChartPalette

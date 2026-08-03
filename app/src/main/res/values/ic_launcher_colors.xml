@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Matches the light theme primary in ui/theme/Theme.kt. -->
-    <color name="ic_launcher_background">#FF2E6B4F</color>
-</resources>

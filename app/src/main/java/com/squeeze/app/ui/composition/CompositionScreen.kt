@@ -147,7 +147,7 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     Card(
         modifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
         ),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -405,7 +405,7 @@ private fun TrendVerdictCard(latest: TrendPoint) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

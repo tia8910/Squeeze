@@ -8,6 +8,8 @@ import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.settings.SecuritySettings
+import com.squeeze.app.data.settings.UiSettings
+import com.squeeze.app.ui.theme.ThemeMode
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Profile
@@ -41,7 +43,15 @@ class SqueezeViewModel @Inject constructor(
     private val profileDao: ProfileDao,
     private val measurementDao: MeasurementDao,
     private val securitySettings: SecuritySettings,
+    private val uiSettings: UiSettings,
 ) : ViewModel() {
+
+    val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
+    val landingSeen: StateFlow<Boolean> = uiSettings.landingSeen
+
+    fun setThemeMode(mode: ThemeMode) = uiSettings.setThemeMode(mode)
+
+    fun markLandingSeen() = uiSettings.markLandingSeen()
 
     /** Whether FLAG_SECURE is applied; see [SecuritySettings.blockScreenshots]. */
     val blockScreenshots: StateFlow<Boolean> = securitySettings.blockScreenshots
