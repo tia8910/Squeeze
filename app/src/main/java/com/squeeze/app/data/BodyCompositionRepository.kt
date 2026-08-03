@@ -123,13 +123,18 @@ class BodyCompositionRepository @Inject constructor(
         BodyFatCalculator.navy(profile, entity.toCircumferences())?.let { navy ->
             // A photo-derived circumference set runs the same equation but scatters more,
             // because scale recovery adds error the tape does not have.
-            return if (entity.source == MeasurementSource.PHOTO.name) {
-                navy.copy(
+            return when (entity.source) {
+                MeasurementSource.PHOTO.name -> navy.copy(
                     method = EstimationMethod.PHOTO_SILHOUETTE,
                     standardErrorPercent = EstimationMethod.PHOTO_SILHOUETTE.standardErrorPercent,
                 )
-            } else {
-                navy
+
+                MeasurementSource.PHOTO_FRONT_ONLY.name -> navy.copy(
+                    method = EstimationMethod.PHOTO_FRONT_ONLY,
+                    standardErrorPercent = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent,
+                )
+
+                else -> navy
             }
         }
 
