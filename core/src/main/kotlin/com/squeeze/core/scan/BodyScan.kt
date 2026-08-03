@@ -22,10 +22,17 @@ enum class ScanSite {
         get() = this == NECK || this == WAIST || this == HIP
 }
 
-/** One measured level, before conversion to real units. */
+/**
+ * One measured level, before conversion to real units.
+ *
+ * @param depthAssumed true when no side photograph was taken and the sagittal depth came
+ *   from [DepthRatios] rather than from a measurement. Tracked per marker rather than per
+ *   scan because it changes what the number may be claimed to be.
+ */
 data class ScanMarker(
     val site: ScanSite,
     val slice: BodySlice,
+    val depthAssumed: Boolean = false,
 )
 
 /**
@@ -68,6 +75,13 @@ data class ScanResult(
     val circumferences: Circumferences,
     val warnings: List<ScanWarning>,
     val usableForBodyFat: Boolean,
+    /**
+     * True when depth was assumed rather than photographed.
+     *
+     * Carried out of the analyser so the estimate can be stored with the wider error a
+     * front-only scan deserves, and so the UI can say which kind of scan produced it.
+     */
+    val depthAssumed: Boolean = false,
 )
 
 /**
@@ -99,7 +113,9 @@ class BodyScanAnalyser(
         for (marker in markers) {
             val slice = marker.slice
 
-            if (CircumferenceEstimator.isLevelMismatched(
+            // Two views can disagree about where a level sits; one view cannot.
+            if (!marker.depthAssumed &&
+                CircumferenceEstimator.isLevelMismatched(
                     slice.frontHeightFraction,
                     slice.sideHeightFraction,
                 )
@@ -110,8 +126,10 @@ class BodyScanAnalyser(
             val frontCm = scale.widthToCm(slice.frontWidthFraction, imageAspectRatio)
             val sideCm = scale.widthToCm(slice.sideWidthFraction, imageAspectRatio)
 
+            // An assumed depth is derived from the width, so its eccentricity is fixed by
+            // construction and flagging it would only ever report our own constant back.
             val ratio = CircumferenceEstimator.eccentricityRatio(frontCm, sideCm)
-            if (ratio > MAX_PLAUSIBLE_RATIO) {
+            if (!marker.depthAssumed && ratio > MAX_PLAUSIBLE_RATIO) {
                 warnings += ScanWarning.ImplausibleShape(marker.site, ratio)
             }
 
@@ -156,6 +174,7 @@ class BodyScanAnalyser(
             ),
             warnings = warnings,
             usableForBodyFat = hasCore,
+            depthAssumed = markers.isNotEmpty() && markers.all { it.depthAssumed },
         )
     }
 
@@ -184,47 +203,78 @@ class BodyScanAnalyser(
 object AutomaticScanBuilder {
 
     /**
-     * @return markers for every site found in *both* views. A site detected in only one
-     *   photo is dropped: a circumference needs a width and a depth, and substituting a
-     *   guess for the missing axis would produce a number indistinguishable from a measured
-     *   one.
+     * @param sideProfile optional. When present the sagittal depth is measured; when absent
+     *   it is assumed from [DepthRatios] and every marker is flagged [ScanMarker.depthAssumed].
+     * @param backProfile optional. A back view supplies a second, independent coronal
+     *   measurement of the same body, so averaging it with the front reduces random error by
+     *   roughly root-two. It adds no depth information and cannot substitute for a side view.
+     * @return markers for every site the available views support. A site needing a width
+     *   that was not found is dropped rather than guessed.
      */
     fun build(
         frontProfile: WidthProfile,
         frontAnchors: PoseAnchors,
-        sideProfile: WidthProfile,
-        sideAnchors: PoseAnchors,
+        sideProfile: WidthProfile? = null,
+        sideAnchors: PoseAnchors? = null,
+        backProfile: WidthProfile? = null,
+        backAnchors: PoseAnchors? = null,
     ): List<ScanMarker> {
         val frontSites = AnatomicalLevelFinder.detectSites(frontProfile, frontAnchors)
-        val sideSites = AnatomicalLevelFinder.detectSites(sideProfile, sideAnchors)
+        val sideSites = if (sideProfile != null && sideAnchors != null) {
+            AnatomicalLevelFinder.detectSites(sideProfile, sideAnchors)
+        } else {
+            emptyMap()
+        }
+        val backSites = if (backProfile != null && backAnchors != null) {
+            AnatomicalLevelFinder.detectSites(backProfile, backAnchors)
+        } else {
+            emptyMap()
+        }
 
         return frontSites.mapNotNull { (site, frontRow) ->
-            val sideRow = sideSites[site] ?: return@mapNotNull null
-
-            // Thigh is measured on a single leg; every other site on the torso run. Using
-            // the full silhouette span for a thigh would measure both legs and the gap
-            // between them, and for a chest would measure shoulders-plus-arms.
             val useLeg = site == ScanSite.THIGH
-            val frontWidth =
-                if (useLeg) frontProfile.legWidthAt(frontRow) else frontProfile.torsoWidthAt(frontRow)
-            val sideWidth =
-                if (useLeg) sideProfile.legWidthAt(sideRow) else sideProfile.torsoWidthAt(sideRow)
-            if (frontWidth <= 0.0 || sideWidth <= 0.0) return@mapNotNull null
+
+            val frontWidth = frontProfile.widthFor(frontRow, useLeg)
+            if (frontWidth <= 0.0) return@mapNotNull null
+
+            // A back view measures the same axis as the front, so the two are averaged
+            // rather than treated as different quantities.
+            val coronalWidth = backSites[site]
+                ?.let { backProfile?.widthFor(it, useLeg) }
+                ?.takeIf { it > 0.0 }
+                ?.let { (frontWidth + it) / 2.0 }
+                ?: frontWidth
+
+            val sideRow = sideSites[site]
+            val measuredDepth = sideRow
+                ?.let { sideProfile?.widthFor(it, useLeg) }
+                ?.takeIf { it > 0.0 }
+
+            val depth = measuredDepth ?: DepthRatios.estimateDepth(site, coronalWidth)
 
             ScanMarker(
                 site = site,
                 slice = BodySlice(
-                    frontWidthFraction = frontWidth,
-                    sideWidthFraction = sideWidth,
-                    // Heights are normalised against each photo's own body span, so that a
-                    // level detected at the same point on the body compares equal even when
-                    // the subject was framed differently in the two shots.
+                    frontWidthFraction = coronalWidth,
+                    sideWidthFraction = depth,
+                    // Heights are normalised against each photo's own body span, so a level
+                    // detected at the same point on the body compares equal even when the
+                    // subject was framed differently between shots.
                     frontHeightFraction = relativeBodyHeight(frontProfile, frontRow),
-                    sideHeightFraction = relativeBodyHeight(sideProfile, sideRow),
+                    sideHeightFraction = if (measuredDepth != null && sideRow != null && sideProfile != null) {
+                        relativeBodyHeight(sideProfile, sideRow)
+                    } else {
+                        // No side view to disagree with, so the level trivially matches.
+                        relativeBodyHeight(frontProfile, frontRow)
+                    },
                 ),
+                depthAssumed = measuredDepth == null,
             )
         }
     }
+
+    private fun WidthProfile.widthFor(row: Int, useLeg: Boolean): Double =
+        if (useLeg) legWidthAt(row) else torsoWidthAt(row)
 
     /** Where a row sits along the body itself, 0.0 at the crown and 1.0 at the feet. */
     private fun relativeBodyHeight(profile: WidthProfile, row: Int): Double {

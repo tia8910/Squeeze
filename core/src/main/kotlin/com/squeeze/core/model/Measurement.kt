@@ -15,6 +15,9 @@ enum class MeasurementSource {
     /** Derived from silhouette extraction. Noise depends on scale recovery quality. */
     PHOTO,
 
+    /** Silhouette extraction from a front photograph alone, with depth assumed. */
+    PHOTO_FRONT_ONLY,
+
     /** Bioimpedance scale, imported via Health Connect. Highly hydration sensitive. */
     BIA_SCALE,
 
@@ -123,6 +126,17 @@ enum class EstimationMethod(
 
     /** Circumferences recovered from silhouette extraction, then fed to the Navy equation. */
     PHOTO_SILHOUETTE(4.0, 0.6, "Photo scan"),
+
+    /**
+     * A front photograph only, with sagittal depth assumed from population ratios.
+     *
+     * Accuracy is markedly worse than a two-photo scan, because the assumed depth is wrong
+     * for any individual. Repeatability is barely affected, because it is wrong by the same
+     * amount every time — which is why this is still worth offering: it tracks change
+     * almost as well while being far easier to capture, and personal calibration removes
+     * the constant offset entirely.
+     */
+    PHOTO_FRONT_ONLY(5.5, 0.7, "Photo scan (front only)"),
 
     /**
      * A directly entered DEXA/BodPod result. The most accurate input available, but

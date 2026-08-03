@@ -59,6 +59,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.scan.DetectionFailure
+import com.squeeze.core.scan.PostureFinding
+import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScanWarning
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -96,7 +98,15 @@ fun ScanScreen(
     LaunchedEffect(state.saved) { if (state.saved) onFinished() }
 
     when (state.step) {
-        ScanStep.FRONT, ScanStep.SIDE -> CaptureStep(
+        ScanStep.OPTIONAL_EXTRAS -> OptionalExtrasStep(
+            hasSide = state.hasSide,
+            hasBack = state.hasBack,
+            onMeasureNow = viewModel::measureNow,
+            onAddSide = viewModel::addSidePhoto,
+            onAddBack = viewModel::addBackPhoto,
+        )
+
+        ScanStep.FRONT, ScanStep.SIDE, ScanStep.BACK -> CaptureStep(
             step = state.step,
             failure = state.failure,
             profileMissing = state.profileMissing,
@@ -250,8 +260,15 @@ private fun CaptureStep(
                         },
                     ) {
                         Text(
-                            if (countdown > 0) "Get into position…"
-                            else if (step == ScanStep.FRONT) "Capture front" else "Capture side",
+                            if (countdown > 0) {
+                            "Get into position…"
+                        } else {
+                            when (step) {
+                                ScanStep.SIDE -> "Capture side"
+                                ScanStep.BACK -> "Capture back"
+                                else -> "Capture front"
+                            }
+                        },
                         )
                     }
 
@@ -271,7 +288,11 @@ private fun CaptureStep(
             ) {
                 Icon(Icons.Default.PhotoLibrary, contentDescription = null, Modifier.size(18.dp))
                 Text(
-                    text = if (step == ScanStep.FRONT) "Upload front photo" else "Upload side photo",
+                    text = when (step) {
+                        ScanStep.SIDE -> "Upload side photo"
+                        ScanStep.BACK -> "Upload back photo"
+                        else -> "Upload front photo"
+                    },
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -283,13 +304,18 @@ private fun CaptureStep(
 private fun StepCard(step: ScanStep) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Only the front photo is required, so the bar shows the required step as
+            // complete rather than implying two more are owed.
             LinearProgressIndicator(
-                progress = { if (step == ScanStep.FRONT) 0.5f else 1f },
+                progress = { if (step == ScanStep.FRONT) 0.34f else 1f },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = if (step == ScanStep.FRONT) "Step 1 of 2 — face the camera"
-                else "Step 2 of 2 — turn side-on",
+                text = when (step) {
+                    ScanStep.SIDE -> "Side view — turn side-on"
+                    ScanStep.BACK -> "Back view — turn around"
+                    else -> "Front view — face the camera"
+                },
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
@@ -405,6 +431,34 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
     ) {
         Text("Scan results", style = MaterialTheme.typography.headlineSmall)
 
+        if (result.depthAssumed) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
+                ),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Measured from the front photo", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        // The honest framing: worse absolute number, nearly the same ability
+                        // to detect change, because the assumption is a constant offset.
+                        text = "Depth was assumed rather than photographed, so the absolute " +
+                            "centimetres are less reliable than a two-photo scan. Because the " +
+                            "assumption is the same every time, tracking change is barely " +
+                            "affected — add a side photo when you want the numbers themselves " +
+                            "to be right.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+
+        ProportionsSection(state.proportions)
+        PostureSection(state.posture)
+
+        Text("Measurements", style = MaterialTheme.typography.titleSmall)
+
         val c = result.circumferences
         listOfNotNull(
             c.neckCm?.let { "Neck" to it },
@@ -495,3 +549,190 @@ private fun ImageProxy.decodeToBitmap(): Bitmap? {
 
 private val TIMER_OPTIONS = listOf(0, 5, 10, 15)
 private const val DEFAULT_TIMER_SECONDS = 10
+
+/**
+ * The decision point after the required photograph.
+ *
+ * A front view alone is enough to measure. The extras are offered with a plain statement of
+ * what each buys, because a user who does not know why a side photo helps will either skip
+ * it and wonder why the number is off, or take it and resent the extra step. Neither is
+ * necessary when the trade-off fits in a sentence.
+ */
+@Composable
+private fun OptionalExtrasStep(
+    hasSide: Boolean,
+    hasBack: Boolean,
+    onMeasureNow: () -> Unit,
+    onAddSide: () -> Unit,
+    onAddBack: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text("Front photo captured", style = MaterialTheme.typography.headlineSmall)
+
+        Text(
+            text = "That is enough to measure. The extra views below improve accuracy, but " +
+                "neither is required.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Button(onClick = onMeasureNow, modifier = Modifier.fillMaxWidth()) {
+            Text("Measure now")
+        }
+
+        ExtraOption(
+            title = "Add a side photo",
+            captured = hasSide,
+            detail = "A front view shows how wide you are but not how deep. Without a side " +
+                "view the depth is assumed from population averages — which is a fixed " +
+                "offset, so it barely affects tracking change, but it does shift the " +
+                "absolute number.",
+            onClick = onAddSide,
+        )
+
+        ExtraOption(
+            title = "Add a back photo",
+            captured = hasBack,
+            detail = "Measures the same width as the front from the other side, and the two " +
+                "are averaged. A small precision gain — worth it if you are chasing a " +
+                "reliable trend, skippable otherwise.",
+            onClick = onAddBack,
+        )
+    }
+}
+
+@Composable
+private fun ExtraOption(
+    title: String,
+    captured: Boolean,
+    detail: String,
+    onClick: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                if (captured) {
+                    Text(
+                        text = "Captured",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+                Text(if (captured) "Retake" else "Add photo")
+            }
+        }
+    }
+}
+
+/**
+ * Ratios, shown above the raw centimetres.
+ *
+ * A ratio divides two measurements taken from one photograph at one scale, so the scale
+ * error cancels out. That makes these more trustworthy than the numbers they are computed
+ * from, and worth more prominence than a footnote.
+ */
+@Composable
+private fun ProportionsSection(proportions: List<Proportion>) {
+    if (proportions.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Proportions", style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = "These divide one measurement by another from the same photo, so they " +
+                "stay right even if the scale is slightly off.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        proportions.forEach { proportion ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = if (proportion.flagged) {
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
+                    )
+                } else {
+                    CardDefaults.cardColors()
+                },
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(proportion.name, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "%.2f".format(proportion.value),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                    Text(
+                        text = proportion.interpretation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Shoulder and hip alignment, read from landmarks the scan produced anyway. */
+@Composable
+private fun PostureSection(findings: List<PostureFinding>) {
+    if (findings.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Alignment", style = MaterialTheme.typography.titleSmall)
+        Text(
+            // The caveat is not optional. One photograph cannot separate a real asymmetry
+            // from how someone happened to stand, and saying so prevents a false alarm.
+            text = "From one photo, so treat a single reading lightly — how you stood can " +
+                "produce a tilt on its own. What matters is whether it repeats.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        findings.forEach { finding ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(finding.name, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "%.1f°".format(kotlin.math.abs(finding.degrees)),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                    Text(
+                        text = finding.interpretation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}

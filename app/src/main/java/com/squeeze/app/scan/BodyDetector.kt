@@ -8,7 +8,9 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.imagesegmenter.ImageSegmenter
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
+import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.PoseAnchors
+import com.squeeze.core.scan.PosePoint
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
 import javax.inject.Inject
@@ -18,6 +20,14 @@ import javax.inject.Singleton
 data class DetectedBody(
     val profile: WidthProfile,
     val anchors: PoseAnchors,
+    /**
+     * Landmark positions for posture analysis.
+     *
+     * The pose model runs anyway to bound the anatomical searches, and its shoulder and hip
+     * coordinates were being discarded. Keeping them costs nothing and yields something a
+     * tape cannot give: whether the two sides sit level.
+     */
+    val geometry: FrontPoseGeometry? = null,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -159,7 +169,26 @@ class BodyDetector @Inject constructor(
             return DetectionResult.Failure(DetectionFailure.BodyNotFullyVisible)
         }
 
-        return DetectionResult.Success(DetectedBody(profile, anchors))
+        return DetectionResult.Success(
+            DetectedBody(profile, anchors, buildGeometry(poseResult)),
+        )
+    }
+
+    /** Normalised landmark coordinates, or null when the pose is too incomplete to use. */
+    private fun buildGeometry(result: PoseLandmarkerResult): FrontPoseGeometry? {
+        val landmarks = result.landmarks().firstOrNull() ?: return null
+
+        fun point(index: Int): PosePoint? = landmarks.getOrNull(index)
+            ?.let { PosePoint(it.x().toDouble(), it.y().toDouble()) }
+
+        return FrontPoseGeometry(
+            shoulderLeft = point(LANDMARK_SHOULDER_LEFT) ?: return null,
+            shoulderRight = point(LANDMARK_SHOULDER_RIGHT) ?: return null,
+            hipLeft = point(LANDMARK_HIP_LEFT) ?: return null,
+            hipRight = point(LANDMARK_HIP_RIGHT) ?: return null,
+            ankleLeft = point(LANDMARK_ANKLE_LEFT),
+            ankleRight = point(LANDMARK_ANKLE_RIGHT),
+        )
     }
 
     /**

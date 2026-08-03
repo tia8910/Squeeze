@@ -208,12 +208,12 @@ class BodyScanAnalyserTest {
 
 class AutomaticScanBuilderTest {
 
-    private fun figure(waistRow: Int): WidthProfile {
+    private fun figure(waistRow: Int, waistWidth: Double = 0.15): WidthProfile {
         val widths = DoubleArray(200)
         for (row in 0..19) widths[row] = 0.10
         for (row in 20..29) widths[row] = 0.06
         for (row in 30..99) widths[row] = 0.26
-        widths[waistRow] = 0.15
+        widths[waistRow] = waistWidth
         for (row in 100..119) widths[row] = 0.24
         widths[110] = 0.28
         for (row in 120..199) widths[row] = 0.16
@@ -251,8 +251,10 @@ class AutomaticScanBuilderTest {
     }
 
     @Test
-    fun `a site found in only one view is dropped`() {
-        // Side profile cropped above the hips: no hip site can be found there.
+    fun `a site missing from the side view falls back to an assumed depth`() {
+        // Side profile cropped above the hips, so no hip can be found there. Dropping the
+        // hip would lose a measurement the front photo genuinely supports; the fallback
+        // keeps it and marks it as assumed so it is never presented as measured.
         val croppedWidths = DoubleArray(200)
         for (row in 20..29) croppedWidths[row] = 0.06
         for (row in 30..90) croppedWidths[row] = 0.26
@@ -264,10 +266,42 @@ class AutomaticScanBuilderTest {
             sideProfile = cropped, sideAnchors = anchors(),
         )
 
-        assertTrue(
-            markers.none { it.site == ScanSite.HIP },
-            "a circumference needs both axes; a half-measured site must not be emitted",
+        val hip = markers.firstOrNull { it.site == ScanSite.HIP }
+        assertNotNull(hip)
+        assertTrue(hip.depthAssumed, "a depth that was not photographed must say so")
+        assertTrue(hip.slice.sideWidthFraction > 0.0)
+    }
+
+    @Test
+    fun `a front-only scan measures every site the front photo supports`() {
+        // The side photo is optional. Without one, depth comes from DepthRatios and every
+        // marker is flagged, but the user still gets a usable set of measurements.
+        val markers = AutomaticScanBuilder.build(
+            frontProfile = figure(80),
+            frontAnchors = anchors(),
         )
+
+        assertTrue(markers.isNotEmpty())
+        assertTrue(markers.all { it.depthAssumed })
+        assertTrue(markers.any { it.site == ScanSite.WAIST })
+    }
+
+    @Test
+    fun `a back photo is averaged with the front rather than treated as depth`() {
+        // A back view measures the same axis as the front. Averaging the two halves the
+        // random error; treating it as a depth would invent a measurement.
+        val wider = figure(80, waistWidth = 0.19)
+
+        val frontOnly = AutomaticScanBuilder.build(figure(80), anchors())
+            .first { it.site == ScanSite.WAIST }
+        val withBack = AutomaticScanBuilder.build(
+            frontProfile = figure(80), frontAnchors = anchors(),
+            backProfile = wider, backAnchors = anchors(),
+        ).first { it.site == ScanSite.WAIST }
+
+        assertEquals(0.15, frontOnly.slice.frontWidthFraction, 1e-9)
+        assertEquals((0.15 + 0.19) / 2.0, withBack.slice.frontWidthFraction, 1e-9)
+        assertTrue(withBack.depthAssumed, "a back view supplies no depth")
     }
 
     @Test
