@@ -217,7 +217,7 @@ class AutomaticScanBuilderTest {
         for (row in 100..119) widths[row] = 0.24
         widths[110] = 0.28
         for (row in 120..199) widths[row] = 0.16
-        return WidthProfile(widths, topRow = 0, bottomRow = 199)
+        return WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199)
     }
 
     private fun anchors() = PoseAnchors(chinRow = 18, shoulderRow = 35, hipRow = 100, kneeRow = 160)
@@ -257,7 +257,7 @@ class AutomaticScanBuilderTest {
         for (row in 20..29) croppedWidths[row] = 0.06
         for (row in 30..90) croppedWidths[row] = 0.26
         croppedWidths[80] = 0.15
-        val cropped = WidthProfile(croppedWidths, topRow = 20, bottomRow = 90)
+        val cropped = WidthProfile.torsoOnly(croppedWidths, topRow = 20, bottomRow = 90)
 
         val markers = AutomaticScanBuilder.build(
             frontProfile = figure(80), frontAnchors = anchors(),
@@ -282,7 +282,7 @@ class AutomaticScanBuilderTest {
         for (row in 35..99) sideWidths[row] = 0.26
         sideWidths[80] = 0.15
         for (row in 100..114) sideWidths[row] = 0.24
-        val side = WidthProfile(sideWidths, topRow = 25, bottomRow = 190)
+        val side = WidthProfile.torsoOnly(sideWidths, topRow = 25, bottomRow = 190)
 
         val markers = AutomaticScanBuilder.build(front, anchors(), side, anchors())
         val waist = markers.firstOrNull { it.site == ScanSite.WAIST }

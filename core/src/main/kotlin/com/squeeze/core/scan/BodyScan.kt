@@ -47,6 +47,14 @@ sealed interface ScanWarning {
 
     /** A site needed for a body-fat estimate was not marked. */
     data class MissingRequiredSite(val site: ScanSite) : ScanWarning
+
+    /**
+     * A measurement fell outside human limits and was discarded.
+     *
+     * Carried rather than swallowed so the user learns the scan went wrong and why, instead
+     * of seeing a shorter list of results and assuming the rest are sound.
+     */
+    data class ImplausibleMeasurement(val site: ScanSite, val centimetres: Double) : ScanWarning
 }
 
 /**
@@ -107,7 +115,24 @@ class BodyScanAnalyser(
                 warnings += ScanWarning.ImplausibleShape(marker.site, ratio)
             }
 
-            measured[marker.site] = CircumferenceEstimator.circumference(frontCm, sideCm)
+            val circumference = CircumferenceEstimator.circumference(frontCm, sideCm)
+
+            // Discarded, not clamped. A value outside human limits is not a slightly-wrong
+            // measurement to be nudged back into range — it is evidence the site was
+            // mis-located, and the honest thing is to have no number rather than a
+            // plausible-looking one.
+            if (PlausibleRanges.isPlausible(marker.site, circumference)) {
+                measured[marker.site] = circumference
+            } else {
+                warnings += ScanWarning.ImplausibleMeasurement(marker.site, circumference)
+            }
+        }
+
+        // Individually-legal numbers can still be collectively impossible; a chest narrower
+        // than the neck above it means the search landed on the wrong rows.
+        PlausibleRanges.inconsistentSites(measured).forEach { site ->
+            measured[site]?.let { warnings += ScanWarning.ImplausibleMeasurement(site, it) }
+            measured.remove(site)
         }
 
         val missingRequired = ScanSite.entries
@@ -176,8 +201,14 @@ object AutomaticScanBuilder {
         return frontSites.mapNotNull { (site, frontRow) ->
             val sideRow = sideSites[site] ?: return@mapNotNull null
 
-            val frontWidth = frontProfile.widthAt(frontRow)
-            val sideWidth = sideProfile.widthAt(sideRow)
+            // Thigh is measured on a single leg; every other site on the torso run. Using
+            // the full silhouette span for a thigh would measure both legs and the gap
+            // between them, and for a chest would measure shoulders-plus-arms.
+            val useLeg = site == ScanSite.THIGH
+            val frontWidth =
+                if (useLeg) frontProfile.legWidthAt(frontRow) else frontProfile.torsoWidthAt(frontRow)
+            val sideWidth =
+                if (useLeg) sideProfile.legWidthAt(sideRow) else sideProfile.torsoWidthAt(sideRow)
             if (frontWidth <= 0.0 || sideWidth <= 0.0) return@mapNotNull null
 
             ScanMarker(

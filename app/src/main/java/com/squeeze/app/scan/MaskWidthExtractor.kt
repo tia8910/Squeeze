@@ -3,33 +3,49 @@ package com.squeeze.app.scan
 import com.google.mediapipe.framework.image.ByteBufferExtractor
 import com.google.mediapipe.framework.image.MPImage
 import com.squeeze.core.scan.WidthProfile
+import java.nio.ByteBuffer
+
+/** A horizontal stretch of subject pixels in one row. */
+private data class Run(val start: Int, val end: Int) {
+    val width: Int get() = end - start + 1
+    val centre: Int get() = (start + end) / 2
+}
 
 /**
- * Reduces a segmentation mask to a per-row width profile.
+ * Reduces a segmentation mask to per-row torso and leg widths.
  *
- * The mask is scanned row by row for the span between the leftmost and rightmost body
- * pixels. Using the span rather than a pixel count is deliberate: a count would shrink
- * whenever the mask has interior holes, which segmentation models produce routinely around
- * dark clothing, and the resulting narrow row would be indistinguishable from a genuine
- * waist. A span is unaffected by holes as long as the outline survives.
+ * The naive reading of a mask row — leftmost subject pixel to rightmost — is wrong for a
+ * human body, and wrong in a way that looks like data. A front-on person at chest height is
+ * three separate runs: arm, torso, arm. Measuring the full span there returns the
+ * shoulder-and-arms width, which is close to twice a chest diameter and yields a chest
+ * circumference no human has. At thigh height the same span covers both legs and the air
+ * between them.
  *
- * Once this returns, everything downstream is plain arithmetic on numbers, which is why the
- * anatomy logic lives in `:core` and is unit tested there.
+ * So each row is decomposed into runs, and two widths are taken from it:
+ *
+ *  - **torso**: the run containing the body's vertical midline, so arms are excluded
+ *    whenever a gap separates them from the trunk
+ *  - **leg**: the widest run that is not the torso run, on either side of the midline,
+ *    which below the hips is a single leg
+ *
+ * Interior holes still matter — segmenters routinely punch them through dark clothing — so
+ * runs separated by less than [MAX_HOLE_PIXELS] are merged before anything is measured.
  */
 object MaskWidthExtractor {
 
-    /**
-     * Rows with fewer than this many body pixels are treated as noise rather than body.
-     * Stray positives around the edge of a mask are common and would otherwise stretch the
-     * detected body height, corrupting the scale for every measurement.
-     */
+    /** Rows with fewer subject pixels than this are noise, not body. */
     private const val MIN_ROW_PIXELS = 3
 
-    /**
-     * At least this fraction of rows must contain body for the mask to be usable.
-     * A near-empty mask means the segmenter found nothing worth measuring.
-     */
+    /** At least this fraction of rows must contain body for the mask to be usable. */
     private const val MIN_BODY_ROWS_FRACTION = 0.15
+
+    /**
+     * Gaps narrower than this are treated as mask defects and bridged.
+     *
+     * A hole in the middle of a torso would otherwise split it into two runs, and the
+     * midline run would then be half a torso — a narrower, entirely believable, wrong waist.
+     */
+    private const val MAX_HOLE_PIXELS = 6
 
     /**
      * @param mask category mask, one byte per pixel
@@ -41,59 +57,129 @@ object MaskWidthExtractor {
         val buffer = ByteBufferExtractor.extract(mask)
 
         // Which byte value means "person" is decided from the image, not assumed. The
-        // category-mask convention for single-class models is not something to bet the
-        // whole pipeline on: guess wrong and the extractor traces the background, which
-        // yields a full-frame "body" and a garbage scale. The corners of a framed
-        // full-body photo are background almost by definition, so whichever value
-        // dominates the corners is background and the other value is the subject.
+        // corners of a framed full-body photo are background almost by definition, so
+        // whichever value dominates them is background and the other is the subject.
+        // Guessing wrong would trace the background as a full-frame body.
         val subjectIsNonZero = cornersAreMostlyZero(buffer, width, height)
 
-        val widths = DoubleArray(height)
-
+        val rowRuns = arrayOfNulls<List<Run>>(height)
         var topRow = -1
         var bottomRow = -1
         var populatedRows = 0
 
         for (row in 0 until height) {
-            val rowStart = row * width
+            val runs = runsInRow(buffer, row, width, subjectIsNonZero)
+            val pixels = runs.sumOf { it.width }
+            if (pixels < MIN_ROW_PIXELS) continue
 
-            var first = -1
-            var last = -1
-            var count = 0
-
-            for (column in 0 until width) {
-                val index = rowStart + column
-                if (index >= buffer.limit()) break
-
-                val isSubject = (buffer.get(index).toInt() != 0) == subjectIsNonZero
-                if (isSubject) {
-                    if (first < 0) first = column
-                    last = column
-                    count++
-                }
-            }
-
-            if (count >= MIN_ROW_PIXELS && first >= 0) {
-                // Span, not count: interior holes must not narrow the measurement.
-                widths[row] = (last - first + 1).toDouble() / width.toDouble()
-                if (topRow < 0) topRow = row
-                bottomRow = row
-                populatedRows++
-            }
+            rowRuns[row] = runs
+            if (topRow < 0) topRow = row
+            bottomRow = row
+            populatedRows++
         }
 
         if (topRow < 0 || bottomRow <= topRow) return null
         if (populatedRows < height * MIN_BODY_ROWS_FRACTION) return null
 
-        return WidthProfile(widths = widths, topRow = topRow, bottomRow = bottomRow)
+        // The midline is taken from the shoulders-to-hips band rather than the whole body,
+        // because arms and stance skew a whole-body centroid sideways.
+        val midlineX = estimateMidline(rowRuns, topRow, bottomRow, width)
+
+        val torsoWidths = DoubleArray(height)
+        val legWidths = DoubleArray(height)
+
+        for (row in topRow..bottomRow) {
+            val runs = rowRuns[row] ?: continue
+
+            val torso = runs.minByOrNull { distanceToRun(it, midlineX) }
+            if (torso != null) {
+                torsoWidths[row] = torso.width.toDouble() / width.toDouble()
+            }
+
+            runs.filter { it !== torso }
+                .maxByOrNull { it.width }
+                ?.let { legWidths[row] = it.width.toDouble() / width.toDouble() }
+
+            // Below the hips the legs usually touch, leaving one run for both. Halving it
+            // approximates a single leg, which is far closer than counting the pair — and
+            // the plausibility gate rejects the result if that approximation breaks down.
+            if (legWidths[row] == 0.0 && torso != null && torso.width > 0) {
+                legWidths[row] = torso.width.toDouble() / (2.0 * width.toDouble())
+            }
+        }
+
+        return WidthProfile(
+            torsoWidths = torsoWidths,
+            legWidths = legWidths,
+            topRow = topRow,
+            bottomRow = bottomRow,
+        )
+    }
+
+    private fun runsInRow(
+        buffer: ByteBuffer,
+        row: Int,
+        width: Int,
+        subjectIsNonZero: Boolean,
+    ): List<Run> {
+        val runs = mutableListOf<Run>()
+        val rowStart = row * width
+
+        var runStart = -1
+        for (column in 0 until width) {
+            val index = rowStart + column
+            if (index >= buffer.limit()) break
+
+            val isSubject = (buffer.get(index).toInt() != 0) == subjectIsNonZero
+            if (isSubject) {
+                if (runStart < 0) runStart = column
+            } else if (runStart >= 0) {
+                runs += Run(runStart, column - 1)
+                runStart = -1
+            }
+        }
+        if (runStart >= 0) runs += Run(runStart, width - 1)
+
+        return mergeSmallGaps(runs)
+    }
+
+    private fun mergeSmallGaps(runs: List<Run>): List<Run> {
+        if (runs.size < 2) return runs
+
+        val merged = mutableListOf(runs.first())
+        for (run in runs.drop(1)) {
+            val last = merged.last()
+            if (run.start - last.end - 1 <= MAX_HOLE_PIXELS) {
+                merged[merged.lastIndex] = Run(last.start, run.end)
+            } else {
+                merged += run
+            }
+        }
+        return merged
+    }
+
+    /** Median centre of the widest run in each row, which tracks the trunk. */
+    private fun estimateMidline(
+        rowRuns: Array<List<Run>?>,
+        topRow: Int,
+        bottomRow: Int,
+        width: Int,
+    ): Int {
+        val centres = (topRow..bottomRow)
+            .mapNotNull { rowRuns[it]?.maxByOrNull { run -> run.width }?.centre }
+            .sorted()
+
+        return if (centres.isEmpty()) width / 2 else centres[centres.size / 2]
+    }
+
+    private fun distanceToRun(run: Run, x: Int): Int = when {
+        x < run.start -> run.start - x
+        x > run.end -> x - run.end
+        else -> 0
     }
 
     /** Samples a small square in each corner and reports whether zero dominates there. */
-    private fun cornersAreMostlyZero(
-        buffer: java.nio.ByteBuffer,
-        width: Int,
-        height: Int,
-    ): Boolean {
+    private fun cornersAreMostlyZero(buffer: ByteBuffer, width: Int, height: Int): Boolean {
         val patch = (minOf(width, height) / 16).coerceIn(2, 24)
         var zero = 0
         var total = 0

@@ -253,6 +253,9 @@ private fun HeroEstimate(
             // colour is allowed to be loud, because it is the same hue that identifies
             // body fat in the chart below — the card and the line read as one thing.
             Modifier
+                // fillMaxWidth before background: a Column wraps its content, so without it
+                // the wash only paints as far as the widest child and stops mid-card.
+                .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
                         0f to accent.copy(alpha = 0.28f),
