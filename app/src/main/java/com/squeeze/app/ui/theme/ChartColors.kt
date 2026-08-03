@@ -7,18 +7,20 @@ import androidx.compose.ui.graphics.Color
 /**
  * Colours for data marks.
  *
- * Deliberately fixed rather than drawn from the Material You dynamic scheme that themes the
- * rest of the app. A data colour identifies a quantity, so it has to mean the same thing
- * every time it appears; letting it follow the user's wallpaper would repaint body fat a
- * different hue on someone else's phone and break that association for no benefit.
+ * Deliberately fixed rather than drawn from a Material You dynamic scheme. A data colour
+ * identifies a quantity, so it has to mean the same thing every time it appears; letting it
+ * follow the user's wallpaper would repaint body fat a different hue on someone else's phone
+ * and break that association for no benefit.
  *
- * Light and dark are separately chosen steps rather than one set flipped, and both were
- * checked against the accessibility criteria that matter for marks: lightness band, chroma
- * floor (so nothing reads as grey), separation under deuteranopia and tritanopia, normal
- * vision separation, and at least 3:1 contrast against the chart surface.
+ * Body fat takes the brand blue, because it is the number the app is about and blue is what
+ * means "this is the data" everywhere else in the UI. Lean mass takes navy. Those two are
+ * close in hue and are still safely distinguishable, because they differ sharply in
+ * *lightness* — and lightness contrast survives every form of colour vision deficiency,
+ * where hue contrast does not.
  *
- * Colour is never the only channel carrying identity here — each series is directly
- * labelled and lives in its own chart — so the palette is reinforcement, not the message.
+ * The separation matters less here than it would elsewhere in any case: body fat and lean
+ * mass are never drawn on the same axis, each chart carries a single series, and each is
+ * directly titled. Colour is reinforcement, not the message.
  */
 data class ChartPalette(
     /** Body fat percentage. */
@@ -36,17 +38,17 @@ data class ChartPalette(
 )
 
 private val LightChartPalette = ChartPalette(
-    bodyFat = Color(0xFF0F8A72),
-    leanMass = Color(0xFF6A4FC4),
+    bodyFat = Brand.Blue,
+    leanMass = Brand.Navy,
     weight = Color(0xFFB35A2C),
     bandAlpha = 0.16f,
     rawMark = Color(0x593C3C3C),
-    grid = Color(0x1A000000),
+    grid = Color(0x14081C45),
 )
 
 private val DarkChartPalette = ChartPalette(
-    bodyFat = Color(0xFF12A78A),
-    leanMass = Color(0xFF8A6BEA),
+    bodyFat = Brand.DarkBlue,
+    leanMass = Color(0xFF9FB6DE),
     weight = Color(0xFFD2703C),
     bandAlpha = 0.22f,
     rawMark = Color(0x59D6D6D6),

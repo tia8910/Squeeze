@@ -1,199 +1,177 @@
 package com.squeeze.app.ui.landing
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.squeeze.app.ui.brand.FeatureGlyph
+import com.squeeze.app.ui.brand.FeatureIcon
 import com.squeeze.app.ui.brand.SqueezeLockup
-import com.squeeze.app.ui.components.AuroraScaffoldBackground
+import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.app.ui.theme.Brand
-import kotlinx.coroutines.delay
+import com.squeeze.app.ui.theme.LocalIsDarkTheme
 
-/** One rotating claim. Each is something the app actually does, not a slogan. */
-private data class Pitch(val headline: String, val detail: String)
+/** The brand sheet's four feature cards, in its order. */
+private data class Feature(
+    val glyph: FeatureGlyph,
+    val title: String,
+    val detail: String,
+)
 
-private val pitches = listOf(
-    Pitch(
-        headline = "Measures what's real",
-        detail = "Separates genuine change from measurement noise, and stays quiet until " +
-            "the data actually supports a verdict.",
+private val features = listOf(
+    Feature(
+        glyph = FeatureGlyph.SMART_SCAN,
+        title = "Smart Scan",
+        detail = "Quick body tracking from one clean flow.",
     ),
-    Pitch(
-        headline = "Scans from two photos",
-        detail = "Finds your waist, neck, hips and chest automatically — on this device, " +
-            "with models that ship inside the app.",
+    Feature(
+        glyph = FeatureGlyph.TRACK_TRENDS,
+        title = "Track Trends",
+        detail = "Clear progress insights over time.",
     ),
-    Pitch(
-        headline = "Nothing leaves your phone",
-        detail = "No internet permission at all. Not a promise in a policy — a permission " +
-            "the system enforces and you can verify.",
+    Feature(
+        glyph = FeatureGlyph.STAY_MOTIVATED,
+        title = "Stay Motivated",
+        detail = "Celebrate consistency and wins.",
     ),
-    Pitch(
-        headline = "Training that listens",
-        detail = "Your programme adapts to what your composition is doing, not just to " +
-            "what you lifted last week.",
+    Feature(
+        glyph = FeatureGlyph.PRIVACY_FIRST,
+        title = "Privacy First",
+        detail = "Your body data stays yours.",
     ),
 )
 
 /**
- * First-run landing screen.
+ * First-run landing screen, laid out as the brand sheet's hero panel.
  *
- * The logo animates its own meaning on entry — arcs closing to a waist, then the
- * measurement line landing — so the first two seconds explain the product without a word
- * of copy. Claims then rotate on a timer, each one something the app genuinely does.
+ * The mark animates its own meaning on entry — the figure appears, then the squeeze bands
+ * sweep across it — so the first second explains the name without a word of copy.
  *
  * This is the only screen that gets to be loud. Everywhere else the data is the subject.
  */
 @Composable
 fun LandingScreen(onGetStarted: () -> Unit) {
-    val markProgress = remember { Animatable(0f) }
+    val squeeze = remember { Animatable(0f) }
     val contentAlpha = remember { Animatable(0f) }
-    var pitchIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
-        // The squeeze happens first and alone; copy arrives once the gesture has landed.
-        markProgress.animateTo(1f, tween(1400, easing = FastOutSlowInEasing))
+        squeeze.animateTo(1f, tween(1100, easing = FastOutSlowInEasing))
         contentAlpha.animateTo(1f, tween(600))
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(4200)
-            pitchIndex = (pitchIndex + 1) % pitches.size
-        }
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 36.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(12.dp))
 
-    AuroraScaffoldBackground(intensity = 1f) {
+        SqueezeLockup(markSize = 92.dp, squeeze = squeeze.value)
+
+        Spacer(Modifier.height(28.dp))
+
+        Text(
+            text = "Body composition built around controlled effort: squeeze, measure, " +
+                "improve. Everything is worked out on this phone and stays there.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Body,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.alpha(contentAlpha.value),
+        )
+
+        Spacer(Modifier.height(30.dp))
+
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 40.dp),
+            modifier = Modifier.fillMaxWidth().alpha(contentAlpha.value),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Two rows of two. The sheet's four-across grid is a desktop layout; at phone
+            // width its own breakpoint drops to two columns, which is what is used here.
+            features.chunked(2).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    pair.forEach { FeatureCard(it) }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(36.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth().alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.weight(0.9f))
+            PrimaryButton(text = "Start tracking", onClick = onGetStarted)
 
-            SqueezeLockup(markSize = 104.dp, progress = markProgress.value)
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = "Body composition, honestly measured.",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(contentAlpha.value),
-            )
-
-            Spacer(Modifier.weight(0.7f))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(148.dp)
-                    .alpha(contentAlpha.value),
-                contentAlignment = Alignment.Center,
-            ) {
-                AnimatedContent(
-                    targetState = pitchIndex,
-                    transitionSpec = {
-                        (slideInVertically { it / 3 } + fadeIn(tween(420)))
-                            .togetherWith(slideOutVertically { -it / 3 } + fadeOut(tween(220)))
-                    },
-                    label = "pitch",
-                ) { index ->
-                    val pitch = pitches[index]
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            text = pitch.headline,
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            text = pitch.detail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.alpha(contentAlpha.value),
-            ) {
-                pitches.indices.forEach { index ->
-                    Surface(
-                        shape = CircleShape,
-                        color = if (index == pitchIndex) {
-                            Brand.Teal
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
-                        },
-                        modifier = Modifier.size(if (index == pitchIndex) 8.dp else 6.dp),
-                    ) {}
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            Column(
-                modifier = Modifier.fillMaxWidth().alpha(contentAlpha.value),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Button(
-                    onClick = onGetStarted,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Brand.Teal),
-                ) {
-                    Text("Start tracking", style = MaterialTheme.typography.titleMedium)
-                }
-
-                TextButton(onClick = onGetStarted) {
-                    Text(
-                        text = "Free. No account. No sign-up.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            TextButton(onClick = onGetStarted) {
+                Text(
+                    text = "Free. No account. No sign-up.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun RowScope.FeatureCard(feature: Feature) {
+    val shape = RoundedCornerShape(22.dp)
+    val dark = LocalIsDarkTheme.current
+
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(shape)
+            .background(if (dark) Brand.DarkCard else Brand.Card)
+            .border(1.dp, if (dark) Brand.DarkLine else Brand.Line, shape)
+            .padding(horizontal = 14.dp, vertical = 18.dp),
+    ) {
+        FeatureIcon(
+            glyph = feature.glyph,
+            tint = MaterialTheme.colorScheme.primary,
+            contentDescription = null,
+        )
+
+        Text(
+            text = feature.title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+
+        Text(
+            text = feature.detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (dark) Brand.DarkMuted else Brand.Muted,
+            modifier = Modifier.padding(top = 7.dp),
+        )
     }
 }
