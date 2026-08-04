@@ -3,6 +3,7 @@ package com.squeeze.app.data
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.bodycomp.CalibrationPoint
 import com.squeeze.core.bodycomp.MethodFusion
 import com.squeeze.core.bodycomp.PersonalCalibration
@@ -150,6 +151,14 @@ class BodyCompositionRepository @Inject constructor(
 
         entity.weightKg
             ?.let { BodyFatCalculator.deurenbergBmi(profile, it, age) }
+            ?.let { candidates += it }
+
+        // The one candidate that does not run on circumferences. Every other method here
+        // shares the scan's scale error, so fusing them alone narrows the interval around a
+        // number that may be confidently wrong; appearance cannot inherit that error, which
+        // is worth more to the combination than its own modest accuracy.
+        entity.visualBodyFatPercent
+            ?.let { VisualAssessment.estimate(it, profile.sex) }
             ?.let { candidates += it }
 
         // Every method that could run, merged rather than ranked. Two routes to the same

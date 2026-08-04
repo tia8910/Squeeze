@@ -77,6 +77,7 @@ import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.BodyFatCalculator
 import com.squeeze.core.bodycomp.NeckEstimate
 import com.squeeze.core.bodycomp.NeckEstimator
+import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
@@ -626,7 +627,7 @@ private fun AnalysingStep() {
 @Composable
 private fun ResultStep(
     state: ScanUiState,
-    onSave: (Circumferences, Double?) -> Unit,
+    onSave: (Circumferences, Double?, Double?) -> Unit,
     onRetake: () -> Unit,
 ) {
     val result = state.result ?: return
@@ -745,6 +746,17 @@ private fun ResultStep(
         // themselves correct.
         BodyFatPreview(state.profile, edited)
 
+        var visualPercent by remember(c) { mutableStateOf<Double?>(null) }
+
+        if (profile != null) {
+            VisualMatchSection(
+                sex = profile.sex,
+                selected = visualPercent,
+                onSelect = { visualPercent = if (visualPercent == it) null else it },
+                measured = BodyFatCalculator.navy(profile, edited)?.percent,
+            )
+        }
+
         if (result.warnings.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -811,7 +823,7 @@ private fun ResultStep(
         }
 
         Button(
-            onClick = { onSave(edited, weight.toCm()) },
+            onClick = { onSave(edited, weight.toCm(), visualPercent) },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Save measurements") }
         OutlinedButton(onClick = onRetake, modifier = Modifier.fillMaxWidth()) { Text("Scan again") }
@@ -1266,5 +1278,93 @@ private fun missingReason(profile: Profile, c: Circumferences): String {
 
         else -> "The values above are outside the range the equation is defined for. Check " +
             "them against a tape."
+    }
+}
+
+/**
+ * Lets the user place themselves on the appearance ladder.
+ *
+ * This is the only input on the screen that does not come from a circumference, and that is
+ * exactly why it is here. Every other route to a percentage runs through the same waist, so
+ * when the scan's scale is off they are all off together and merging them narrows the
+ * interval around a number that is confidently wrong. What someone looks like cannot inherit
+ * a scale error.
+ *
+ * Described rather than illustrated. Reference photographs are of particular strangers with
+ * particular frames, and a lean-but-narrow person comparing themselves against a muscular
+ * ten-per-cent photo reads high every time. The markers below are what an assessor actually
+ * checks, they apply to any build, and they cost nothing to ship.
+ *
+ * Optional throughout. A user who does not want to judge their own appearance skips it and
+ * loses nothing they had before.
+ */
+@Composable
+private fun VisualMatchSection(
+    sex: Sex,
+    selected: Double?,
+    onSelect: (Double) -> Unit,
+    measured: Double?,
+) {
+    val bands = VisualAssessment.bandsFor(sex)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Which describes you? — optional", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "Everything above was worked out from your measurements. This is the " +
+                    "one thing the tape cannot see, so it checks the rest rather than " +
+                    "repeating it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            bands.forEach { band ->
+                val chosen = selected == band.percent
+                Card(
+                    onClick = { onSelect(band.percent) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (chosen) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    ),
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            text = "${band.label} · about %.0f%%".format(band.percent),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Text(
+                            text = band.markers,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            // The disagreement is the useful part. A scan saying twenty per cent to someone
+            // who can see their abs is not a small error to be averaged quietly away - the
+            // two disagree about something the user can settle by looking down, and saying
+            // so is more honest than blending them and reporting the midpoint.
+            if (selected != null && measured != null && kotlin.math.abs(selected - measured) > 6.0) {
+                Text(
+                    text = ("Your measurements give %.0f%% and what you picked is nearer " +
+                        "%.0f%%. That gap is too large to be noise — the scan has most " +
+                        "likely mis-measured a site. Both are saved, and the estimate will " +
+                        "sit between them, but a tape reading would settle it.")
+                        .format(measured, selected),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }

@@ -144,4 +144,16 @@ enum class EstimationMethod(
      * absolute level without being the best signal for week-to-week change.
      */
     REFERENCE_SCAN(1.5, 1.0, "Reference scan"),
+
+    /**
+     * The user matching themselves against described appearance bands.
+     *
+     * Worth its place despite being the least precise method here, because it is the only
+     * one that does not run on circumferences. Every other route to a number shares the
+     * scan's scale error, so fusing them narrows the interval around a figure that may be
+     * confidently wrong; appearance cannot inherit that error at all. Its repeatability is
+     * better than its accuracy suggests, since someone who picks a band today picks the
+     * same one next month unless something actually changed.
+     */
+    VISUAL_ASSESSMENT(5.0, 1.8, "Visual match"),
 }

@@ -16,7 +16,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -65,6 +65,19 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /**
+     * Adds the visual appearance match.
+     *
+     * NULL on existing rows, which is correct rather than merely convenient: those
+     * measurements were taken before the question was ever asked, and inventing an answer
+     * would put a fabricated estimate into the fusion for every historical entry.
+     */
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE measurements ADD COLUMN visualBodyFatPercent REAL")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -72,7 +85,7 @@ object SqueezeDatabaseFactory {
         return try {
             Room.databaseBuilder(context, SqueezeDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to
                 // accumulate, and with no cloud backup it would be unrecoverable. Every
