@@ -2,6 +2,7 @@ package com.squeeze.app.scan
 
 import com.google.mediapipe.framework.image.ByteBufferExtractor
 import com.google.mediapipe.framework.image.MPImage
+import com.squeeze.core.scan.TrunkBounds
 import com.squeeze.core.scan.WidthProfile
 import java.nio.ByteBuffer
 
@@ -49,9 +50,18 @@ object MaskWidthExtractor {
 
     /**
      * @param mask category mask, one byte per pixel
+     * @param trunk pose-derived bound on where the trunk can be, used to cut an arm off a
+     *   torso run when the two touch. Without it, a hand on a hip or an arm hanging against
+     *   the waist is measured as part of the body — the largest error this pipeline can make
+     *   and the one that still lands inside every plausibility range.
      * @return null when the mask is too sparse to represent a body
      */
-    fun extract(mask: MPImage, width: Int, height: Int): WidthProfile? {
+    fun extract(
+        mask: MPImage,
+        width: Int,
+        height: Int,
+        trunk: TrunkBounds? = null,
+    ): WidthProfile? {
         if (width <= 0 || height <= 0) return null
 
         val buffer = ByteBufferExtractor.extract(mask)
@@ -93,7 +103,24 @@ object MaskWidthExtractor {
 
             val torso = runs.minByOrNull { distanceToRun(it, midlineX) }
             if (torso != null) {
-                torsoWidths[row] = torso.width.toDouble() / width.toDouble()
+                // Where an arm touches the trunk the two are a single run, so the run is
+                // cut back to where the skeleton says the trunk can reach. When no pose
+                // geometry is available the raw run is used, which is the previous
+                // behaviour rather than a failure.
+                val clipped = trunk?.clip(
+                    startX = torso.start.toDouble() / width.toDouble(),
+                    endX = (torso.end + 1).toDouble() / width.toDouble(),
+                    row = row,
+                )
+
+                torsoWidths[row] = when {
+                    trunk == null -> torso.width.toDouble() / width.toDouble()
+                    clipped != null -> clipped.endInclusive - clipped.start
+                    // The midline run fell entirely outside the trunk bound. That is not a
+                    // narrow torso, it is a torso that was not found, and recording a width
+                    // here would invent one.
+                    else -> 0.0
+                }
             }
 
             runs.filter { it !== torso }

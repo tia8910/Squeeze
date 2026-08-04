@@ -57,9 +57,18 @@ private const val VIEWPORT = 200f
 /**
  * The flexing figure with the two squeeze bands across it.
  *
+ * @param bands draws the two white compression bands across the chest.
+ *
+ *   Off by default, which matches the brand sheet: its `.logo` — the 140px hero — carries
+ *   the bands over a gradient fill on a pale disc, while its `.mini-logo`, used in the phone
+ *   frame's app bar, is a single flat-blue path with no bands at all. That distinction is
+ *   not decoration. White bands 10 and 8 units wide in a 200-unit viewport are 5% and 4% of
+ *   the mark; at app-bar size they stop reading as compression and start reading as the
+ *   figure being sliced into pieces.
+ *
  * @param squeeze 0..1, how far the bands have swept across the chest. Animating this from 0
  *   to 1 makes the mark perform its own name — the figure appears, then the squeeze lands.
- *   Left at 1 the mark is simply the static logo.
+ *   Left at 1 the mark is simply the static logo. Irrelevant when [bands] is false.
  * @param disc when set, the pale circle the brand sheet places behind the full-colour mark.
  *   Omitted for the compact monochrome uses, which sit directly on the surface.
  */
@@ -72,6 +81,7 @@ fun SqueezeMark(
     figureColor: Color = Brand.Blue,
     bandColor: Color = Color.White,
     disc: Color? = null,
+    bands: Boolean = false,
 ) {
     // Parsed once and reused. Re-parsing three path strings on every recomposition would be
     // wasted work on a mark that never changes shape.
@@ -95,7 +105,7 @@ fun SqueezeMark(
                 drawPath(figure, figureColor)
             }
 
-            if (squeeze > 0f) {
+            if (bands && squeeze > 0f) {
                 drawSweptBand(bandUpper, bandColor, strokeWidth = 10f, progress = squeeze)
                 drawSweptBand(bandLower, bandColor, strokeWidth = 8f, progress = squeeze)
             }
@@ -142,27 +152,22 @@ fun squeezeMarkBrush(): Brush = Brush.linearGradient(
 /**
  * Mark plus wordmark, for app bars.
  *
- * The brand sheet sets the mark flat blue at this size — the gradient is reserved for the
- * hero lockup, because at 34px it reads as a muddy fill rather than as a gradient.
+ * This is the brand sheet's `.mini-logo`: one flat-blue path, no bands, no disc. The
+ * gradient and the compression bands are reserved for the hero lockup, because at 34px both
+ * lose their meaning — the gradient reads as a muddy fill and the bands read as damage.
  */
 @Composable
 fun SqueezeWordmark(
     modifier: Modifier = Modifier,
     markSize: Dp = 34.dp,
     fontSize: TextUnit = 18.sp,
-    squeeze: Float = 1f,
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SqueezeMark(
-            size = markSize,
-            squeeze = squeeze,
-            figureColor = Brand.Blue,
-            bandColor = MaterialTheme.colorScheme.surface,
-        )
+        SqueezeMark(size = markSize, figureColor = Brand.Blue)
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -210,6 +215,7 @@ fun SqueezeLockup(
                 squeeze = squeeze,
                 figureBrush = squeezeMarkBrush(),
                 disc = MaterialTheme.colorScheme.surfaceVariant,
+                bands = true,
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {

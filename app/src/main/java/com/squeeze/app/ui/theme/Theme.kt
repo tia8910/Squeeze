@@ -48,6 +48,21 @@ private val LightColors = lightColorScheme(
     surfaceVariant = Brand.Ice,
     onSurfaceVariant = Brand.Muted,
 
+    // Material derives these from the primary when they are left unset, which tints every
+    // default Card a pale lavender — visibly off-brand against the flat white the design is
+    // built on. Pinning them to the real neutrals is what keeps a stock Card looking like
+    // the rest of the app.
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainer = Brand.Sunken,
+    surfaceContainerHigh = Brand.Sunken,
+    surfaceContainerHighest = Brand.Ice,
+    surfaceBright = Color.White,
+    surfaceDim = Brand.Sunken,
+
+    // Elevation overlay colour. Left at its default, a raised surface picks up a blue wash.
+    surfaceTint = Color.Transparent,
+
     error = Brand.Danger,
     onError = Color.White,
     errorContainer = Color(0xFFFEE2E2),
@@ -78,6 +93,15 @@ private val DarkColors = darkColorScheme(
 
     surfaceVariant = Brand.DarkIce,
     onSurfaceVariant = Brand.DarkMuted,
+
+    surfaceContainerLowest = Brand.DarkGround,
+    surfaceContainerLow = Brand.DarkCard,
+    surfaceContainer = Brand.DarkCard,
+    surfaceContainerHigh = Brand.DarkSunken,
+    surfaceContainerHighest = Brand.DarkSunken,
+    surfaceBright = Brand.DarkSunken,
+    surfaceDim = Brand.DarkGround,
+    surfaceTint = Color.Transparent,
 
     error = Color(0xFFF87171),
     onError = Color(0xFF450A0A),

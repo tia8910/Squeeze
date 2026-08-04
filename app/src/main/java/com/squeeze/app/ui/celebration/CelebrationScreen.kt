@@ -86,10 +86,13 @@ fun CelebrationScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         SqueezeMark(
-            size = 64.dp,
+            size = 88.dp,
             squeeze = markSqueeze.value,
             modifier = Modifier.scale(markScale.value),
-            bandColor = MaterialTheme.colorScheme.surface,
+            // Large enough here for the compression bands to read as compression rather
+            // than as the figure being cut apart, which is why they are on for this one.
+            bands = true,
+            bandColor = MaterialTheme.colorScheme.background,
         )
 
         Column(
