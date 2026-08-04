@@ -57,7 +57,6 @@ fun CelebrationScreen(
 ) {
     val context = LocalContext.current
     val sound = LocalSoundEngine.current
-    val markSqueeze = remember { Animatable(0f) }
     val contentAlpha = remember { Animatable(0f) }
     val markScale = remember { Animatable(0.7f) }
 
@@ -68,11 +67,10 @@ fun CelebrationScreen(
     }
 
     LaunchedEffect(Unit) {
-        // The mark performs the squeeze, then the copy arrives — the same order as the
-        // landing screen, so the gesture reads as the app's signature rather than as an
+        // The mark lands first, then the copy arrives behind it — the same order as the
+        // landing screen, so the entrance reads as the app's signature rather than as an
         // effect that happens to be on two screens.
         markScale.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
-        markSqueeze.animateTo(1f, tween(620, easing = FastOutSlowInEasing))
         contentAlpha.animateTo(1f, tween(420))
     }
 
@@ -86,13 +84,8 @@ fun CelebrationScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         SqueezeMark(
-            size = 88.dp,
-            squeeze = markSqueeze.value,
+            size = 96.dp,
             modifier = Modifier.scale(markScale.value),
-            // Large enough here for the compression bands to read as compression rather
-            // than as the figure being cut apart, which is why they are on for this one.
-            bands = true,
-            bandColor = MaterialTheme.colorScheme.background,
         )
 
         Column(
