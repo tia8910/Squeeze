@@ -1,0 +1,16 @@
+{
+  "name": "squeeze-fit-web",
+  "version": "1.0.0",
+  "exports": "./main.ts",
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --watch main.ts",
+    "start": "deno run --allow-net --allow-read main.ts",
+    "check": "deno check main.ts",
+    "test": "deno test --allow-read"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  }
+}

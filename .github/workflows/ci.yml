@@ -123,3 +123,28 @@ jobs:
             app/build/outputs/logs/
             app/build/intermediates/merged_manifests/
           retention-days: 14
+
+  web:
+    name: Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Type check, lint and route tests. The site has no build step, so this is the only
+      # thing standing between a typo and a broken deployment.
+      - name: Check
+        working-directory: web
+        run: deno check main.ts
+
+      - name: Lint
+        working-directory: web
+        run: deno lint
+
+      - name: Test
+        working-directory: web
+        run: deno test --allow-read
