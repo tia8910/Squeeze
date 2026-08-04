@@ -218,7 +218,8 @@ private val SqueezeTypography = Typography().run {
  */
 @Composable
 fun SqueezeTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    // Matches the stored default, so a preview shows what a new user actually gets.
+    themeMode: ThemeMode = ThemeMode.LIGHT,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {

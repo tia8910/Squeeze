@@ -24,9 +24,20 @@ class UiSettings @Inject constructor(context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /**
+     * Light by default, rather than following the system.
+     *
+     * The brand sheet this app is built from is light-only: flat white cards, hairline
+     * borders, navy text. That is the design as drawn and the one every screen was checked
+     * against. A dark theme exists and is properly designed, but it is a variant — starting
+     * a new user there shows them a version of the product nobody signed off as the default.
+     *
+     * Anyone who has already chosen keeps their choice. `getString` returns null only when
+     * nothing was ever stored, so this default applies to first run and nothing else.
+     */
     private val _themeMode = MutableStateFlow(
         runCatching { ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "") }
-            .getOrDefault(ThemeMode.SYSTEM),
+            .getOrDefault(ThemeMode.LIGHT),
     )
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
