@@ -28,6 +28,10 @@ fun SettingsScreen(
     onBlockScreenshotsChange: (Boolean) -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    soundEnabled: Boolean,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    ambientEnabled: Boolean,
+    onAmbientEnabledChange: (Boolean) -> Unit,
     heightCm: Double?,
     birthYear: Int?,
     sex: Sex?,
@@ -51,6 +55,36 @@ fun SettingsScreen(
         Text("Appearance", style = MaterialTheme.typography.titleMedium)
 
         ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
+
+        Text("Sound", style = MaterialTheme.typography.titleMedium)
+
+        SettingToggle(
+            title = "Sound effects",
+            description = "A short chime when a measurement saves, when a photo is captured, " +
+                "and on the celebration screen. These play over your music rather than " +
+                "interrupting it, and stay silent when your phone is on silent or vibrate.",
+            checked = soundEnabled,
+            onCheckedChange = onSoundEnabledChange,
+        )
+
+        SettingToggle(
+            title = "Motivational background music",
+            // Stated plainly because this is the toggle that can take something away from
+            // the user. Someone who already has a playlist running needs to know why this
+            // one is different before they turn it on, not after.
+            description = "A slow, looping backing track while the app is open. It will not " +
+                "start if something else is already playing, and it stops as soon as another " +
+                "app wants the audio. Off by default so it never interrupts your own music.",
+            checked = ambientEnabled,
+            onCheckedChange = onAmbientEnabledChange,
+        )
+
+        Text(
+            text = "All sound is generated on the device as it plays. No audio files are " +
+                "bundled, downloaded or streamed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         Text("Privacy", style = MaterialTheme.typography.titleMedium)
 

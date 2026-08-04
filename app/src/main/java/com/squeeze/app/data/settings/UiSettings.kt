@@ -35,6 +35,28 @@ class UiSettings @Inject constructor(context: Context) {
     /** False only until the user has dismissed the landing screen once. */
     val landingSeen: StateFlow<Boolean> = _landingSeen.asStateFlow()
 
+    private val _soundEnabled = MutableStateFlow(prefs.getBoolean(KEY_SOUND, true))
+
+    /**
+     * Short cues on saving, capturing and celebrating.
+     *
+     * On by default: they are brief, they follow the ringer, and they are tagged so the
+     * system lets them sound alongside music rather than ducking it.
+     */
+    val soundEnabled: StateFlow<Boolean> = _soundEnabled.asStateFlow()
+
+    private val _ambientEnabled = MutableStateFlow(prefs.getBoolean(KEY_AMBIENT, false))
+
+    /**
+     * The looping motivational bed.
+     *
+     * Off by default, and that is a deliberate asymmetry with [soundEnabled]. This one is
+     * music: it holds audio focus for as long as the app is open, and most people using a
+     * fitness app already have something playing. Defaulting it on would mean the first
+     * launch silences the user's own playlist, which is not a first impression worth having.
+     */
+    val ambientEnabled: StateFlow<Boolean> = _ambientEnabled.asStateFlow()
+
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME, mode.name).apply()
         _themeMode.value = mode
@@ -45,9 +67,21 @@ class UiSettings @Inject constructor(context: Context) {
         _landingSeen.value = true
     }
 
+    fun setSoundEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SOUND, enabled).apply()
+        _soundEnabled.value = enabled
+    }
+
+    fun setAmbientEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AMBIENT, enabled).apply()
+        _ambientEnabled.value = enabled
+    }
+
     private companion object {
         const val PREFS = "squeeze_ui"
         const val KEY_THEME = "theme_mode"
         const val KEY_LANDING_SEEN = "landing_seen"
+        const val KEY_SOUND = "sound_enabled"
+        const val KEY_AMBIENT = "ambient_enabled"
     }
 }

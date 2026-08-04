@@ -26,7 +26,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.ui.brand.SqueezeMark
+import com.squeeze.core.audio.Cue
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.app.ui.components.SecondaryButton
@@ -54,9 +56,16 @@ fun CelebrationScreen(
     onViewProgress: () -> Unit,
 ) {
     val context = LocalContext.current
+    val sound = LocalSoundEngine.current
     val markSqueeze = remember { Animatable(0f) }
     val contentAlpha = remember { Animatable(0f) }
     val markScale = remember { Animatable(0.7f) }
+
+    LaunchedEffect(Unit) {
+        // Fired alongside the mark's entrance rather than on a delay, so the arpeggio and
+        // the squeeze land together and read as one event.
+        sound?.play(Cue.CELEBRATION)
+    }
 
     LaunchedEffect(Unit) {
         // The mark performs the squeeze, then the copy arrives — the same order as the

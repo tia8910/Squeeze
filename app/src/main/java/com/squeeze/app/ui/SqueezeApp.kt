@@ -181,12 +181,20 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                     val blockScreenshots by viewModel.blockScreenshots
                         .collectAsStateWithLifecycle()
                     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+                    val soundEnabled by viewModel.soundEnabled
+                        .collectAsStateWithLifecycle()
+                    val ambientEnabled by viewModel.ambientEnabled
+                        .collectAsStateWithLifecycle()
 
                     SettingsScreen(
                         blockScreenshots = blockScreenshots,
                         onBlockScreenshotsChange = viewModel::setBlockScreenshots,
                         themeMode = themeMode,
                         onThemeModeChange = viewModel::setThemeMode,
+                        soundEnabled = soundEnabled,
+                        onSoundEnabledChange = viewModel::setSoundEnabled,
+                        ambientEnabled = ambientEnabled,
+                        onAmbientEnabledChange = viewModel::setAmbientEnabled,
                         heightCm = state.profile?.heightCm,
                         birthYear = state.profile?.birthYear,
                         sex = state.profile?.sex,
