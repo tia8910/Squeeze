@@ -89,7 +89,11 @@ fun CompositionScreen(
         val latest = trend.lastOrNull()
 
         if (latest == null) {
-            EmptyState(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
+            EmptyState(
+                onStartScan = onStartScan,
+                onAddMeasurement = onAddMeasurement,
+                measurements = measurements,
+            )
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
@@ -378,7 +382,18 @@ private const val HISTORY_LIMIT = 14
  * path, not the accurate one, and saying so up front sets an honest expectation.
  */
 @Composable
-private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
+private fun EmptyState(
+    onStartScan: () -> Unit,
+    onAddMeasurement: () -> Unit,
+    measurements: List<MeasurementEntity>,
+) {
+    // Entries can exist while no estimate does, when a scan saved some sites but not the
+    // ones the equation needs. Saying "no measurements yet" then is simply false, and it
+    // hides the one thing worth telling the user: which field is missing.
+    val blocked = measurements.isNotEmpty()
+    val hasNeck = measurements.any { it.neckCm != null }
+    val hasWaist = measurements.any { it.waistCm != null }
+
     val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -416,7 +431,22 @@ private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
             }
 
             Text(
-                text = "Take your first measurement and this becomes your number.",
+                text = when {
+                    !blocked -> "Take your first measurement and this becomes your number."
+                    !hasNeck && !hasWaist ->
+                        "Your entry is saved, but it has neither a neck nor a waist " +
+                            "measurement, and the equation needs both."
+                    !hasNeck ->
+                        "Your entry is saved and has a waist, but no neck. The equation " +
+                            "works on the gap between the two, so it cannot run without it. " +
+                            "A tape around the narrowest part of your neck is all it takes."
+                    !hasWaist ->
+                        "Your entry is saved and has a neck, but no waist. The equation " +
+                            "works on the gap between the two, so it cannot run without it."
+                    else ->
+                        "Your entry is saved, but the values it holds are outside the range " +
+                            "the equation is defined for. Open it from History to check them."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = subColour,
                 modifier = Modifier.padding(top = 4.dp),
@@ -424,7 +454,9 @@ private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
 
             Spacer(Modifier.height(14.dp))
 
-            NoticePill(text = "No measurements yet")
+            NoticePill(
+                text = if (blocked) "Missing a measurement" else "No measurements yet",
+            )
         }
 
         PrimaryButton(

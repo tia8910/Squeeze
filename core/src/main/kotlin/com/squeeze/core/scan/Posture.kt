@@ -18,6 +18,14 @@ data class FrontPoseGeometry(
     val hipRight: PosePoint,
     val ankleLeft: PosePoint? = null,
     val ankleRight: PosePoint? = null,
+    /**
+     * The nose tip.
+     *
+     * Not used for posture — it is here because it is the upper end of the only span this
+     * landmark set offers that covers most of the body, which is what [LandmarkStature] needs
+     * to check the silhouette's idea of the subject's height against a second opinion.
+     */
+    val nose: PosePoint? = null,
 )
 
 /** One postural observation, in degrees, with the reading that makes it usable. */
