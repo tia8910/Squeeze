@@ -23,9 +23,10 @@ import kotlin.math.abs
  *
  * The bound is deliberately loose. Landmarks sit at joint centres, not at the skin, so the
  * real body extends past them — by the deltoid at the shoulder, by soft tissue at the
- * waist. [SOFT_TISSUE_MARGIN] is set wide enough to contain a large person's waist and
- * still narrow enough to exclude a limb, because clipping a genuine waist would understate
- * it and understating is no better than overstating.
+ * waist. The margin is level-dependent — see [SHOULDER_MARGIN] and [HIP_MARGIN] — because
+ * the two landmark pairs sit at very different depths, and it is sized to contain a large
+ * person's waist while still excluding a limb: clipping a genuine waist would understate it,
+ * and understating is no better than overstating.
  *
  * All coordinates are 0..1 fractions of image width, matching the pose model's own output.
  */
