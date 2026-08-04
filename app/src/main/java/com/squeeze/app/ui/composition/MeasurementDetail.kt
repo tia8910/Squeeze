@@ -45,6 +45,7 @@ import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.SecondaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.core.bodycomp.CompositionPanel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -62,6 +63,7 @@ import java.time.format.DateTimeFormatter
 fun MeasurementDetailDialog(
     entry: MeasurementEntity,
     loadPhoto: suspend (String) -> Bitmap?,
+    panel: CompositionPanel?,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -196,6 +198,25 @@ fun MeasurementDetailDialog(
                         },
                     ),
                 )
+
+                // Below the stored values, not above them. Everything here is derived from
+                // the numbers printed above, and a reader who wants to check a figure should
+                // meet its inputs first.
+                panel?.let {
+                    Text(
+                        text = "Full analysis",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Text(
+                        text = "Worked out from this entry alone, so it says what this " +
+                            "session said rather than what the trend believes today.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                    )
+                    AnalysisBody(it)
+                }
 
                 Spacer(Modifier.height(4.dp))
 

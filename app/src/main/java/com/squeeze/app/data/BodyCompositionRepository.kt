@@ -107,8 +107,13 @@ class BodyCompositionRepository @Inject constructor(
      * Skinfolds beat circumferences when present, and both beat the BMI fallback. The
      * fallback is only reached when the user has recorded nothing but a weight, and it is
      * labelled as an estimate in the UI precisely because it cannot see muscle.
+     *
+     * Public because a single record's analysis needs the estimate for *that* record, not the
+     * trend's current level. The trend is a filtered view of every entry and is the right
+     * number for "where am I now"; it is the wrong number to print inside a row dated three
+     * weeks ago, which should say what that day's measurements said.
      */
-    private fun estimate(profile: Profile, entity: MeasurementEntity): BodyFatEstimate? {
+    fun estimate(profile: Profile, entity: MeasurementEntity): BodyFatEstimate? {
         val age = profile.ageAt(LocalDate.now().year)
         val candidates = mutableListOf<BodyFatEstimate>()
 

@@ -42,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,12 +67,14 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.bodycomp.NeckEstimator
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScanWarning
+import com.squeeze.core.scan.WeightScaleCheck
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -526,6 +529,25 @@ private fun ResultStep(
         MeasurementField("Thigh", thigh, { thigh = it }, missing = c.thighCm == null)
         MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
 
+        val profile = state.profile
+        val weightKg = weight.toCm()
+
+        // Offered rather than applied. Both of these change numbers the user is about to
+        // save, and this app does not silently rewrite a measurement — the whole screen is
+        // built on showing what was found and letting them decide.
+        if (profile != null && neck.toCm() == null) {
+            NeckEstimateCard(profile, weightKg) { neck = "%.1f".format(it) }
+        }
+
+        if (profile != null) {
+            ScaleCorrectionCard(profile, edited, weightKg) { factor ->
+                chest = chest.scaledBy(factor)
+                waist = waist.scaledBy(factor)
+                hip = hip.scaledBy(factor)
+                thigh = thigh.scaledBy(factor)
+            }
+        }
+
         // The whole point of making these editable: the estimate updates as the user fixes a
         // value, so a wrong neck stops being a dead end and becomes something they can see
         // themselves correct.
@@ -809,6 +831,113 @@ private fun PostureSection(findings: List<PostureFinding>) {
 private fun Double?.toField(): String = this?.let { "%.1f".format(it) } ?: ""
 
 private fun String.toCm(): Double? = trim().replace(',', '.').toDoubleOrNull()
+
+/** Rescales a field's contents, leaving anything unparseable alone. */
+private fun String.scaledBy(factor: Double): String =
+    toCm()?.let { "%.1f".format(it * factor) } ?: this
+
+/**
+ * Offers a neck worked out from height and weight when the scan could not find one.
+ *
+ * The neck is the site a silhouette gets wrong most often and the one the Navy equation
+ * leans on hardest, so missing it costs the whole estimate. It is also the site that varies
+ * least between people of the same size, which is what makes inferring it defensible at all.
+ */
+@Composable
+private fun NeckEstimateCard(profile: Profile, weightKg: Double?, onUse: (Double) -> Unit) {
+    val estimate = NeckEstimator.estimate(profile.heightCm, weightKg, profile.sex)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (estimate == null) {
+                Text("Estimate the neck", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "Enter your weight above and this can work out a likely neck " +
+                        "measurement from your height and weight.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text(
+                    text = "Neck ≈ %.1f cm".format(estimate.centimetres),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    // The error is stated in the unit the user cares about, not in
+                    // centimetres, because centimetres of neck sound harmless and points of
+                    // body fat do not.
+                    text = "Worked out from your height and weight — deliberately not from " +
+                        "the scan's own chest, which would inherit whatever the scan got " +
+                        "wrong. Two people your size differ by about %.1f cm here, which is " +
+                        "roughly %.1f points of body fat, so treat the result as an " +
+                        "indication and measure with a tape when you can."
+                        .format(
+                            estimate.standardErrorCm,
+                            estimate.standardErrorCm * NeckEstimator.BODY_FAT_POINTS_PER_CM,
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                TextButton(onClick = { onUse(estimate.centimetres) }) {
+                    Text("Use this estimate")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Flags a scan whose measurements describe a body that does not weigh what the user does.
+ *
+ * The failure this catches is invisible from inside the scan: scale error multiplies every
+ * circumference at once, so each one stays individually plausible and every per-site check in
+ * the app passes them. Weight is the only number here measured by an instrument, and a body's
+ * girths and its mass cannot disagree.
+ */
+@Composable
+private fun ScaleCorrectionCard(
+    profile: Profile,
+    edited: Circumferences,
+    weightKg: Double?,
+    onApply: (Double) -> Unit,
+) {
+    val finding = WeightScaleCheck.evaluate(edited, profile.heightCm, weightKg)
+        ?.takeIf { it.significant }
+        ?: return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "These measurements do not match your weight",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = ("A body with these girths at your height would weigh about %.0f kg, " +
+                    "but you entered %.0f kg. Every measurement in a photo scan is worked " +
+                    "out from one height reference, so when that reference is off they are " +
+                    "all wrong by the same %.0f%% — which is why each one looks believable " +
+                    "on its own.")
+                    .format(
+                        finding.impliedWeightKg,
+                        finding.actualWeightKg,
+                        finding.errorPercent,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = { onApply(finding.correctionFactor) }) {
+                Text("Rescale to match my weight")
+            }
+        }
+    }
+}
 
 /**
  * One editable measurement.
