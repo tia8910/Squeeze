@@ -32,6 +32,13 @@ data class MeasurementEntity(
     /** A DEXA or BodPod result entered by hand; anchors personal calibration. */
     val referenceBodyFatPercent: Double?,
     val note: String?,
+    /**
+     * Identifier of the encrypted scan photograph, when one was kept.
+     *
+     * Null for tape entries and for any scan recorded before photographs were stored. The
+     * file lives in the app's private storage under this name; see ScanPhotoStore.
+     */
+    val photoId: String? = null,
 )
 
 /**

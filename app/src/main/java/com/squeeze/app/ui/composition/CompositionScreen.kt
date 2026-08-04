@@ -1,5 +1,6 @@
 package com.squeeze.app.ui.composition
 
+import android.graphics.Bitmap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -20,11 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +72,7 @@ fun CompositionScreen(
     calibration: PersonalCalibration,
     measurements: List<MeasurementEntity>,
     panel: CompositionPanel?,
+    loadPhoto: suspend (String) -> Bitmap?,
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
@@ -93,7 +93,7 @@ fun CompositionScreen(
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, onDelete)
+                HistorySection(measurements, loadPhoto, onDelete)
             }
             return@Column
         }
@@ -137,7 +137,7 @@ fun CompositionScreen(
         // answers what most people opened the app to ask; this is for interrogating it.
         panel?.let { AnalysisSection(it, Modifier.padding(top = 4.dp)) }
 
-        HistorySection(measurements, onDelete)
+        HistorySection(measurements, loadPhoto, onDelete)
 
         // Supporting detail, deliberately below the fold. Someone who wants to interrogate
         // the number can; someone who just wants the number never has to scroll past a chart.
@@ -277,6 +277,7 @@ private fun HeroCard(
 @Composable
 private fun HistorySection(
     measurements: List<MeasurementEntity>,
+    loadPhoto: suspend (String) -> Bitmap?,
     onDelete: (MeasurementEntity) -> Unit,
 ) {
     if (measurements.isEmpty()) return
@@ -326,23 +327,14 @@ private fun HistorySection(
     }
 
     selected?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            title = { Text(formatDate(entry.epochDay)) },
-            text = { Text(entrySummary(entry), style = MaterialTheme.typography.bodyMedium) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete(entry)
-                        selected = null
-                    },
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
+        MeasurementDetailDialog(
+            entry = entry,
+            loadPhoto = loadPhoto,
+            onDelete = {
+                onDelete(entry)
+                selected = null
             },
-            dismissButton = {
-                TextButton(onClick = { selected = null }) { Text("Close") }
-            },
+            onDismiss = { selected = null },
         )
     }
 }
