@@ -4,12 +4,16 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.os.SystemClock
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraPreview
@@ -23,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,6 +75,7 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.bodycomp.NeckEstimate
 import com.squeeze.core.bodycomp.NeckEstimator
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Profile
@@ -75,8 +84,11 @@ import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScanWarning
 import com.squeeze.core.scan.WeightScaleCheck
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * Guided two-photograph body scan.
@@ -127,6 +139,7 @@ fun ScanScreen(
             onRequestCamera = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onCapture = viewModel::onPhotoCaptured,
             onPhotoPicked = viewModel::onPhotoPicked,
+            onCheckFraming = viewModel::checkFraming,
         )
 
         ScanStep.ANALYSING -> AnalysingStep()
@@ -148,6 +161,14 @@ private fun CaptureStep(
     onRequestCamera: () -> Unit,
     onCapture: (Bitmap) -> Unit,
     onPhotoPicked: (Uri) -> Unit,
+    /**
+     * Judges a live preview frame, returning advice to fix or null when it is worth shooting.
+     *
+     * Suspending and supplied from outside because it runs the real detector: the point of
+     * auto-capture is that the frame it fires on has already passed the same checks the scan
+     * will apply afterwards, so a photo it takes cannot be rejected for framing.
+     */
+    onCheckFraming: suspend (Bitmap) -> String?,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -158,6 +179,23 @@ private fun CaptureStep(
     var useFrontCamera by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableIntStateOf(DEFAULT_TIMER_SECONDS) }
     var countdown by remember { mutableIntStateOf(0) }
+
+    var autoDetect by remember { mutableStateOf(false) }
+    var framingHint by remember { mutableStateOf<String?>(null) }
+
+    // Held so the zoom control has something to talk to. CameraControl only exists once a
+    // camera is bound, so this is null until the provider callback has run.
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+
+    val imageAnalysis = remember {
+        ImageAnalysis.Builder()
+            // Only the newest frame matters. Queueing them would mean the hint describes a
+            // pose the user has already moved out of.
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .build()
+    }
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -185,30 +223,123 @@ private fun CaptureStep(
         )
     }
 
+    // Auto-detect: watch the preview and take the photo when the framing is actually right,
+    // rather than making the user guess when to start a timer. The two failure modes this
+    // removes are the two the scan cannot recover from — a body cut off at the feet, and a
+    // body turned away from the lens — because both are decided before the shutter and no
+    // amount of later arithmetic can undo either.
+    LaunchedEffect(autoDetect, step) {
+        if (!autoDetect) {
+            imageAnalysis.clearAnalyzer()
+            framingHint = null
+            return@LaunchedEffect
+        }
+
+        var busy = false
+        var lastCheck = 0L
+        var goodStreak = 0
+
+        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { proxy ->
+            val now = SystemClock.elapsedRealtime()
+            // Two models per frame at preview rate would heat the phone and drop the
+            // preview. A person getting into position does not move faster than this.
+            if (busy || now - lastCheck < AUTO_DETECT_INTERVAL_MS) {
+                proxy.close()
+                return@setAnalyzer
+            }
+            lastCheck = now
+            busy = true
+
+            val frame = runCatching { proxy.toBitmap() }.getOrNull()
+            val degrees = proxy.imageInfo.rotationDegrees
+            proxy.close()
+
+            if (frame == null) {
+                busy = false
+                return@setAnalyzer
+            }
+
+            scope.launch {
+                val hint = onCheckFraming(frame.rotated(degrees))
+                framingHint = hint
+
+                if (hint == null) {
+                    goodStreak++
+                    // Two consecutive good frames, not one. A single frame catches the
+                    // moment an arm happens to swing clear and fires while the user is
+                    // still walking into place.
+                    if (goodStreak >= AUTO_DETECT_CONFIRMATIONS && countdown == 0) {
+                        goodStreak = 0
+                        countdown = AUTO_DETECT_COUNTDOWN_SECONDS
+                        while (countdown > 0) {
+                            delay(1000)
+                            countdown--
+                        }
+                        shoot()
+                    }
+                } else {
+                    goodStreak = 0
+                }
+                busy = false
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         if (hasCameraPermission) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                // Keyed on the lens so flipping rebinds the provider rather than leaving
-                // the old camera attached.
-                factory = { ctx -> PreviewView(ctx) },
-                update = { previewView ->
-                    val providerFuture = ProcessCameraProvider.getInstance(context)
-                    providerFuture.addListener({
-                        val provider = providerFuture.get()
-                        val preview = CameraPreview.Builder().build().also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-                        provider.unbindAll()
+            val previewView = remember { PreviewView(context) }
+
+            // Binding belongs in an effect keyed on what it depends on, not in AndroidView's
+            // update lambda. That lambda runs on every recomposition — every countdown tick,
+            // every zoom nudge — and each run called unbindAll() and rebound the camera,
+            // which is why the preview stuttered and the lens sometimes came back detached.
+            LaunchedEffect(useFrontCamera, autoDetect) {
+                val provider = ProcessCameraProvider.getInstance(context).awaitProvider()
+                val preview = CameraPreview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+                provider.unbindAll()
+                camera = runCatching {
+                    val selector = if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA
+                    else CameraSelector.DEFAULT_BACK_CAMERA
+
+                    // The analyser is only bound when the user asked for it. It runs the
+                    // same pose and segmentation models the scan itself uses, which is not
+                    // something to have running against the battery on every capture screen.
+                    if (autoDetect) {
                         provider.bindToLifecycle(
-                            lifecycleOwner,
-                            if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA
-                            else CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageCapture,
+                            lifecycleOwner, selector, preview, imageCapture, imageAnalysis,
                         )
-                    }, ContextCompat.getMainExecutor(context))
-                },
+                    } else {
+                        provider.bindToLifecycle(
+                            lifecycleOwner, selector, preview, imageCapture,
+                        )
+                    }
+                }.getOrNull()
+                zoomRatio = 1f
+            }
+
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Pinch to zoom, because the framing this method wants puts the phone
+                    // several metres away and the body then occupies a fraction of a wide
+                    // lens. Zooming in is also the least distorting way to fill the frame:
+                    // it trades resolution for a longer effective focal length, where
+                    // stepping closer instead adds the perspective error the scan warns
+                    // about.
+                    .pointerInput(camera) {
+                        detectTransformGestures { _, _, gestureZoom, _ ->
+                            val control = camera?.cameraControl ?: return@detectTransformGestures
+                            val state = camera?.cameraInfo?.zoomState?.value
+                                ?: return@detectTransformGestures
+                            val next = (state.zoomRatio * gestureZoom)
+                                .coerceIn(state.minZoomRatio, state.maxZoomRatio)
+                            control.setZoomRatio(next)
+                            zoomRatio = next
+                        }
+                    },
+                factory = { previewView },
             )
 
             CaptureGuideOverlay()
@@ -237,6 +368,49 @@ private fun CaptureStep(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (hasCameraPermission) {
+                // What the detector currently makes of the frame. Shown only while
+                // auto-capture is armed, because otherwise it is a running commentary on a
+                // photo the user has not asked to take.
+                if (autoDetect) {
+                    InfoCard(framingHint ?: "Framing looks good — hold still.")
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChip(
+                        selected = autoDetect,
+                        onClick = { autoDetect = !autoDetect },
+                        leadingIcon = if (autoDetect) {
+                            { Icon(Icons.Default.Visibility, null, Modifier.size(16.dp)) }
+                        } else {
+                            null
+                        },
+                        label = { Text("Auto") },
+                    )
+
+                    // Two fixed steps rather than a slider. The useful zooms here are "as
+                    // wide as possible" and "framed on the body from across the room", and a
+                    // slider invites fiddling with a setting that has one right answer per
+                    // room.
+                    ZOOM_STEPS.forEach { ratio ->
+                        val control = camera?.cameraControl
+                        val supported = camera?.cameraInfo?.zoomState?.value
+                            ?.let { ratio <= it.maxZoomRatio } ?: false
+                        if (!supported) return@forEach
+
+                        FilterChip(
+                            selected = zoomRatio in (ratio - 0.05f)..(ratio + 0.05f),
+                            onClick = {
+                                control?.setZoomRatio(ratio)
+                                zoomRatio = ratio
+                            },
+                            label = { Text("%.0f×".format(ratio)) },
+                        )
+                    }
+                }
+
                 // A self-timer is not a nicety here: the framing that produces a good
                 // measurement puts the user metres from the phone, where the shutter is out
                 // of reach. Without it, every self-captured scan is taken at arm's length,
@@ -532,11 +706,29 @@ private fun ResultStep(
         val profile = state.profile
         val weightKg = weight.toCm()
 
-        // Offered rather than applied. Both of these change numbers the user is about to
-        // save, and this app does not silently rewrite a measurement — the whole screen is
-        // built on showing what was found and letting them decide.
-        if (profile != null && neck.toCm() == null) {
-            NeckEstimateCard(profile, weightKg) { neck = "%.1f".format(it) }
+        // Filled in for the user rather than offered behind a button. The neck is the site
+        // the silhouette misses most often, and leaving the field blank stopped the entire
+        // estimate on a measurement that height and weight predict about as well as anything
+        // does. A blank field asks the user to go and find a tape; a filled one they can
+        // correct asks nothing and is right more often than not.
+        //
+        // It is still theirs to overwrite, and the card beneath says plainly that it was
+        // worked out rather than measured — an estimate presented as a measurement would be
+        // the one dishonesty this screen cannot afford.
+        var neckAutoFilled by remember(c) { mutableStateOf(false) }
+        val neckEstimate = profile?.let {
+            NeckEstimator.estimate(it.heightCm, weightKg, it.sex)
+        }
+
+        LaunchedEffect(neckEstimate, c) {
+            if (c.neckCm == null && neck.isBlank() && neckEstimate != null) {
+                neck = "%.1f".format(neckEstimate.centimetres)
+                neckAutoFilled = true
+            }
+        }
+
+        if (profile != null && neckAutoFilled) {
+            NeckEstimateNote(neckEstimate)
         }
 
         if (profile != null) {
@@ -635,11 +827,57 @@ private fun ImageProxy.decodeToBitmap(): Bitmap? {
     val plane = planes.firstOrNull() ?: return null
     val buffer = plane.buffer
     val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
-    return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+    val decoded = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+        .getOrNull() ?: return null
+
+    // The sensor is mounted sideways in almost every phone, so the JPEG that comes back is
+    // in sensor orientation and the upright angle lives in imageInfo.rotationDegrees.
+    // Ignoring it handed the pipeline a body lying on its side, which is not a subtle
+    // failure: the pose model's ordering check requires chin above shoulders above hips,
+    // and a rotated frame satisfies none of it. Every camera capture was being measured
+    // sideways or refused outright, while gallery uploads worked because the loader there
+    // reads EXIF.
+    val degrees = imageInfo.rotationDegrees
+    if (degrees == 0) return decoded
+
+    val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+    return runCatching {
+        Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+    }.getOrDefault(decoded)
 }
 
 private val TIMER_OPTIONS = listOf(0, 5, 10, 15)
 private const val DEFAULT_TIMER_SECONDS = 10
+
+/** Wide, and framed from across a room. See the chip row for why these two. */
+private val ZOOM_STEPS = listOf(1f, 2f)
+
+/** How often a preview frame is put through the detector while auto-capture is armed. */
+private const val AUTO_DETECT_INTERVAL_MS = 700L
+
+/** Consecutive good frames required before the countdown starts. */
+private const val AUTO_DETECT_CONFIRMATIONS = 2
+
+/** Long enough to drop the arm that was holding the phone, short enough not to drift. */
+private const val AUTO_DETECT_COUNTDOWN_SECONDS = 3
+
+/** Rotates a preview frame upright, matching what [decodeToBitmap] does for a capture. */
+private fun Bitmap.rotated(degrees: Int): Bitmap {
+    if (degrees == 0) return this
+    val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+    return runCatching {
+        Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+    }.getOrDefault(this)
+}
+
+/** Suspends until CameraX hands over the provider, instead of nesting a listener callback. */
+private suspend fun ListenableFuture<ProcessCameraProvider>.awaitProvider(): ProcessCameraProvider =
+    suspendCancellableCoroutine { continuation ->
+        addListener(
+            { runCatching { get() }.fold(continuation::resume) { continuation.cancel(it) } },
+            Runnable::run,
+        )
+    }
 
 /**
  * The decision point after the required photograph.
@@ -843,9 +1081,17 @@ private fun String.scaledBy(factor: Double): String =
  * leans on hardest, so missing it costs the whole estimate. It is also the site that varies
  * least between people of the same size, which is what makes inferring it defensible at all.
  */
+/**
+ * Says where the pre-filled neck came from.
+ *
+ * The field is already populated by the time this is read, so the job here is not to sell
+ * the estimate but to stop it being mistaken for a measurement. The error is quoted in
+ * points of body fat rather than centimetres, because centimetres of neck sound harmless
+ * and two of them are worth about two points.
+ */
 @Composable
-private fun NeckEstimateCard(profile: Profile, weightKg: Double?, onUse: (Double) -> Unit) {
-    val estimate = NeckEstimator.estimate(profile.heightCm, weightKg, profile.sex)
+private fun NeckEstimateNote(estimate: NeckEstimate?) {
+    if (estimate == null) return
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -853,38 +1099,20 @@ private fun NeckEstimateCard(profile: Profile, weightKg: Double?, onUse: (Double
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (estimate == null) {
-                Text("Estimate the neck", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "Enter your weight above and this can work out a likely neck " +
-                        "measurement from your height and weight.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                Text(
-                    text = "Neck ≈ %.1f cm".format(estimate.centimetres),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    // The error is stated in the unit the user cares about, not in
-                    // centimetres, because centimetres of neck sound harmless and points of
-                    // body fat do not.
-                    text = "Worked out from your height and weight — deliberately not from " +
-                        "the scan's own chest, which would inherit whatever the scan got " +
-                        "wrong. Two people your size differ by about %.1f cm here, which is " +
-                        "roughly %.1f points of body fat, so treat the result as an " +
-                        "indication and measure with a tape when you can."
-                        .format(
-                            estimate.standardErrorCm,
-                            estimate.standardErrorCm * NeckEstimator.BODY_FAT_POINTS_PER_CM,
-                        ),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                TextButton(onClick = { onUse(estimate.centimetres) }) {
-                    Text("Use this estimate")
-                }
-            }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Neck was estimated", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = ("The scan could not find your neck, so it was worked out from your " +
+                    "height and weight — deliberately not from the scan's own chest, which " +
+                    "would inherit whatever the scan got wrong. Two people your size differ " +
+                    "by about %.1f cm here, roughly %.1f points of body fat, so overwrite it " +
+                    "with a tape measurement when you can.")
+                    .format(
+                        estimate.standardErrorCm,
+                        estimate.standardErrorCm * NeckEstimator.BODY_FAT_POINTS_PER_CM,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }

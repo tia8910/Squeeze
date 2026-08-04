@@ -129,6 +129,38 @@ class ScanViewModel @Inject constructor(
         viewModelScope.launch { analyse(front, sideBody, backBody) }
     }
 
+    /**
+     * Judges a live preview frame for the auto-capture option.
+     *
+     * Runs the same detector the scan itself runs, which is the whole point: a frame this
+     * approves has already passed the cropping, frontality and scale checks, so the photo
+     * auto-capture takes cannot then be rejected for framing. A timer cannot promise that —
+     * it fires whether or not the user made it into shot.
+     *
+     * @return advice the user can act on, or null when the frame is worth shooting
+     */
+    suspend fun checkFraming(frame: Bitmap): String? = withContext(Dispatchers.Default) {
+        when (val result = detector.detect(frame)) {
+            is DetectionResult.Success -> null
+            is DetectionResult.Failure -> when (val reason = result.reason) {
+                DetectionFailure.NoPersonDetected -> "Step into frame."
+                DetectionFailure.BodyNotFullyVisible,
+                DetectionFailure.BodyCropped,
+                -> "Step back until your head and feet are both in shot."
+
+                DetectionFailure.PoseImplausible -> "Stand upright, arms clear of your sides."
+                DetectionFailure.SegmentationFailed ->
+                    "Your outline is hard to separate from the background."
+
+                DetectionFailure.ScaleUnreliable ->
+                    "The background is being counted as part of you — try a plainer wall."
+
+                DetectionFailure.PhotoUnreadable -> "Waiting for the camera."
+                is DetectionFailure.NotFacingCamera -> reason.advice
+            }
+        }
+    }
+
     /** Entry point for the upload path: decode off the main thread, then process. */
     fun onPhotoPicked(uri: Uri) {
         if (!canAcceptPhoto()) return
