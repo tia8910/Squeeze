@@ -2,6 +2,7 @@ package com.squeeze.app.ui.composition
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,9 +20,12 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.ui.theme.chartPalette
 import com.squeeze.core.trend.TrendPoint
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 /**
  * A single measure over time, with its confidence band and the raw readings behind it.
@@ -76,9 +80,13 @@ fun TrendChart(
                 .height(180.dp)
                 .padding(end = 44.dp, bottom = 18.dp, top = 8.dp),
         ) {
-            val minDay = points.first().epochDay
-            val maxDay = points.last().epochDay
-            val dayRange = (maxDay - minDay).coerceAtLeast(1L).toFloat()
+            // One step per record, not per day. Measurements land whenever the user
+            // remembers to take them, so a real time axis bunches a fortnight of daily
+            // readings into a smear and then hands two thirds of the width to the gap where
+            // nothing happened. Even spacing puts every reading where it can be seen and
+            // compared, which is what this chart is for. The dates below the plot give the
+            // elapsed time back, so the spacing is a layout choice rather than a claim.
+            val lastIndex = (points.size - 1).coerceAtLeast(1).toFloat()
 
             val lows = points.map { it.level - it.levelConfidence95 } + points.map { it.raw }
             val highs = points.map { it.level + it.levelConfidence95 } + points.map { it.raw }
@@ -86,7 +94,7 @@ fun TrendChart(
             val maxValue = highs.max()
             val valueRange = (maxValue - minValue).coerceAtLeast(0.5)
 
-            fun x(day: Long) = (day - minDay) / dayRange * size.width
+            fun x(index: Int) = index / lastIndex * size.width
             fun y(value: Double) =
                 size.height - ((value - minValue) / valueRange).toFloat() * size.height
 
@@ -104,8 +112,8 @@ fun TrendChart(
 
             val line = Path().apply {
                 points.forEachIndexed { index, point ->
-                    if (index == 0) moveTo(x(point.epochDay), y(point.level))
-                    else lineTo(x(point.epochDay), y(point.level))
+                    if (index == 0) moveTo(x(index), y(point.level))
+                    else lineTo(x(index), y(point.level))
                 }
             }
             // 2px: thin enough to read as a precise estimate rather than a wide brush.
@@ -113,16 +121,16 @@ fun TrendChart(
 
             // Raw readings stay visible so nothing is hidden by the smoothing, but they are
             // recessive: the filtered line is the claim, these are the evidence.
-            points.forEach { point ->
+            points.forEachIndexed { index, point ->
                 drawCircle(
                     color = palette.rawMark,
                     radius = 2.dp.toPx(),
-                    center = Offset(x(point.epochDay), y(point.raw)),
+                    center = Offset(x(index), y(point.raw)),
                 )
             }
 
             val last = points.last()
-            val lastCenter = Offset(x(last.epochDay), y(last.level))
+            val lastCenter = Offset(x(points.lastIndex), y(last.level))
 
             // A surface ring separates the marker from whatever it overlaps.
             drawCircle(Color.White.copy(alpha = 0.9f), 5.dp.toPx(), lastCenter)
@@ -138,8 +146,35 @@ fun TrendChart(
                 ),
             )
         }
+
+        // The x-axis is evenly spaced, so it carries no time information on its own. These
+        // two dates put it back: without them a fortnight and a year look identical, and a
+        // rate of change read off the slope would be meaningless.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 44.dp),
+        ) {
+            Text(
+                text = shortDate(points.first().epochDay),
+                style = labelStyle,
+            )
+            Text(
+                text = "${points.size} entries",
+                style = labelStyle,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = shortDate(points.last().epochDay),
+                style = labelStyle,
+            )
+        }
     }
 }
+
+private fun shortDate(epochDay: Long): String =
+    LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("d MMM"))
 
 /**
  * Horizontal rules at the extremes and midpoint, with their values.
@@ -176,18 +211,18 @@ private fun DrawScope.drawGridAndAxisLabels(
 
 private fun DrawScope.drawConfidenceBand(
     points: List<TrendPoint>,
-    x: (Long) -> Float,
+    x: (Int) -> Float,
     y: (Double) -> Float,
     color: Color,
 ) {
     val band = Path().apply {
         points.forEachIndexed { index, point ->
-            val px = x(point.epochDay)
+            val px = x(index)
             val py = y(point.level + point.levelConfidence95)
             if (index == 0) moveTo(px, py) else lineTo(px, py)
         }
-        points.asReversed().forEach { point ->
-            lineTo(x(point.epochDay), y(point.level - point.levelConfidence95))
+        for (index in points.indices.reversed()) {
+            lineTo(x(index), y(points[index].level - points[index].levelConfidence95))
         }
         close()
     }

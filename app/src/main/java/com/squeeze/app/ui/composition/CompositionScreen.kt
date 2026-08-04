@@ -104,6 +104,18 @@ fun CompositionScreen(
 
         HeroCard(latest, calibration, trend)
 
+        // On the dashboard, not below the history. The hero says where you are; this says
+        // how you got there, and that is the second question almost everyone asks — putting
+        // it behind a scroll past every stored entry answered it for nobody.
+        if (trend.size >= 2) {
+            TrendChart(
+                title = "Body fat",
+                unitSuffix = "%",
+                points = trend,
+                lineColor = MaterialTheme.colorScheme.primary,
+            )
+        }
+
         StatRow {
             StatTile(
                 value = measurements.size.toString(),
@@ -142,17 +154,6 @@ fun CompositionScreen(
         // sessions, which is a fine answer to "where am I now" and a poor thing to call an
         // analysis, because no single measurement ever produced that combination.
         HistorySection(measurements, loadPhoto, analysisFor, onDelete)
-
-        // Supporting detail, deliberately below the fold. Someone who wants to interrogate
-        // the number can; someone who just wants the number never has to scroll past a chart.
-        if (trend.size >= 2) {
-            TrendChart(
-                title = "Body fat",
-                unitSuffix = "%",
-                points = trend,
-                lineColor = MaterialTheme.colorScheme.primary,
-            )
-        }
 
         // A separate chart rather than a second axis. Body fat and lean mass are different
         // quantities on different scales; sharing an axis would let the apparent crossing
