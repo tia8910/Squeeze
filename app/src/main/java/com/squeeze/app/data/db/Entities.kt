@@ -39,6 +39,13 @@ data class MeasurementEntity(
      * file lives in the app's private storage under this name; see ScanPhotoStore.
      */
     val photoId: String? = null,
+    /**
+     * The appearance band the user matched themselves to, if they did.
+     *
+     * Defaulted so existing construction sites and migrated rows both mean "not asked",
+     * which is the truth for every measurement taken before this column existed.
+     */
+    val visualBodyFatPercent: Double? = null,
 )
 
 /**
@@ -86,4 +93,7 @@ data class ProfileEntity(
     val trainingAge: String,
     val goal: String,
     val unitSystem: String,
+    /** Target body fat and its deadline; see [com.squeeze.core.model.Profile]. */
+    val targetBodyFatPercent: Double? = null,
+    val targetEpochDay: Long? = null,
 )

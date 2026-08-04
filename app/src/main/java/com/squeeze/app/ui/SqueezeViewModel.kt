@@ -14,6 +14,8 @@ import com.squeeze.app.data.settings.UiSettings
 import com.squeeze.app.ui.theme.ThemeMode
 import com.squeeze.core.bodycomp.CompositionAnalyser
 import com.squeeze.core.bodycomp.CompositionPanel
+import com.squeeze.core.bodycomp.GoalPlanner
+import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Goal
@@ -41,6 +43,13 @@ data class SqueezeUiState(
     val leanMassTrend: List<TrendPoint> = emptyList(),
     val repeatability: RepeatabilityScore? = null,
     val calibration: PersonalCalibration = PersonalCalibration.none(),
+    /**
+     * Progress against the user's dated goal, or null when they have not set one.
+     *
+     * Recomputed on refresh rather than stored: it is a pure function of the trend and the
+     * target, and the day it is read on changes the answer.
+     */
+    val goalProgress: GoalProgress? = null,
     val loading: Boolean = true,
 )
 
@@ -83,7 +92,13 @@ class SqueezeViewModel @Inject constructor(
      * defaulted height would silently mis-scale every photo scan, which is worse than
      * having no profile at all, because the failure would be invisible.
      */
-    fun updateProfile(heightCm: Double?, birthYear: Int?, sex: Sex?) {
+    fun updateProfile(
+        heightCm: Double?,
+        birthYear: Int?,
+        sex: Sex?,
+        targetBodyFatPercent: Double? = null,
+        targetEpochDay: Long? = null,
+    ) {
         if (heightCm == null || birthYear == null || sex == null) return
         if (heightCm !in 100.0..250.0) return
         if (birthYear !in 1900..LocalDate.now().year) return
@@ -99,6 +114,31 @@ class SqueezeViewModel @Inject constructor(
                     trainingAge = existing?.trainingAge ?: TrainingAge.NOVICE.name,
                     goal = existing?.goal ?: Goal.HYPERTROPHY.name,
                     unitSystem = existing?.unitSystem ?: UnitSystem.METRIC.name,
+                    // A goal supplied here wins; otherwise whatever is already stored
+                    // survives, so editing height in Settings cannot silently clear it.
+                    targetBodyFatPercent = targetBodyFatPercent
+                        ?: existing?.targetBodyFatPercent,
+                    targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
+                ),
+            )
+            refresh()
+        }
+    }
+
+    /**
+     * Stores or clears the dated target.
+     *
+     * Both together, always. Storing one without the other would leave the planner with a
+     * goal it cannot judge, which is exactly the state this feature exists to avoid.
+     */
+    fun setGoal(targetBodyFatPercent: Double?, targetEpochDay: Long?) {
+        viewModelScope.launch {
+            val existing = profileDao.get() ?: return@launch
+            val both = targetBodyFatPercent != null && targetEpochDay != null
+            profileDao.upsert(
+                existing.copy(
+                    targetBodyFatPercent = if (both) targetBodyFatPercent else null,
+                    targetEpochDay = if (both) targetEpochDay else null,
                 ),
             )
             refresh()
@@ -133,9 +173,38 @@ class SqueezeViewModel @Inject constructor(
                 leanMassTrend = snapshot.leanMassTrend,
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
+                goalProgress = goalProgress(profile, snapshot, measurements),
                 loading = false,
             )
         }
+    }
+
+    /**
+     * Judges the trend against the user's deadline.
+     *
+     * The rate handed over is the filter's own weekly slope, not the difference between the
+     * last two readings. Two readings differ by measurement noise as much as by anything
+     * real, and a plan built on that would swing between "on track" and "behind" week to
+     * week while the body did nothing unusual.
+     */
+    private fun goalProgress(
+        profile: Profile,
+        snapshot: com.squeeze.app.data.CompositionSnapshot,
+        measurements: List<MeasurementEntity>,
+    ): GoalProgress? {
+        val target = profile.targetOrNull() ?: return null
+        val latest = snapshot.latest
+
+        return GoalPlanner.evaluate(
+            target = target,
+            currentBodyFatPercent = latest?.level,
+            currentWeightKg = measurements.firstNotNullOfOrNull { it.weightKg },
+            // Only once the slope is distinguishable from noise. Before that the honest
+            // answer is that there is no rate yet, which GoalPlanner reports as TOO_EARLY.
+            actualRatePerWeek = latest?.takeIf { it.isChangeSignificant }?.weeklyChange,
+            todayEpochDay = LocalDate.now().toEpochDay(),
+            sex = profile.sex,
+        )
     }
 
     /**
@@ -202,4 +271,6 @@ private fun com.squeeze.app.data.db.ProfileEntity.toDomain() = Profile(
     trainingAge = TrainingAge.valueOf(trainingAge),
     goal = Goal.valueOf(goal),
     unitSystem = UnitSystem.valueOf(unitSystem),
+    targetBodyFatPercent = targetBodyFatPercent,
+    targetEpochDay = targetEpochDay,
 )

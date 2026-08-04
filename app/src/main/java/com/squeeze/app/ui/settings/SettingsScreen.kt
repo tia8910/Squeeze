@@ -36,6 +36,9 @@ fun SettingsScreen(
     birthYear: Int?,
     sex: Sex?,
     onProfileChange: (Double?, Int?, Sex?) -> Unit,
+    targetBodyFatPercent: Double?,
+    targetEpochDay: Long?,
+    onGoalChange: (Double?, Long?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -50,6 +53,12 @@ fun SettingsScreen(
             birthYear = birthYear,
             sex = sex,
             onProfileChange = onProfileChange,
+        )
+
+        GoalSection(
+            targetBodyFatPercent = targetBodyFatPercent,
+            targetEpochDay = targetEpochDay,
+            onGoalChange = onGoalChange,
         )
 
         Text("Appearance", style = MaterialTheme.typography.titleMedium)

@@ -111,8 +111,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     // fails after they have undressed and framed a photograph.
     if (state.profile == null) {
         OnboardingScreen(
-            onComplete = { heightCm, birthYear, sex ->
-                viewModel.updateProfile(heightCm, birthYear, sex)
+            onComplete = { heightCm, birthYear, sex, targetBodyFat, targetDay ->
+                viewModel.updateProfile(heightCm, birthYear, sex, targetBodyFat, targetDay)
             },
         )
         return
@@ -211,6 +211,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         measurements = state.measurements,
                         loadPhoto = viewModel::loadPhoto,
                         analysisFor = viewModel::analysisFor,
+                        goalProgress = state.goalProgress,
+                        onEditGoal = { navController.navigate(Destination.SETTINGS.route) },
                         onStartScan = { navController.navigate(ROUTE_SCAN) },
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
@@ -241,6 +243,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         birthYear = state.profile?.birthYear,
                         sex = state.profile?.sex,
                         onProfileChange = viewModel::updateProfile,
+                        targetBodyFatPercent = state.profile?.targetBodyFatPercent,
+                        targetEpochDay = state.profile?.targetEpochDay,
+                        onGoalChange = viewModel::setGoal,
                     )
                 }
 
