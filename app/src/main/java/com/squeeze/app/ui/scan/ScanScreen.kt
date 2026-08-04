@@ -54,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -884,17 +886,24 @@ private fun BodyFatPreview(profile: Profile?, circumferences: Circumferences) {
 /** Names the specific thing standing between these values and a percentage. */
 private fun missingReason(profile: Profile, c: Circumferences): String {
     val needsHip = profile.sex == Sex.FEMALE
+
+    // Bound to locals rather than smart-cast from the earlier null checks: `Circumferences`
+    // lives in `:core`, and Kotlin will not smart-cast a public property across a module
+    // boundary because the other module is free to change it under us.
+    val neck = c.neckCm
+    val waist = c.waistCm
+
     return when {
-        c.neckCm == null -> "A neck measurement is needed. Put a tape around the narrowest " +
+        neck == null -> "A neck measurement is needed. Put a tape around the narrowest " +
             "part of your neck, below the Adam's apple."
 
-        c.waistCm == null -> "A waist measurement is needed. Measure at the narrowest point, " +
+        waist == null -> "A waist measurement is needed. Measure at the narrowest point, " +
             "level with the navel for most people."
 
         needsHip && c.hipCm == null ->
             "A hip measurement is needed for the equation used here — around the widest point."
 
-        c.waistCm <= c.neckCm ->
+        waist <= neck ->
             "Your waist is not larger than your neck, which the equation cannot use. One of " +
                 "the two is wrong — the neck is the usual culprit."
 
