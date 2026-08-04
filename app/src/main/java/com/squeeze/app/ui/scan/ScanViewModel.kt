@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
+import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.scan.BodyDetector
 import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
@@ -76,10 +77,19 @@ class ScanViewModel @Inject constructor(
     private val detector: BodyDetector,
     private val measurementDao: MeasurementDao,
     private val profileDao: ProfileDao,
+    private val photoStore: ScanPhotoStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScanUiState())
     val state: StateFlow<ScanUiState> = _state.asStateFlow()
+
+    /**
+     * The front photograph, held until the measurement is saved.
+     *
+     * Kept in memory only for the length of the scan. It is written to encrypted storage at
+     * save time and dropped here, so an abandoned scan leaves nothing behind.
+     */
+    private var frontBitmap: Bitmap? = null
 
     private var frontBody: DetectedBody? = null
     private var sideBody: DetectedBody? = null
@@ -160,6 +170,7 @@ class ScanViewModel @Inject constructor(
                     else -> {
                         frontBody = detection.body
                         frontAspectRatio = aspectRatio
+                        frontBitmap = bitmap
                     }
                 }
 
@@ -230,6 +241,12 @@ class ScanViewModel @Inject constructor(
 
         viewModelScope.launch {
             val c = result.circumferences
+
+            // Written before the row, so a row never references a file that failed to save.
+            val photoId = frontBitmap?.let { bitmap ->
+                withContext(Dispatchers.IO) { photoStore.save(bitmap) }
+            }
+
             measurementDao.insert(
                 MeasurementEntity(
                     epochDay = LocalDate.now().toEpochDay(),
@@ -256,13 +273,17 @@ class ScanViewModel @Inject constructor(
                     suprailiacMm = null,
                     referenceBodyFatPercent = null,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
+                    photoId = photoId,
                 ),
             )
+
+            frontBitmap = null
             _state.value = _state.value.copy(saved = true)
         }
     }
 
     fun restart() {
+        frontBitmap = null
         frontBody = null
         sideBody = null
         backBody = null

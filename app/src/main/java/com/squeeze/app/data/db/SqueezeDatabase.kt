@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.squeeze.app.data.crypto.DatabaseKeyManager
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -14,7 +16,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -36,6 +38,20 @@ object SqueezeDatabaseFactory {
 
     private const val DATABASE_NAME = "squeeze.db"
 
+    /**
+     * Adds the scan photograph reference.
+     *
+     * Written out rather than relying on destructive fallback. This app's entire value is an
+     * accumulated history with no cloud copy to restore from, so a schema change that wipes
+     * it is not a migration failure — it is the worst thing the app could do to someone.
+     * Existing rows get NULL, which is exactly right: those scans never kept a photograph.
+     */
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE measurements ADD COLUMN photoId TEXT")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -43,6 +59,7 @@ object SqueezeDatabaseFactory {
         return try {
             Room.databaseBuilder(context, SqueezeDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
+                .addMigrations(MIGRATION_1_2)
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to
                 // accumulate, and with no cloud backup it would be unrecoverable. Every

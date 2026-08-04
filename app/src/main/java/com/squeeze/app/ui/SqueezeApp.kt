@@ -210,6 +210,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         calibration = state.calibration,
                         measurements = state.measurements,
                         panel = state.panel,
+                        loadPhoto = viewModel::loadPhoto,
                         onStartScan = { navController.navigate(ROUTE_SCAN) },
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,

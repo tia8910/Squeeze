@@ -101,8 +101,11 @@ fun SettingsScreen(
         )
 
         Text(
-            text = "Your measurements never leave this device. This setting only controls " +
-                "what other apps on your phone can capture from the screen.",
+            text = "Your measurements and scan photos never leave this device — the app has " +
+                "no internet permission, so it cannot send them anywhere. Photos are stored " +
+                "encrypted in the app's private storage, are not visible in your gallery, and " +
+                "are deleted when you delete the measurement they belong to. This setting " +
+                "only controls what other apps can capture from the screen.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

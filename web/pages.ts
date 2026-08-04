@@ -164,11 +164,11 @@ export function homePage(): string {
 
   <section class="wrap">
     <h2>How a scan works</h2>
-    <p class="sub">Two models run on your device. Nothing is uploaded, and no photo is written to storage.</p>
+    <p class="sub">Two models run on your device. Nothing is uploaded, and everything stays in the app's encrypted private storage.</p>
     <div class="grid three">
       <div class="card"><h3>1 &middot; Pose and silhouette</h3><p>A pose model locates your joints and a segmenter separates you from the background. The joints bound the search; the silhouette decides the exact level.</p></div>
       <div class="card"><h3>2 &middot; Real measurements</h3><p>Your stated height turns pixels into centimetres. Cross-sections are treated as ellipses rather than circles, which is what makes a side photo worth taking.</p></div>
-      <div class="card"><h3>3 &middot; Photos discarded</h3><p>Images exist in memory only for as long as inference takes. What is kept is a set of circumferences — never the photograph.</p></div>
+      <div class="card"><h3>3 &middot; Photos kept, encrypted</h3><p>Your scan photo is saved so you can look back at it, encrypted with a key in your phone's secure hardware. It never leaves the device, and deleting a measurement deletes its photo.</p></div>
     </div>
   </section>
 </main>`;
@@ -211,6 +211,7 @@ export function privacyPage(): string {
       <li><strong>Your profile</strong> — height, year of birth, and which equation variant to use.</li>
       <li><strong>Your measurements</strong> — circumferences, weights, skinfolds and any reference scan results you enter.</li>
       <li><strong>Your settings</strong> — theme, sound and screenshot preferences.</li>
+      <li><strong>Your scan photographs</strong> — encrypted, and described in full below.</li>
     </ul>
     <p>
       All of it is written to an encrypted database in the app's private storage, which other
@@ -219,13 +220,22 @@ export function privacyPage(): string {
 
     <h2>Photographs</h2>
     <p>
-      A body scan analyses a photograph in memory and discards it. Photos taken or selected for
-      a scan are <strong>never written to storage</strong> and never leave the process. What is
-      kept is the resulting set of measurements — a handful of numbers — not the image.
+      Scan photographs are <strong>saved on your device</strong>, so you can look back at the
+      image a measurement came from. They are encrypted with a key held in your phone's secure
+      hardware and written to the app's private storage.
     </p>
     <p>
-      The camera permission is used only while you are taking a scan photo. You can also pick an
-      existing photo instead, in which case the app never asks for camera access at all.
+      That means they do not appear in your gallery, no other app can read them, and they are
+      excluded from cloud backups. Because the key lives in the device's secure hardware, the
+      files are unreadable if the storage is ever recovered from a lost or stolen phone.
+    </p>
+    <p>
+      Deleting a measurement deletes its photograph with it. Deleting the app removes all of
+      them. They are never uploaded, because the app has no way to upload anything.
+    </p>
+    <p>
+      The camera permission is used only while you are taking a scan photo. You can also pick
+      an existing photo instead, in which case the app never asks for camera access at all.
     </p>
 
     <h2>What we do not do</h2>

@@ -1,5 +1,6 @@
 package com.squeeze.app.ui
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.BodyCompositionRepository
@@ -7,6 +8,7 @@ import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
+import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.app.data.settings.UiSettings
 import com.squeeze.app.ui.theme.ThemeMode
@@ -25,7 +27,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -55,6 +59,7 @@ class SqueezeViewModel @Inject constructor(
     private val measurementDao: MeasurementDao,
     private val securitySettings: SecuritySettings,
     private val uiSettings: UiSettings,
+    private val photoStore: ScanPhotoStore,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
@@ -189,9 +194,18 @@ class SqueezeViewModel @Inject constructor(
     fun deleteMeasurement(measurement: MeasurementEntity) {
         viewModelScope.launch {
             measurementDao.delete(measurement)
+
+            // The photograph goes with the row. Leaving it would mean the user deleted a
+            // measurement and the most sensitive part of it quietly stayed on the device.
+            measurement.photoId?.let { photoStore.delete(it) }
+
             refresh()
         }
     }
+
+    /** Decrypts a stored scan photograph for the detail view. */
+    suspend fun loadPhoto(photoId: String): Bitmap? =
+        withContext(Dispatchers.IO) { photoStore.load(photoId) }
 }
 
 private fun com.squeeze.app.data.db.ProfileEntity.toDomain() = Profile(
