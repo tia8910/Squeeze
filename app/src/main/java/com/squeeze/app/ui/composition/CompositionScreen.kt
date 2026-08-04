@@ -46,6 +46,7 @@ import com.squeeze.app.ui.components.StatTile
 import com.squeeze.app.ui.components.NoticePill
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
 import com.squeeze.core.trend.TrendPoint
@@ -71,6 +72,7 @@ fun CompositionScreen(
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
     measurements: List<MeasurementEntity>,
+    panel: CompositionPanel?,
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
@@ -130,6 +132,10 @@ fun CompositionScreen(
                 Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
             },
         )
+
+        // Everything derivable from the latest measurement, collapsed. The hero number
+        // answers what most people opened the app to ask; this is for interrogating it.
+        panel?.let { AnalysisSection(it, Modifier.padding(top = 4.dp)) }
 
         HistorySection(measurements, onDelete)
 

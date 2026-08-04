@@ -145,10 +145,15 @@ fun CelebrationScreen(
                 modifier = Modifier.padding(top = 4.dp),
             )
 
-            Sparkline(
-                values = trend,
-                modifier = Modifier.padding(top = 16.dp),
-            )
+            // One reading is a dot, not a trend. Reserving the chart's height for it left a
+            // tall band of empty card that reads as a rendering fault — the same defect the
+            // home screen had, which was fixed there and missed here.
+            if (trend.size >= 2) {
+                Sparkline(
+                    values = trend,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
         }
 
         Column(
