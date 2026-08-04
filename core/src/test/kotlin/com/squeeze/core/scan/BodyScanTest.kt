@@ -142,9 +142,9 @@ class BodyScanAnalyserTest {
     fun `a complete scan produces circumferences usable for body fat`() {
         val result = analyser().analyse(
             listOf(
-                marker(ScanSite.NECK, 0.075, 0.070),
-                marker(ScanSite.WAIST, 0.150, 0.100),
-                marker(ScanSite.HIP, 0.170, 0.120),
+                marker(ScanSite.NECK, 0.0551, 0.0524),
+                marker(ScanSite.WAIST, 0.1307, 0.0941),
+                marker(ScanSite.HIP, 0.1520, 0.1155),
             ),
         )
 
@@ -157,7 +157,7 @@ class BodyScanAnalyserTest {
 
     @Test
     fun `a scan missing the waist cannot produce body fat`() {
-        val result = analyser().analyse(listOf(marker(ScanSite.NECK, 0.075, 0.070)))
+        val result = analyser().analyse(listOf(marker(ScanSite.NECK, 0.0551, 0.0524)))
 
         assertFalse(result.usableForBodyFat)
         assertTrue(result.warnings.any { it is ScanWarning.MissingRequiredSite })

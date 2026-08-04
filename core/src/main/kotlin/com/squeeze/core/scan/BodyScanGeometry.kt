@@ -50,7 +50,8 @@ data class BodySlice(
  *    user who rounds 174 cm up to 176 shifts every circumference by about 1%.
  */
 class ScaleRecovery(
-    private val heightCm: Double,
+    /** Exposed so the analyser can judge a measurement against the person's own stature. */
+    val heightCm: Double,
     private val bodyHeightFraction: Double,
 ) {
     init {

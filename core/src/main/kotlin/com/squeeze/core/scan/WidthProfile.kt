@@ -110,6 +110,15 @@ object AnatomicalLevelFinder {
      * thigh came back byte-identical — a bug visible in the app as two sites reporting the
      * same centimetre value. Disjoint ranges make that impossible by construction.
      */
+    /**
+     * Where within the chin-to-shoulder span the neck is genuinely narrowest.
+     *
+     * Trimmed at both ends: the jaw sits above it and the trapezius below, and the silhouette
+     * is wider than the neck at both.
+     */
+    private const val NECK_BAND_START = 0.35
+    private const val NECK_BAND_END = 0.80
+
     private const val HIP_BAND_END = 0.18
 
     /** Thigh is measured below the gluteal fold, where the legs have genuinely separated. */
@@ -126,8 +135,17 @@ object AnatomicalLevelFinder {
     fun detectSites(profile: WidthProfile, anchors: PoseAnchors): Map<ScanSite, Int> {
         val sites = mutableMapOf<ScanSite, Int>()
 
-        narrowestBetween(profile, anchors.chinRow, anchors.shoulderRow)
-            ?.let { sites[ScanSite.NECK] = it }
+        // Not the whole chin-to-shoulder span. The anchor above the neck comes from the
+        // mouth landmarks, so the top of that span is jaw and the bottom is where the
+        // trapezius flares out into the shoulder. Both are wider than a neck, and including
+        // them is how a 175 cm man ends up with a 52 cm neck — which drives the Navy
+        // equation to a negative body fat and so produces no estimate at all.
+        val neckSpan = anchors.shoulderRow - anchors.chinRow
+        narrowestBetween(
+            profile,
+            anchors.chinRow + (neckSpan * NECK_BAND_START).toInt(),
+            anchors.chinRow + (neckSpan * NECK_BAND_END).toInt(),
+        )?.let { sites[ScanSite.NECK] = it }
 
         narrowestBetween(profile, anchors.shoulderRow, anchors.hipRow)
             ?.let { sites[ScanSite.WAIST] = it }

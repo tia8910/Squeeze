@@ -25,11 +25,47 @@ object PlausibleRanges {
         ScanSite.CALF to 20.0..65.0,
     )
 
+    /**
+     * The same limits expressed against the person's own stature.
+     *
+     * Absolute bounds are too blunt on their own. A 52.5 cm neck is inside the absolute
+     * range and still absurd on a 175 cm frame — and that exact reading was what made the
+     * Navy equation return a negative body fat, which the app then reported as no result at
+     * all rather than as a bad measurement.
+     *
+     * Circumference scales with stature, so a ratio catches a mis-located site that an
+     * absolute range waves through. These are wide enough to contain any real adult and
+     * still narrow enough to reject a site the pipeline placed on the wrong part of the body.
+     */
+    private val staturedRatios: Map<ScanSite, ClosedFloatingPointRange<Double>> = mapOf(
+        ScanSite.NECK to 0.17..0.27,
+        ScanSite.CHEST to 0.42..0.78,
+        ScanSite.WAIST to 0.33..0.85,
+        ScanSite.HIP to 0.45..0.78,
+        ScanSite.THIGH to 0.22..0.48,
+        ScanSite.ARM to 0.11..0.28,
+        ScanSite.CALF to 0.14..0.30,
+    )
+
     fun rangeFor(site: ScanSite): ClosedFloatingPointRange<Double> =
         ranges[site] ?: 1.0..300.0
 
     fun isPlausible(site: ScanSite, centimetres: Double): Boolean =
         centimetres.isFinite() && centimetres in rangeFor(site)
+
+    /**
+     * Whether a measurement is plausible both absolutely and against [heightCm].
+     *
+     * Both checks have to pass. The absolute range catches a wildly broken scale; the ratio
+     * catches a site measured on the wrong anatomy at a scale that happens to be right.
+     */
+    fun isPlausibleForHeight(site: ScanSite, centimetres: Double, heightCm: Double): Boolean {
+        if (!isPlausible(site, centimetres)) return false
+        if (heightCm <= 0.0) return true
+
+        val ratios = staturedRatios[site] ?: return true
+        return centimetres / heightCm in ratios
+    }
 
     /**
      * Cross-site sanity: a chest narrower than a neck, or a waist wider than the range

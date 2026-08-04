@@ -56,15 +56,32 @@ data class TrunkBounds(
      * grow without limit down the legs.
      */
     fun maxHalfWidthAt(row: Int): Double {
-        val span = when {
-            row <= shoulderRow -> shoulderHalfSpan
-            row >= hipRow -> hipHalfSpan
-            else -> {
-                val t = (row - shoulderRow).toDouble() / (hipRow - shoulderRow).toDouble()
-                shoulderHalfSpan + t * (hipHalfSpan - shoulderHalfSpan)
-            }
+        val fraction = when {
+            row <= shoulderRow -> 0.0
+            row >= hipRow -> 1.0
+            else -> (row - shoulderRow).toDouble() / (hipRow - shoulderRow).toDouble()
         }
-        return span * (1.0 + SOFT_TISSUE_MARGIN)
+
+        val span = shoulderHalfSpan + fraction * (hipHalfSpan - shoulderHalfSpan)
+
+        // The margin is interpolated too, and that is the point. A single margin cannot
+        // serve both ends, because the two landmark pairs sit at very different depths: the
+        // acromion is just under the skin, so the shoulder needs barely more than the
+        // deltoid, while the hip landmarks are joint centres buried inside the pelvis and
+        // the body extends far past them across the glutes and trochanters.
+        //
+        // Using the shoulder's margin at the hip is what clipped a real hip down below the
+        // waist measured on the same body — anatomically impossible, and produced by the
+        // bound rather than by the person.
+        //
+        // The ramp is quadratic rather than linear, and that matters. The waist sits in the
+        // middle of this span and is exactly where an arm at the side has to be cut off, so
+        // the margin has to stay tight through the middle and open up only as it approaches
+        // the hip. A linear ramp loosens the waist by half the hip's allowance and lets the
+        // arm back in — which a test caught.
+        val eased = fraction * fraction
+        val margin = SHOULDER_MARGIN + eased * (HIP_MARGIN - SHOULDER_MARGIN)
+        return span * (1.0 + margin)
     }
 
     /** Where the trunk's centre sits at [row], interpolated the same way. */
@@ -93,17 +110,23 @@ data class TrunkBounds(
 
     companion object {
         /**
-         * How far past the joint centres the body is allowed to extend, as a fraction of
-         * the half-span at that height.
+         * How far past the acromion the shoulder may extend, as a fraction of its half-span.
          *
-         * 0.55 is chosen from the two failures it sits between. Too tight and a genuinely
-         * large waist gets clipped, understating it. Too loose and an arm at the side fits
-         * inside the bound and the original error returns. An adult arm is roughly 0.6 to
-         * 0.8 of a trunk half-width, so a margin below that excludes it; a waist wider than
-         * 1.55 times the hip-joint half-span is well into the range where the plausibility
-         * checks should be speaking up anyway.
+         * Small, because the acromion sits just under the skin — what lies outside it is the
+         * deltoid and not much else.
          */
-        const val SOFT_TISSUE_MARGIN = 0.55
+        const val SHOULDER_MARGIN = 0.40
+
+        /**
+         * The same at the hip, and much larger for a physical reason.
+         *
+         * The hip landmarks are joint centres buried inside the pelvis, roughly 18 to 20 cm
+         * apart on an adult, while the body across the glutes and trochanters is more like
+         * 34 cm. The skin is therefore nearly twice the half-span from the midline, and a
+         * margin sized for the shoulder clips a real hip badly — in testing it returned a
+         * hip narrower than the waist measured on the same body, which cannot happen.
+         */
+        const val HIP_MARGIN = 1.00
 
         /**
          * Builds bounds from front-facing pose geometry.
