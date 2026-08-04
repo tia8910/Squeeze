@@ -202,3 +202,100 @@ class FrontalityCheckTest {
         assertNull(FrontalityCheck.evaluate(collapsed, bodyHeightFraction, aspect))
     }
 }
+
+/**
+ * Regressions from a real scan, taken on a body its owner reports at 10% body fat.
+ *
+ * The scan returned a 52.5 cm neck and a 77.1 cm hip against a 75.4 cm waist on a 175 cm
+ * frame. The neck drove the Navy equation to a negative body fat, so the app reported no
+ * estimate at all; the hip came back narrower than the waist, which cannot happen on a
+ * human and was produced by the trunk bound rather than by the person.
+ */
+class RealScanRegressionTest {
+
+    private val heightCm = 175.0
+
+    @Test
+    fun `the neck that broke the body fat estimate is now refused`() {
+        // 52.5 / 175 = 0.30. No adult neck is thirty per cent of stature.
+        assertTrue(
+            !PlausibleRanges.isPlausibleForHeight(ScanSite.NECK, 52.5, heightCm),
+            "the 52.5 cm neck that produced a negative body fat is still accepted",
+        )
+
+        // The absolute range alone waved it through, which is why the ratio check exists.
+        assertTrue(
+            PlausibleRanges.isPlausible(ScanSite.NECK, 52.5),
+            "the absolute range was supposed to be the weaker check",
+        )
+    }
+
+    @Test
+    fun `the neck implied by the reported body fat is accepted`() {
+        // Solving Navy backwards from 10% with the waist the scan measured gives 36.6 cm.
+        assertTrue(
+            PlausibleRanges.isPlausibleForHeight(ScanSite.NECK, 36.6, heightCm),
+            "the correct neck for this body is being rejected",
+        )
+    }
+
+    @Test
+    fun `the waist the scan measured is accepted`() {
+        // This one was right, and must stay right — it is the measurement the arm-exclusion
+        // work fixed, down from 125.7 cm on the previous build.
+        assertTrue(PlausibleRanges.isPlausibleForHeight(ScanSite.WAIST, 75.4, heightCm))
+    }
+
+    @Test
+    fun `a hip narrower than the waist on the same body is refused`() {
+        assertTrue(
+            !PlausibleRanges.isPlausibleForHeight(ScanSite.HIP, 77.1, heightCm),
+            "a 77.1 cm hip beside a 75.4 cm waist should not pass",
+        )
+        assertTrue(
+            PlausibleRanges.isPlausibleForHeight(ScanSite.HIP, 95.0, heightCm),
+            "a realistic hip for this body is being rejected",
+        )
+    }
+
+    @Test
+    fun `the hip bound no longer clips a real hip`() {
+        // Hip joint centres about 19 cm apart, so 0.108 of a 175 cm stature; the body across
+        // the glutes is about 34 cm, or 0.194. The bound has to contain the second.
+        val trunk = TrunkBounds(
+            shoulderLeftX = 0.37, shoulderRightX = 0.63, shoulderRow = 100,
+            hipLeftX = 0.446, hipRightX = 0.554, hipRow = 300,
+        )
+
+        val halfBodyWidthAtHip = 0.194 / 2
+        assertTrue(
+            trunk.maxHalfWidthAt(300) >= halfBodyWidthAtHip,
+            "the hip bound ${trunk.maxHalfWidthAt(300)} still clips a real hip " +
+                "half-width of $halfBodyWidthAtHip",
+        )
+    }
+
+    @Test
+    fun `loosening the hip did not stop the waist trimming an arm`() {
+        val trunk = TrunkBounds(
+            shoulderLeftX = 0.37, shoulderRightX = 0.63, shoulderRow = 100,
+            hipLeftX = 0.446, hipRightX = 0.554, hipRow = 300,
+        )
+
+        // Stated as behaviour rather than as a comparison of the two bounds. The hip span is
+        // so much narrower than the shoulder span that the hip's absolute allowance stays
+        // the smaller of the two even after its margin doubles — so comparing the numbers
+        // directly tests nothing about whether the waist still does its job.
+        val armInflated = trunk.clip(startX = 0.28, endX = 0.72, row = 200)
+        assertNotNull(armInflated)
+        assertTrue(
+            (armInflated.endInclusive - armInflated.start) < 0.44,
+            "an arm at the waist is no longer being trimmed",
+        )
+
+        // And a real waist still passes through untouched.
+        val genuine = trunk.clip(startX = 0.41, endX = 0.59, row = 200)
+        assertNotNull(genuine)
+        assertEquals(0.18, genuine.endInclusive - genuine.start, 1e-9)
+    }
+}

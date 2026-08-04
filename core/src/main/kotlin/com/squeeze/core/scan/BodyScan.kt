@@ -139,7 +139,7 @@ class BodyScanAnalyser(
             // measurement to be nudged back into range — it is evidence the site was
             // mis-located, and the honest thing is to have no number rather than a
             // plausible-looking one.
-            if (PlausibleRanges.isPlausible(marker.site, circumference)) {
+            if (PlausibleRanges.isPlausibleForHeight(marker.site, circumference, scale.heightCm)) {
                 measured[marker.site] = circumference
             } else {
                 warnings += ScanWarning.ImplausibleMeasurement(marker.site, circumference)

@@ -36,6 +36,14 @@ data class Metric(
     val unit: String,
     val confidence: Confidence,
     val detail: String,
+    /**
+     * Where this reading sits against the population, when a published reference exists.
+     *
+     * Null where none does. A number without a comparison tells most people nothing —
+     * "17.4%" only becomes useful once you know whether that is lean or ordinary for
+     * someone like you.
+     */
+    val band: ReferenceBand? = null,
 )
 
 /** Something the user could supply to unlock figures that cannot be computed without it. */
@@ -86,6 +94,18 @@ object CompositionAnalyser {
 
         // --- Composition -----------------------------------------------------------------
 
+        if (bodyFatPercent != null) {
+            composition += Metric(
+                name = "Body fat",
+                value = bodyFatPercent,
+                unit = "%",
+                confidence = Confidence.ESTIMATED,
+                detail = "Merged from every method your measurements support, weighted by how " +
+                    "precise each one is.",
+                band = ReferenceBands.bodyFat(bodyFatPercent, profile.sex, age),
+            )
+        }
+
         if (bodyFatPercent != null && weightKg != null) {
             val partition = BodyFatCalculator.partition(weightKg, bodyFatPercent)
 
@@ -114,8 +134,8 @@ object CompositionAnalyser {
                 unit = "",
                 confidence = Confidence.ESTIMATED,
                 detail = "Fat-free mass index — lean mass scaled for height, so it can be " +
-                    "compared between people. Around 19 is average for an untrained man, " +
-                    "22 to 23 is well trained, and the drug-free ceiling sits near 25.",
+                    "compared between people.",
+                band = ReferenceBands.ffmi(ffmi, profile.sex),
             )
 
             // Kouri et al. 1995: normalises FFMI to a 1.8 m reference stature, because the
@@ -186,6 +206,7 @@ object CompositionAnalyser {
                     "Under 0.5, which is the usual target. Waist under half your height is " +
                         "the simplest single screen for central fat."
                 },
+                band = ReferenceBands.waistToHeight(whtr),
             )
 
             // A Body Shape Index (Krakauer 2012). Designed so that what remains after
@@ -212,6 +233,7 @@ object CompositionAnalyser {
                     detail = "Included for reference only. BMI cannot tell muscle from fat, " +
                         "which is why a lean, muscular person is routinely classed overweight " +
                         "by it. The figures above are better answers to the same question.",
+                    band = ReferenceBands.bmi(bmi),
                 )
             }
 
@@ -250,6 +272,7 @@ object CompositionAnalyser {
                 detail = "Where fat sits rather than how much there is. Both numbers come " +
                     "from the same photo at the same scale, so scale error cancels — this is " +
                     "one of the most trustworthy things a scan produces.",
+                band = ReferenceBands.waistToHip(waist / hip, profile.sex),
             )
         }
 

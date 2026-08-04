@@ -4,6 +4,7 @@ import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.core.bodycomp.BodyFatCalculator
 import com.squeeze.core.bodycomp.CalibrationPoint
+import com.squeeze.core.bodycomp.MethodFusion
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
@@ -109,21 +110,25 @@ class BodyCompositionRepository @Inject constructor(
      */
     private fun estimate(profile: Profile, entity: MeasurementEntity): BodyFatEstimate? {
         val age = profile.ageAt(LocalDate.now().year)
+        val candidates = mutableListOf<BodyFatEstimate>()
 
+        // A reference scan is not an equation applied to this entry, it is a measurement of
+        // the thing itself, so it enters the pool at its own much tighter error.
         entity.referenceBodyFatPercent?.let { reference ->
-            return BodyFatEstimate(
+            candidates += BodyFatEstimate(
                 percent = reference,
                 method = EstimationMethod.REFERENCE_SCAN,
                 standardErrorPercent = EstimationMethod.REFERENCE_SCAN.standardErrorPercent,
             )
         }
 
-        BodyFatCalculator.jacksonPollock3(profile, entity.toSkinfolds(), age)?.let { return it }
+        BodyFatCalculator.jacksonPollock3(profile, entity.toSkinfolds(), age)
+            ?.let { candidates += it }
 
         BodyFatCalculator.navy(profile, entity.toCircumferences())?.let { navy ->
             // A photo-derived circumference set runs the same equation but scatters more,
             // because scale recovery adds error the tape does not have.
-            return when (entity.source) {
+            candidates += when (entity.source) {
                 MeasurementSource.PHOTO.name -> navy.copy(
                     method = EstimationMethod.PHOTO_SILHOUETTE,
                     standardErrorPercent = EstimationMethod.PHOTO_SILHOUETTE.standardErrorPercent,
@@ -138,7 +143,15 @@ class BodyCompositionRepository @Inject constructor(
             }
         }
 
-        return entity.weightKg?.let { BodyFatCalculator.deurenbergBmi(profile, it, age) }
+        entity.weightKg
+            ?.let { BodyFatCalculator.deurenbergBmi(profile, it, age) }
+            ?.let { candidates += it }
+
+        // Every method that could run, merged rather than ranked. Two routes to the same
+        // quantity constrain it better than the better one alone, and MethodFusion handles
+        // the two things that would otherwise make that a false economy: the methods are
+        // correlated, and the BMI fallback is not a peer.
+        return MethodFusion.combine(candidates)?.combined
     }
 
     /**

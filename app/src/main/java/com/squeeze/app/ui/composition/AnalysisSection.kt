@@ -30,9 +30,11 @@ import androidx.compose.ui.unit.dp
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.core.bodycomp.BandPosition
 import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.Confidence
 import com.squeeze.core.bodycomp.Metric
+import com.squeeze.core.bodycomp.ReferenceBand
 import kotlin.math.abs
 
 /**
@@ -146,7 +148,23 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
                     )
                 }
 
-                ConfidenceTag(metric.confidence)
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    metric.band?.let { BandTag(it) }
+                    ConfidenceTag(metric.confidence)
+                }
+
+                metric.band?.let { band ->
+                    Text(
+                        text = band.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
 
                 Text(
                     text = metric.detail,
@@ -175,6 +193,36 @@ private fun format(metric: Metric): String {
     return if (metric.unit.isEmpty()) text else "$text ${metric.unit}"
 }
 
+/**
+ * Where the reading sits against the population.
+ *
+ * Colour comes from what the metric means rather than from the enum, because the direction
+ * is not the judgement: a high fat-free mass index is a good outcome and a high
+ * waist-to-height is not. Both are [BandPosition.HIGH].
+ */
+@Composable
+private fun BandTag(band: ReferenceBand) {
+    val dark = LocalIsDarkTheme.current
+    val colour = when (band.position) {
+        BandPosition.NORMAL -> if (dark) Brand.DarkBlue else Brand.BlueDeep
+        BandPosition.LOW, BandPosition.HIGH -> Brand.Warning
+    }
+
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(colour.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = band.label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = colour,
+        )
+    }
+}
+
 @Composable
 private fun ConfidenceTag(confidence: Confidence) {
     val dark = LocalIsDarkTheme.current
@@ -187,7 +235,6 @@ private fun ConfidenceTag(confidence: Confidence) {
 
     Box(
         Modifier
-            .padding(top = 6.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(colour.copy(alpha = 0.12f))
             .padding(horizontal = 8.dp, vertical = 3.dp),
