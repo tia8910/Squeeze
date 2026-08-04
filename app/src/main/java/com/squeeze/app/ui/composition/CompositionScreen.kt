@@ -46,6 +46,7 @@ import com.squeeze.app.ui.components.NoticePill
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
+import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
 import com.squeeze.core.trend.TrendPoint
@@ -73,6 +74,8 @@ fun CompositionScreen(
     measurements: List<MeasurementEntity>,
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
+    goalProgress: GoalProgress?,
+    onEditGoal: () -> Unit,
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
@@ -103,6 +106,11 @@ fun CompositionScreen(
         }
 
         HeroCard(latest, calibration, trend)
+
+        // Directly under the hero, above everything else. It is the only card here that
+        // answers "so what": the number says where you are, this says whether that is
+        // enough and what to change if it is not.
+        goalProgress?.let { GoalCard(it, onEditGoal) }
 
         // On the dashboard, not below the history. The hero says where you are; this says
         // how you got there, and that is the second question almost everyone asks — putting
@@ -284,6 +292,8 @@ private fun HistorySection(
     measurements: List<MeasurementEntity>,
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
+    goalProgress: GoalProgress?,
+    onEditGoal: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
 ) {
     if (measurements.isEmpty()) return

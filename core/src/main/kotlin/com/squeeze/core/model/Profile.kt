@@ -50,10 +50,31 @@ data class Profile(
     val trainingAge: TrainingAge = TrainingAge.NOVICE,
     val goal: Goal = Goal.HYPERTROPHY,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
+    /**
+     * Where the user wants their body fat to be, and by when.
+     *
+     * Both or neither. A target without a date cannot be behind schedule, so nothing about
+     * it can ever be wrong and the app can never say anything useful about it; a date with
+     * no target is a deadline for nothing. Together they give a required rate, which is the
+     * only thing a current rate can honestly be compared against.
+     */
+    val targetBodyFatPercent: Double? = null,
+    val targetEpochDay: Long? = null,
 ) {
     init {
         require(heightCm in 100.0..250.0) { "heightCm out of plausible range: $heightCm" }
     }
 
     fun ageAt(year: Int): Int = year - birthYear
+
+    /** The dated goal, or null when the user has not set one. */
+    fun targetOrNull(): com.squeeze.core.bodycomp.GoalTarget? {
+        val percent = targetBodyFatPercent ?: return null
+        val day = targetEpochDay ?: return null
+        return com.squeeze.core.bodycomp.GoalTarget(
+            goal = goal,
+            targetBodyFatPercent = percent,
+            targetEpochDay = day,
+        )
+    }
 }

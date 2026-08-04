@@ -25,6 +25,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.TrainingAge
 import com.squeeze.core.program.Equipment
+import com.squeeze.core.program.WeakPoint
+import com.squeeze.core.program.WeakPointAnalysis
 import com.squeeze.core.program.Session
 import com.squeeze.core.program.TrainingWeek
 
@@ -59,6 +61,11 @@ fun TrainingScreen(viewModel: TrainingViewModel = hiltViewModel()) {
             // An adjustment the user cannot explain reads as the app being erratic.
             InfoCard(title = "Adjusted from your measurements", body = rationale)
         }
+
+        // Before the block, because it is the reason the block prioritises what it does.
+        // A programme that quietly favours calves is indistinguishable from a random one
+        // unless the user is told why.
+        if (state.weakPoints.isNotEmpty()) WeakPointCard(state.weakPoints)
 
         state.mesocycle?.let { mesocycle ->
             Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)
@@ -233,4 +240,58 @@ private fun Goal.label(): String = when (this) {
     Goal.CUT -> "Cut"
     Goal.RECOMP -> "Recomp"
     Goal.MAKE_WEIGHT -> "Make weight"
+}
+
+/**
+ * What the scan says is lagging, and what the programme did about it.
+ *
+ * Every ratio behind this comes from a single photograph at a single scale, so the scale
+ * error that troubles the absolute centimetres divides out — which is what makes it
+ * defensible to prescribe from measurements that may themselves be a few per cent off.
+ *
+ * Framed as a training decision rather than a judgement. The user did not ask to be graded
+ * against an ideal physique, and the useful content is which of their own parts is furthest
+ * from where the rest of their body sits.
+ */
+@Composable
+private fun WeakPointCard(weakPoints: List<WeakPoint>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "Prioritised from your measurements",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "These are proportions, not absolutes — the parts furthest from where " +
+                    "the rest of your body sits. The block below gives the first " +
+                    "${WeakPointAnalysis.MAX_PRIORITIES} of them extra sets.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            weakPoints.forEachIndexed { index, point ->
+                Column(Modifier.padding(top = 10.dp)) {
+                    Text(
+                        text = point.group.name.lowercase().replaceFirstChar { it.uppercase() } +
+                            if (index < WeakPointAnalysis.MAX_PRIORITIES) " · prioritised" else "",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text(
+                        text = point.finding,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = point.prescription,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
 }

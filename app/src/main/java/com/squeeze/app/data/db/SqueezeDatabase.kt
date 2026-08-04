@@ -16,7 +16,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -52,6 +52,19 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /**
+     * Adds the dated body-fat goal.
+     *
+     * Both columns are nullable and start NULL, which says the right thing about existing
+     * users: they have no goal, rather than a goal of zero by a deadline of the epoch.
+     */
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN targetBodyFatPercent REAL")
+            db.execSQL("ALTER TABLE profile ADD COLUMN targetEpochDay INTEGER")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -59,7 +72,7 @@ object SqueezeDatabaseFactory {
         return try {
             Room.databaseBuilder(context, SqueezeDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to
                 // accumulate, and with no cloud backup it would be unrecoverable. Every

@@ -3,7 +3,9 @@ package com.squeeze.app.ui.training
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.BodyCompositionRepository
+import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.ProfileDao
+import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
@@ -15,6 +17,8 @@ import com.squeeze.core.program.Mesocycle
 import com.squeeze.core.program.ProgramGenerator
 import com.squeeze.core.program.TrainingConstraints
 import com.squeeze.core.program.VolumeAdjustment
+import com.squeeze.core.program.WeakPoint
+import com.squeeze.core.program.WeakPointAnalysis
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +36,13 @@ data class TrainingUiState(
     /** Why the composition trend changed the prescription, if it did. */
     val adjustmentRationale: String? = null,
     val selectedWeek: Int = 0,
+    /**
+     * Lagging body parts read from the latest scan, worst first.
+     *
+     * The programme is built with these as priority groups, so this list is not decoration —
+     * it is the explanation for why the block looks the way it does.
+     */
+    val weakPoints: List<WeakPoint> = emptyList(),
 )
 
 /**
@@ -44,6 +55,7 @@ data class TrainingUiState(
 @HiltViewModel
 class TrainingViewModel @Inject constructor(
     private val profileDao: ProfileDao,
+    private val measurementDao: MeasurementDao,
     private val repository: BodyCompositionRepository,
     private val generator: ProgramGenerator,
 ) : ViewModel() {
@@ -111,6 +123,23 @@ class TrainingViewModel @Inject constructor(
                 unitSystem = UnitSystem.valueOf(stored.unitSystem),
             )
 
+            // Proportions from the most recent measurement carrying each site. Ratios
+            // survive the scan's scale error — both sides of a ratio come from one
+            // photograph at one scale — which is what makes them safe to prescribe from
+            // when the absolute centimetres may not be.
+            val measurements = measurementDao.since(Long.MIN_VALUE)
+                .sortedByDescending { it.epochDay }
+            val circumferences = Circumferences(
+                neckCm = measurements.firstNotNullOfOrNull { it.neckCm },
+                waistCm = measurements.firstNotNullOfOrNull { it.waistCm },
+                hipCm = measurements.firstNotNullOfOrNull { it.hipCm },
+                chestCm = measurements.firstNotNullOfOrNull { it.chestCm },
+                thighCm = measurements.firstNotNullOfOrNull { it.thighCm },
+                armCm = measurements.firstNotNullOfOrNull { it.armCm },
+                calfCm = measurements.firstNotNullOfOrNull { it.calfCm },
+            )
+            val weakPoints = WeakPointAnalysis.analyse(circumferences, profile.sex)
+
             val snapshot = repository.snapshot(profile)
             val adjustment: VolumeAdjustment = CompositionFeedback.evaluate(
                 bodyFatTrend = snapshot.bodyFatTrend,
@@ -123,6 +152,7 @@ class TrainingViewModel @Inject constructor(
                 constraints = TrainingConstraints(
                     daysPerWeek = current.daysPerWeek,
                     availableEquipment = current.equipment,
+                    priorityGroups = WeakPointAnalysis.priorityGroups(weakPoints),
                 ),
                 adjustment = adjustment,
             )
@@ -130,6 +160,7 @@ class TrainingViewModel @Inject constructor(
             _state.value = current.copy(
                 mesocycle = mesocycle,
                 adjustmentRationale = adjustment.rationale,
+                weakPoints = weakPoints,
                 selectedWeek = 0,
                 profileMissing = false,
             )
