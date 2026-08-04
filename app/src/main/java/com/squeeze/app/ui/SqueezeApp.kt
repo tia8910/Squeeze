@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -55,6 +56,7 @@ import com.squeeze.app.ui.celebration.CelebrationScreen
 import com.squeeze.app.ui.composition.CompositionScreen
 import com.squeeze.app.ui.landing.LandingScreen
 import com.squeeze.app.ui.measurement.AddMeasurementScreen
+import com.squeeze.app.ui.onboarding.OnboardingScreen
 import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
 import com.squeeze.app.ui.theme.Brand
@@ -84,16 +86,41 @@ private enum class Destination(
 @Composable
 fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     val landingSeen by viewModel.landingSeen.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     if (!landingSeen) {
         LandingScreen(onGetStarted = viewModel::markLandingSeen)
         return
     }
 
+    // Nothing is drawn until the stored profile has actually been read. Deciding on a null
+    // profile while the query is still in flight would flash onboarding at every returning
+    // user for as long as the database takes to open.
+    if (state.loading) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        )
+        return
+    }
+
+    // The three fields the equations and the scale recovery need. Without them the app can
+    // produce no number at all, so they are collected before the app rather than left in a
+    // settings screen a user might never open — a scan that fails for a missing height
+    // fails after they have undressed and framed a photograph.
+    if (state.profile == null) {
+        OnboardingScreen(
+            onComplete = { heightCm, birthYear, sex ->
+                viewModel.updateProfile(heightCm, birthYear, sex)
+            },
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val state by viewModel.state.collectAsStateWithLifecycle()
 
     val activeTab = Destination.entries.firstOrNull { destination ->
         backStackEntry?.destination?.hierarchy?.any { it.route == destination.route } == true

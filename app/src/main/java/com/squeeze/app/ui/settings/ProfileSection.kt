@@ -26,15 +26,10 @@ import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.core.model.ProfileValidation
 import com.squeeze.core.model.Sex
 import kotlinx.coroutines.delay
 import java.time.LocalDate
-
-/** Bounds beyond which a typed value is a typo rather than a person. */
-private const val MIN_HEIGHT_CM = 120.0
-private const val MAX_HEIGHT_CM = 230.0
-private const val MIN_AGE_YEARS = 13
-private const val MAX_AGE_YEARS = 100
 
 /**
  * Height, sex and year of birth, committed explicitly.
@@ -73,26 +68,12 @@ fun ProfileSection(
     val parsedHeight = heightText.toDoubleOrNull()
     val parsedYear = yearText.toIntOrNull()
 
-    val heightError = when {
-        heightText.isBlank() -> null
-        parsedHeight == null -> "Enter a number"
-        parsedHeight < MIN_HEIGHT_CM || parsedHeight > MAX_HEIGHT_CM ->
-            "Height should be between ${MIN_HEIGHT_CM.toInt()} and ${MAX_HEIGHT_CM.toInt()} cm"
-        else -> null
-    }
+    // The same rules onboarding uses. Kept in :core precisely so these two screens cannot
+    // disagree about what a valid height is.
+    val heightError = ProfileValidation.heightError(heightText)
+    val yearError = ProfileValidation.birthYearError(yearText, currentYear)
 
-    val yearError = when {
-        yearText.isBlank() -> null
-        parsedYear == null -> "Enter a year"
-        currentYear - parsedYear < MIN_AGE_YEARS || currentYear - parsedYear > MAX_AGE_YEARS ->
-            "Year of birth should be between ${currentYear - MAX_AGE_YEARS} and " +
-                "${currentYear - MIN_AGE_YEARS}"
-        else -> null
-    }
-
-    val complete = parsedHeight != null && parsedYear != null && pendingSex != null
-    val valid = complete && heightError == null && yearError == null
-
+    val complete = ProfileValidation.isComplete(heightText, yearText, pendingSex, currentYear)
     val changed = parsedHeight != heightCm || parsedYear != birthYear || pendingSex != sex
 
     // The confirmation clears itself; a tick that stays put stops meaning "just now".
@@ -125,7 +106,7 @@ fun ProfileSection(
             },
             label = { Text("Height (cm)") },
             isError = heightError != null,
-            supportingText = heightError?.let { { Text(it) } },
+            supportingText = heightError?.let { { Text(it.message) } },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
@@ -142,7 +123,7 @@ fun ProfileSection(
             },
             label = { Text("Year of birth") },
             isError = yearError != null,
-            supportingText = yearError?.let { { Text(it) } },
+            supportingText = yearError?.let { { Text(it.message) } },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
@@ -188,7 +169,7 @@ fun ProfileSection(
                 onProfileChange(parsedHeight, parsedYear, pendingSex)
                 justSaved = true
             },
-            enabled = valid && changed,
+            enabled = complete && changed,
             leading = if (justSaved) {
                 { Icon(Icons.Default.Check, contentDescription = null) }
             } else {
