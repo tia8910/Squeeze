@@ -51,6 +51,16 @@ class SqueezeViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) = uiSettings.setThemeMode(mode)
 
+    /** Short cues on save, capture and celebration. */
+    val soundEnabled: StateFlow<Boolean> = uiSettings.soundEnabled
+
+    /** The looping motivational bed. */
+    val ambientEnabled: StateFlow<Boolean> = uiSettings.ambientEnabled
+
+    fun setSoundEnabled(enabled: Boolean) = uiSettings.setSoundEnabled(enabled)
+
+    fun setAmbientEnabled(enabled: Boolean) = uiSettings.setAmbientEnabled(enabled)
+
     fun markLandingSeen() = uiSettings.markLandingSeen()
 
     /** Whether FLAG_SECURE is applied; see [SecuritySettings.blockScreenshots]. */

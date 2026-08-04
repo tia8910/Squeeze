@@ -7,7 +7,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -20,99 +19,168 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 /**
  * Whether the app is currently rendering dark.
  *
- * Exposed as a composition local because several brand surfaces — the aurora, the logo,
- * chart marks — need the answer and must not each re-derive it from the system setting,
- * which would ignore an explicit user override.
+ * Exposed as a composition local because several brand surfaces need the answer and must
+ * not each re-derive it from the system setting, which would ignore an explicit override.
  */
-val LocalIsDarkTheme = staticCompositionLocalOf { true }
+val LocalIsDarkTheme = staticCompositionLocalOf { false }
+
+private val LightColors = lightColorScheme(
+    primary = Brand.Blue,
+    onPrimary = Color.White,
+    primaryContainer = Brand.Ice,
+    onPrimaryContainer = Brand.BlueDeep,
+
+    secondary = Brand.Navy,
+    onSecondary = Color.White,
+    secondaryContainer = Brand.Sunken,
+    onSecondaryContainer = Brand.Navy,
+
+    tertiary = Brand.BlueDeep,
+    onTertiary = Color.White,
+
+    background = Brand.Ground,
+    onBackground = Brand.Navy,
+    surface = Brand.Card,
+    onSurface = Brand.Navy,
+
+    // The pale disc behind the full-colour mark, and any inset that should read as
+    // "recessed but still white-ish".
+    surfaceVariant = Brand.Ice,
+    onSurfaceVariant = Brand.Muted,
+
+    error = Brand.Danger,
+    onError = Color.White,
+    errorContainer = Color(0xFFFEE2E2),
+    onErrorContainer = Color(0xFF7F1D1D),
+
+    outline = Brand.Line,
+    outlineVariant = Brand.Line,
+)
 
 private val DarkColors = darkColorScheme(
-    primary = Brand.TealBright,
-    onPrimary = Color(0xFF00281F),
-    primaryContainer = Brand.TealDeep,
-    onPrimaryContainer = Color(0xFFB6F5E4),
+    primary = Brand.DarkBlue,
+    onPrimary = Color(0xFF04122B),
+    primaryContainer = Brand.DarkIce,
+    onPrimaryContainer = Color(0xFFCFE0FF),
 
-    secondary = Brand.Violet,
-    onSecondary = Color(0xFF1E0F45),
-    secondaryContainer = Color(0xFF2A1F52),
-    onSecondaryContainer = Color(0xFFDDD2FF),
+    secondary = Color(0xFFCFE0FF),
+    onSecondary = Brand.Navy,
+    secondaryContainer = Brand.DarkSunken,
+    onSecondaryContainer = Color(0xFFCFE0FF),
 
-    tertiary = Brand.Amber,
-    onTertiary = Color(0xFF3A2400),
+    tertiary = Brand.DarkBlue,
+    onTertiary = Color(0xFF04122B),
 
-    background = Brand.InkDeep,
-    onBackground = Color(0xFFE6EFEC),
-    surface = Brand.Ink,
-    onSurface = Color(0xFFE6EFEC),
-    surfaceVariant = Brand.InkRaised,
-    onSurfaceVariant = Color(0xFF9FB3AE),
+    background = Brand.DarkGround,
+    onBackground = Brand.DarkInk,
+    surface = Brand.DarkCard,
+    onSurface = Brand.DarkInk,
 
-    error = Brand.Coral,
-    onError = Color(0xFF2B0000),
+    surfaceVariant = Brand.DarkIce,
+    onSurfaceVariant = Brand.DarkMuted,
+
+    error = Color(0xFFF87171),
+    onError = Color(0xFF450A0A),
     errorContainer = Color(0xFF4A1414),
     onErrorContainer = Color(0xFFFFDAD6),
 
-    outline = Color(0xFF32423E),
-    outlineVariant = Color(0xFF22302D),
-)
-
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF0F8A72),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFB6F5E4),
-    onPrimaryContainer = Color(0xFF00281F),
-
-    secondary = Color(0xFF6A4FC4),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE6DFFF),
-    onSecondaryContainer = Color(0xFF20124D),
-
-    tertiary = Color(0xFFB3701A),
-    onTertiary = Color.White,
-
-    background = Brand.Paper,
-    onBackground = Color(0xFF0D1614),
-    surface = Brand.PaperRaised,
-    onSurface = Color(0xFF0D1614),
-    surfaceVariant = Brand.PaperSunken,
-    onSurfaceVariant = Color(0xFF4C5F5A),
-
-    error = Color(0xFFB3261E),
-    onError = Color.White,
-    errorContainer = Color(0xFFF9DEDC),
-    onErrorContainer = Color(0xFF410E0B),
-
-    outline = Color(0xFFC3D0CC),
-    outlineVariant = Color(0xFFDCE6E3),
+    outline = Brand.DarkLine,
+    outlineVariant = Brand.DarkLine,
 )
 
 /**
- * Type scale tuned for a data app: display sizes are tight and heavy so a hero number reads
- * as a headline, while body copy stays generous enough to explain what the number means.
+ * The brand sheet's type scale.
+ *
+ * Sizes are the design's own, taken from its phone frame rather than its desktop hero: the
+ * mockup's 355px phone is close to a real handset, so `.metric` at 68px maps to 68sp and
+ * `.stat b` at 18px maps to 18sp directly. The one exception is the hero wordmark, where the
+ * design's own `max-width:720px` breakpoint drops 74px to 48px — that is the design telling
+ * us what it wants at phone width, so [Typography.displayMedium] uses 48sp.
+ *
+ * Tracking is scaled with the size rather than copied, since -5px at 74px and -5px at 48px
+ * are very different tightnesses. The ratio (about -0.068em) is what stays constant.
  */
 private val SqueezeTypography = Typography().run {
     copy(
+        // `.metric` — the hero number, the whole point of the home screen.
         displayLarge = displayLarge.copy(
             fontWeight = FontWeight.Black,
-            fontSize = 64.sp,
-            lineHeight = 64.sp,
+            fontSize = 68.sp,
+            lineHeight = 72.sp,
+            letterSpacing = (-4).sp,
+        ),
+        // `.wordmark` at the design's phone breakpoint.
+        displayMedium = displayMedium.copy(
+            fontWeight = FontWeight.Black,
+            fontSize = 48.sp,
+            lineHeight = 50.sp,
+            letterSpacing = (-3.2).sp,
+        ),
+        displaySmall = displaySmall.copy(
+            fontWeight = FontWeight.Black,
+            fontSize = 36.sp,
+            lineHeight = 40.sp,
             letterSpacing = (-2).sp,
         ),
-        displayMedium = displayMedium.copy(
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1.5).sp,
+        // `.celebrate h2`
+        headlineMedium = headlineMedium.copy(
+            fontWeight = FontWeight.Black,
+            fontSize = 32.sp,
+            lineHeight = 38.sp,
+            letterSpacing = (-1.2).sp,
         ),
-        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-        headlineSmall = headlineSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
-        titleLarge = titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        titleSmall = titleSmall.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.4.sp),
-        labelSmall = TextStyle(
-            fontWeight = FontWeight.Medium,
+        // `.panel h3`
+        headlineSmall = headlineSmall.copy(
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 27.sp,
+            lineHeight = 33.sp,
+            letterSpacing = (-0.9).sp,
+        ),
+        // `.metric small` — the unit riding beside the hero number.
+        titleLarge = titleLarge.copy(
+            fontWeight = FontWeight.Black,
+            fontSize = 25.sp,
+            lineHeight = 28.sp,
+            letterSpacing = 0.sp,
+        ),
+        // `.stat b`, `.mini-brand`
+        titleMedium = titleMedium.copy(
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 18.sp,
+            lineHeight = 22.sp,
+            letterSpacing = (-0.3).sp,
+        ),
+        // `.feature h4`, `.history h4`
+        titleSmall = titleSmall.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            lineHeight = 19.sp,
+            letterSpacing = (-0.2).sp,
+        ),
+        // `.eyebrow`, and the label on both buttons.
+        labelLarge = labelLarge.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            letterSpacing = 0.sp,
+        ),
+        bodyLarge = bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
+        // `.sub`, `.row`, `.feature p`
+        bodySmall = bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+        // `.nav`
+        labelMedium = labelMedium.copy(
+            fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             lineHeight = 14.sp,
-            letterSpacing = 0.6.sp,
+            letterSpacing = 0.1.sp,
+        ),
+        // `.stat span`
+        labelSmall = TextStyle(
+            fontWeight = FontWeight.Medium,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            letterSpacing = 0.2.sp,
         ),
     )
 }
@@ -120,9 +188,9 @@ private val SqueezeTypography = Typography().run {
 /**
  * Dark and light are separately designed schemes, not one flipped.
  *
- * Material You dynamic colour is deliberately not used. This app has an identity of its
- * own, and letting the wallpaper repaint it would mean the same screenshot looks like a
- * different product on every phone — which is the opposite of a recognisable app.
+ * Material You dynamic colour is deliberately not used. The identity is two specific
+ * colours; letting the wallpaper repaint them would mean the same screenshot looks like a
+ * different product on every phone.
  */
 @Composable
 fun SqueezeTheme(
@@ -143,8 +211,3 @@ fun SqueezeTheme(
         )
     }
 }
-
-/** Brand gradient stops for the current theme. */
-val auroraPalette: List<Color>
-    @Composable @ReadOnlyComposable
-    get() = Brand.auroraColors(LocalIsDarkTheme.current)

@@ -58,7 +58,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
+import com.squeeze.core.audio.Cue
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScanWarning
@@ -140,6 +142,7 @@ private fun CaptureStep(
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember { ImageCapture.Builder().build() }
     val scope = rememberCoroutineScope()
+    val sound = LocalSoundEngine.current
 
     var useFrontCamera by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableIntStateOf(DEFAULT_TIMER_SECONDS) }
@@ -154,7 +157,12 @@ private fun CaptureStep(
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
-                    image.decodeToBitmap()?.let(onCapture)
+                    // Only on a frame that actually decoded. A shutter sound for a capture
+                    // that produced nothing would tell the user the opposite of the truth.
+                    image.decodeToBitmap()?.let { bitmap ->
+                        sound?.play(Cue.CAPTURE)
+                        onCapture(bitmap)
+                    }
                     image.close()
                 }
 

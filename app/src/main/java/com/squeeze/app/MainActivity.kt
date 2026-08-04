@@ -15,8 +15,11 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.squeeze.app.audio.LocalSoundEngine
+import com.squeeze.app.audio.SoundEngine
 import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.app.data.settings.UiSettings
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import com.squeeze.app.ui.SqueezeApp
 import com.squeeze.app.ui.lock.LockScreen
@@ -53,6 +56,7 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var securitySettings: SecuritySettings
     @Inject lateinit var uiSettings: UiSettings
+    @Inject lateinit var soundEngine: SoundEngine
 
     private var unlocked by mutableStateOf(false)
 
@@ -61,6 +65,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         applyScreenshotPolicy()
+        applyAmbientPolicy()
 
         val biometricsAvailable = BiometricManager.from(this)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
@@ -77,10 +82,12 @@ class MainActivity : FragmentActivity() {
             val themeMode by uiSettings.themeMode.collectAsState()
 
             SqueezeTheme(themeMode = themeMode) {
-                if (unlocked) {
-                    SqueezeApp()
-                } else {
-                    LockScreen(onAuthenticate = ::promptForBiometric)
+                CompositionLocalProvider(LocalSoundEngine provides soundEngine) {
+                    if (unlocked) {
+                        SqueezeApp()
+                    } else {
+                        LockScreen(onAuthenticate = ::promptForBiometric)
+                    }
                 }
             }
         }
@@ -109,6 +116,37 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    /**
+     * Runs the ambient bed only while the app is genuinely in front of the user.
+     *
+     * Scoped to RESUMED rather than STARTED, and stopped when that scope ends, so the music
+     * dies the moment the app is backgrounded or a dialog takes over. A backing track that
+     * outlives the screen it belongs to is the single most common way this feature becomes
+     * the reason someone uninstalls an app.
+     *
+     * Gated on [unlocked] as well: nothing should play over the biometric gate, when the
+     * user has not yet proven the phone is theirs.
+     */
+    private fun applyAmbientPolicy() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                try {
+                    uiSettings.ambientEnabled.collect { enabled ->
+                        if (enabled && unlocked) {
+                            soundEngine.startAmbient()
+                        } else {
+                            soundEngine.stopAmbient()
+                        }
+                    }
+                } finally {
+                    // Reached when the RESUMED scope is cancelled, i.e. on pause. The engine
+                    // stops on its own dispatcher, so this survives the cancellation.
+                    soundEngine.stopAmbient()
+                }
+            }
+        }
+    }
+
     private fun promptForBiometric() {
         val prompt = BiometricPrompt(
             this,
@@ -116,6 +154,9 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     unlocked = true
+                    // The ambient collector already ran while locked and chose silence, and
+                    // it will not re-emit for a change it cannot see. Start it here instead.
+                    if (uiSettings.ambientEnabled.value) soundEngine.startAmbient()
                 }
             },
         )
@@ -132,6 +173,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        soundEngine.stopAmbient()
+
         // Re-lock whenever the app leaves the foreground, so handing someone the phone
         // does not hand them the measurement history.
         if (BiometricManager.from(this)

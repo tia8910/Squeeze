@@ -2,53 +2,67 @@ package com.squeeze.app.ui.composition
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.data.db.MeasurementEntity
-import com.squeeze.app.ui.theme.chartPalette
+import com.squeeze.app.ui.components.BrandCard
+import com.squeeze.app.ui.components.BrandRow
+import com.squeeze.app.ui.components.PrimaryButton
+import com.squeeze.app.ui.components.SecondaryButton
+import com.squeeze.app.ui.components.Sparkline
+import com.squeeze.app.ui.components.StatRow
+import com.squeeze.app.ui.components.StatTile
+import com.squeeze.app.ui.components.NoticePill
+import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
 import com.squeeze.core.trend.TrendPoint
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 /**
  * The body composition dashboard.
  *
- * Structured so the most important thing is the largest thing: the current estimate is a
- * hero number, the verdict on whether it is moving sits directly beneath it, and the charts
- * are supporting evidence rather than the headline. A user glancing at this for two seconds
- * should get "18.4%, down 0.3 a week, that's real" without reading a chart.
+ * Laid out in the brand sheet's order, which is also the right order by importance: the
+ * estimate and its uncertainty first, the verdict on whether it is moving directly beneath,
+ * then momentum, then the two actions, then the log. A user glancing at this for two seconds
+ * should get "34.8%, nothing confirmed yet" without reading a chart.
+ *
+ * The deeper charts sit below the log rather than competing with the hero card. They are
+ * evidence for the number above, not the headline.
  */
 @Composable
 fun CompositionScreen(
@@ -62,14 +76,13 @@ fun CompositionScreen(
     onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val palette = chartPalette
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 22.dp)
+            .padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         val latest = trend.lastOrNull()
 
@@ -83,18 +96,53 @@ fun CompositionScreen(
             return@Column
         }
 
-        HeroEstimate(latest, calibration, palette.bodyFat)
-        TrendVerdictCard(latest)
-        StatsRow(measurements)
+        HeroCard(latest, calibration, trend)
 
-        ActionRow(onStartScan = onStartScan, onAddMeasurement = onAddMeasurement)
+        StatRow {
+            StatTile(
+                value = measurements.size.toString(),
+                label = if (measurements.size == 1) "Entry" else "Entries",
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                value = daysTracked(measurements).toString(),
+                label = "Days tracked",
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                value = lastEntryLabel(measurements),
+                label = "Last entry",
+                modifier = Modifier.weight(1f),
+            )
+        }
 
-        TrendChart(
-            title = "Body fat",
-            unitSuffix = "%",
-            points = trend,
-            lineColor = palette.bodyFat,
+        PrimaryButton(
+            text = "Scan",
+            onClick = onStartScan,
+            leading = {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+            },
         )
+        SecondaryButton(
+            text = "Enter",
+            onClick = onAddMeasurement,
+            leading = {
+                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
+            },
+        )
+
+        HistorySection(measurements, onDelete)
+
+        // Supporting detail, deliberately below the fold. Someone who wants to interrogate
+        // the number can; someone who just wants the number never has to scroll past a chart.
+        if (trend.size >= 2) {
+            TrendChart(
+                title = "Body fat",
+                unitSuffix = "%",
+                points = trend,
+                lineColor = MaterialTheme.colorScheme.primary,
+            )
+        }
 
         // A separate chart rather than a second axis. Body fat and lean mass are different
         // quantities on different scales; sharing an axis would let the apparent crossing
@@ -104,72 +152,114 @@ fun CompositionScreen(
                 title = "Lean mass",
                 unitSuffix = " kg",
                 points = leanMassTrend,
-                lineColor = palette.leanMass,
+                lineColor = Brand.Navy,
             )
         }
 
         repeatability?.let { RepeatabilityCard(it) }
-
-        HistorySection(measurements, onDelete)
     }
 }
 
 /**
- * Momentum at a glance: how much data exists and how consistently it arrives.
+ * The hero: current estimate, its interval, its calibration status, and the trend line.
  *
- * Consistency is the input the trend engine actually needs, so it is the behaviour worth
- * celebrating — not streaks for their own sake.
+ * The interval is never omitted. An estimate shown without it is the central dishonesty of
+ * this app category, and it is what destroys trust the first time the app disagrees with a
+ * scan the user has paid for.
  */
 @Composable
-private fun StatsRow(measurements: List<MeasurementEntity>) {
-    if (measurements.isEmpty()) return
+private fun HeroCard(
+    latest: TrendPoint,
+    calibration: PersonalCalibration,
+    trend: List<TrendPoint>,
+) {
+    BrandCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Text(
+                text = "Body fat",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
 
-    val daysTracked = (measurements.maxOf { it.epochDay } - measurements.minOf { it.epochDay }) + 1
-    val daysSinceLast = java.time.LocalDate.now().toEpochDay() - measurements.maxOf { it.epochDay }
+        // The number animates to its new value on each refresh. Beyond feel, this is a
+        // state-change cue: after a save the user sees the estimate move, which confirms the
+        // new measurement was absorbed without reading anything.
+        val animatedLevel by animateFloatAsState(
+            targetValue = latest.level.toFloat(),
+            animationSpec = tween(durationMillis = 700),
+            label = "heroLevel",
+        )
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatTile("Entries", measurements.size.toString(), Modifier.weight(1f))
-        StatTile("Days tracked", daysTracked.toString(), Modifier.weight(1f))
-        StatTile(
-            label = "Last entry",
-            value = when (daysSinceLast) {
-                0L -> "Today"
-                1L -> "1 day ago"
-                else -> "$daysSinceLast days"
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                text = "%.1f".format(animatedLevel),
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "%",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 10.dp, start = 3.dp),
+            )
+        }
+
+        val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
+
+        Text(
+            text = "± %.1f points, 95%% confidence".format(latest.levelConfidence95),
+            style = MaterialTheme.typography.bodySmall,
+            color = subColour,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Text(
+            text = if (calibration.isActive) {
+                "Calibrated to your own scan results."
+            } else {
+                "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
             },
-            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = subColour,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+
+        Sparkline(
+            values = trend.map { it.level },
+            modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+        )
+
+        NoticePill(
+            text = if (latest.isChangeSignificant) {
+                val direction = if (latest.weeklyChange < 0) "down" else "up"
+                "%.2f points per week %s — larger than your noise".format(
+                    abs(latest.weeklyChange),
+                    direction,
+                )
+            } else {
+                "No confirmed change yet"
+            },
         )
     }
 }
 
-@Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
-        ),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /**
- * The raw log, newest first, with one-tap delete.
+ * The raw log, newest first.
  *
- * Delete lives here because a single mis-entered reading — a waist typed as 850 instead
- * of 85.0 — visibly bends the trend, and the fix belongs next to where the damage shows.
+ * Tapping a row opens its detail, which is where delete lives. Delete is reachable because a
+ * single mis-entered reading — a waist typed as 850 instead of 85.0 — visibly bends the
+ * trend, and the fix has to be available where the damage shows.
  */
 @Composable
 private fun HistorySection(
@@ -178,36 +268,38 @@ private fun HistorySection(
 ) {
     if (measurements.isEmpty()) return
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("History", style = MaterialTheme.typography.titleSmall)
+    var selected by remember { mutableStateOf<MeasurementEntity?>(null) }
+
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "History",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
 
         measurements.take(HISTORY_LIMIT).forEach { entry ->
-            Card(Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = java.time.LocalDate.ofEpochDay(entry.epochDay)
-                                .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            text = entrySummary(entry),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(onClick = { onDelete(entry) }) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete this measurement",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            BrandRow(onClick = { selected = entry }) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = formatDate(entry.epochDay),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = entrySummary(entry),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+                    )
                 }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Open this measurement",
+                    tint = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+                )
             }
         }
 
@@ -215,11 +307,45 @@ private fun HistorySection(
             Text(
                 text = "${measurements.size - HISTORY_LIMIT} older entries not shown",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
             )
         }
     }
+
+    selected?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            title = { Text(formatDate(entry.epochDay)) },
+            text = { Text(entrySummary(entry), style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(entry)
+                        selected = null
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selected = null }) { Text("Close") }
+            },
+        )
+    }
 }
+
+private fun formatDate(epochDay: Long): String =
+    LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+
+private fun daysTracked(measurements: List<MeasurementEntity>): Long =
+    (measurements.maxOf { it.epochDay } - measurements.minOf { it.epochDay }) + 1
+
+private fun lastEntryLabel(measurements: List<MeasurementEntity>): String =
+    when (val days = LocalDate.now().toEpochDay() - measurements.maxOf { it.epochDay }) {
+        0L -> "Today"
+        1L -> "1 day"
+        else -> "$days days"
+    }
 
 private fun entrySummary(entry: MeasurementEntity): String {
     val parts = buildList {
@@ -228,254 +354,144 @@ private fun entrySummary(entry: MeasurementEntity): String {
         entry.weightKg?.let { add("%.1f kg".format(it)) }
         entry.neckCm?.let { add("neck %.1f".format(it)) }
     }
-    val source = if (entry.source == "PHOTO") "Scan" else "Tape"
+    val source = when (entry.source) {
+        "PHOTO" -> "Scan"
+        "PHOTO_FRONT_ONLY" -> "Scan (front)"
+        "REFERENCE_SCAN" -> "Reference"
+        else -> "Tape"
+    }
     return if (parts.isEmpty()) source else "$source · " + parts.joinToString(" · ")
 }
 
 private const val HISTORY_LIMIT = 14
 
 /**
- * The one number worth reading at a glance, with its uncertainty attached.
+ * What a new user sees.
  *
- * The interval is never omitted. An estimate shown without it is the central dishonesty of
- * this app category, and it is what destroys trust the first time the app disagrees with a
- * scan the user has paid for.
+ * Two concrete actions rather than an explanation of why the screen is blank. The tape
+ * option is described as the more precise one because it is — the scan is the convenient
+ * path, not the accurate one, and saying so up front sets an honest expectation.
  */
 @Composable
-private fun HeroEstimate(
-    latest: TrendPoint,
-    calibration: PersonalCalibration,
-    accent: Color,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            // A wash of the series colour fading into the surface. This is the one place
-            // colour is allowed to be loud, because it is the same hue that identifies
-            // body fat in the chart below — the card and the line read as one thing.
-            Modifier
-                // fillMaxWidth before background: a Column wraps its content, so without it
-                // the wash only paints as far as the widest child and stops mid-card.
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        0f to accent.copy(alpha = 0.28f),
-                        1f to Color.Transparent,
-                    ),
-                )
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
+    val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        BrandCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = accent, shape = CircleShape, modifier = Modifier.size(10.dp)) {}
+                Box(
+                    Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
                 Text(
                     text = "Body fat",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
 
-            // The number animates to its new value on each refresh. Beyond feel, this is
-            // a state-change cue: after a save the user sees the estimate move, which
-            // confirms the new measurement was absorbed without reading anything.
-            val animatedLevel by animateFloatAsState(
-                targetValue = latest.level.toFloat(),
-                animationSpec = tween(durationMillis = 700),
-                label = "heroLevel",
-            )
-
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 Text(
-                    text = "%.1f".format(animatedLevel),
+                    text = "--",
                     style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "%",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 8.dp, start = 2.dp),
-                )
-            }
-
-            Text(
-                text = "± %.1f points, 95%% confidence".format(latest.levelConfidence95),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Text(
-                text = if (calibration.isActive) {
-                    "Calibrated to your own scan results."
-                } else {
-                    "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActionRow(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onStartScan, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
-            Text("Scan", Modifier.padding(start = 8.dp))
-        }
-        OutlinedButton(onClick = onAddMeasurement, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            Text("Enter", Modifier.padding(start = 8.dp))
-        }
-    }
-}
-
-/**
- * What a new user sees.
- *
- * Two concrete actions rather than an explanation of why the screen is blank. The tape
- * option is presented as the more accurate one because it is — the scan is the convenient
- * path, not the precise one, and saying so up front sets an honest expectation.
- */
-@Composable
-private fun EmptyState(onStartScan: () -> Unit, onAddMeasurement: () -> Unit) {
-    val palette = chartPalette
-
-    Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // The first screen a new user ever sees carries the identity: wordmark over a
-            // gradient of the two data colours, and the one-line reason this app exists.
-            Card(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.linearGradient(
-                                0f to palette.bodyFat.copy(alpha = 0.35f),
-                                1f to palette.leanMass.copy(alpha = 0.35f),
-                            ),
-                        )
-                        .padding(horizontal = 20.dp, vertical = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = "SQUEEZE",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = androidx.compose.ui.unit.TextUnit(
-                            4f, androidx.compose.ui.unit.TextUnitType.Sp,
-                        ),
-                    )
-                    Text(
-                        text = "Track what's really changing. Nothing leaves this phone.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-
-            Text("Take your first measurement", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                text = "Two measurements are needed before a trend appears, and about three " +
-                    "weeks before the app can tell a real change from measurement noise.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Button(onClick = onStartScan, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
-                Text("Scan with camera or photos", Modifier.padding(start = 8.dp))
-            }
-            OutlinedButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-                Text("Enter tape measurements", Modifier.padding(start = 8.dp))
-            }
-
-            Text(
-                text = "A tape is more repeatable than any photo method. The scan is faster; " +
-                    "the tape is more precise.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrendVerdictCard(latest: TrendPoint) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (latest.isChangeSignificant) {
-                val direction = if (latest.weeklyChange < 0) "down" else "up"
-                Text(
-                    text = "%.2f points per week %s".format(abs(latest.weeklyChange), direction),
                     style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    text = "Larger than your measurement noise, so this is a real change.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                // "Not yet" is more useful than a confident arrow through scatter, and it is
-                // the only claim the data actually supports.
-                Text("No confirmed change yet", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = "Movement so far is within measurement noise. A real trend usually " +
-                        "separates out after two to three more weekly measurements.",
-                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 10.dp, start = 3.dp),
                 )
             }
+
+            Text(
+                text = "Take your first measurement and this becomes your number.",
+                style = MaterialTheme.typography.bodySmall,
+                color = subColour,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            NoticePill(text = "No measurements yet")
         }
+
+        PrimaryButton(
+            text = "Scan with camera or photos",
+            onClick = onStartScan,
+            leading = {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+            },
+        )
+        SecondaryButton(
+            text = "Enter tape measurements",
+            onClick = onAddMeasurement,
+            leading = {
+                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
+            },
+        )
+
+        Text(
+            text = "Two measurements are needed before a trend appears, and about three weeks " +
+                "before the app can tell a real change from measurement noise. A tape is more " +
+                "repeatable than any photo method — the scan is faster, the tape is more precise.",
+            style = MaterialTheme.typography.bodySmall,
+            color = subColour,
+        )
     }
 }
 
 @Composable
 private fun RepeatabilityCard(score: RepeatabilityScore) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "Your measurement precision",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
 
-            Text(
-                text = when (score.grade) {
-                    RepeatabilityScore.Grade.EXCELLENT -> "Excellent"
-                    RepeatabilityScore.Grade.GOOD -> "Good"
-                    RepeatabilityScore.Grade.FAIR -> "Fair"
-                    RepeatabilityScore.Grade.POOR -> "Poor"
-                },
-                style = MaterialTheme.typography.titleLarge,
-            )
+    BrandCard(Modifier.fillMaxWidth()) {
+        Text(
+            text = "Your measurement precision",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+        )
 
+        Text(
+            text = when (score.grade) {
+                RepeatabilityScore.Grade.EXCELLENT -> "Excellent"
+                RepeatabilityScore.Grade.GOOD -> "Good"
+                RepeatabilityScore.Grade.FAIR -> "Fair"
+                RepeatabilityScore.Grade.POOR -> "Poor"
+            },
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Text(
+            text = (
+                "Repeat measurements vary by ±%.2f points. Two readings must differ by more " +
+                    "than %.2f points before the difference is real."
+                ).format(score.withinSessionStdDev, score.repeatabilityCoefficient),
+            style = MaterialTheme.typography.bodySmall,
+            color = subColour,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
+        if (score.grade == RepeatabilityScore.Grade.FAIR ||
+            score.grade == RepeatabilityScore.Grade.POOR
+        ) {
+            // Precision is the one error source the user directly controls, so coaching
+            // protocol improves every future reading more than any algorithm change would.
             Text(
-                text = (
-                    "Repeat measurements vary by ±%.2f points. Two readings must differ by " +
-                        "more than %.2f points before the difference is real."
-                    ).format(score.withinSessionStdDev, score.repeatabilityCoefficient),
+                text = "Measure at the same time of day, before eating, with the tape at the " +
+                    "same tension. This is the fastest way to make your trend readable.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subColour,
+                modifier = Modifier.padding(top = 8.dp),
             )
-
-            if (score.grade == RepeatabilityScore.Grade.FAIR ||
-                score.grade == RepeatabilityScore.Grade.POOR
-            ) {
-                // Precision is the one error source the user directly controls, so coaching
-                // protocol improves every future reading more than any algorithm change would.
-                Text(
-                    text = "Measure at the same time of day, before eating, with the tape at " +
-                        "the same tension. This is the fastest way to make your trend readable.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
         }
     }
 }
