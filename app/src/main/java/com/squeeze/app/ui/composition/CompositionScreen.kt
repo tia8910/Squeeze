@@ -292,8 +292,6 @@ private fun HistorySection(
     measurements: List<MeasurementEntity>,
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
-    goalProgress: GoalProgress?,
-    onEditGoal: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
 ) {
     if (measurements.isEmpty()) return
