@@ -10,7 +10,10 @@ import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.app.data.settings.UiSettings
 import com.squeeze.app.ui.theme.ThemeMode
+import com.squeeze.core.bodycomp.CompositionAnalyser
+import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.PersonalCalibration
+import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
@@ -34,6 +37,14 @@ data class SqueezeUiState(
     val leanMassTrend: List<TrendPoint> = emptyList(),
     val repeatability: RepeatabilityScore? = null,
     val calibration: PersonalCalibration = PersonalCalibration.none(),
+    /**
+     * Everything derivable from the most recent measurement.
+     *
+     * Recomputed on refresh rather than stored, because it is a pure function of the
+     * measurement and the profile — persisting it would create a second copy that could
+     * disagree with the first after a profile edit.
+     */
+    val panel: CompositionPanel? = null,
     val loading: Boolean = true,
 )
 
@@ -117,6 +128,7 @@ class SqueezeViewModel @Inject constructor(
             }
 
             val snapshot = repository.snapshot(profile)
+
             _state.value = SqueezeUiState(
                 profile = profile,
                 measurements = measurements,
@@ -124,9 +136,47 @@ class SqueezeViewModel @Inject constructor(
                 leanMassTrend = snapshot.leanMassTrend,
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
+                panel = buildPanel(profile, measurements, snapshot.latest?.level),
                 loading = false,
             )
         }
+    }
+
+    /**
+     * Derives the analysis panel from the newest measurement.
+     *
+     * Circumferences and weight are taken from the most recent entry that carries each,
+     * rather than from a single row. A tape session and a weigh-in are usually separate
+     * events, and refusing to combine them would leave the panel empty for users who do
+     * exactly what the app asks of them.
+     */
+    private fun buildPanel(
+        profile: Profile,
+        measurements: List<MeasurementEntity>,
+        bodyFatPercent: Double?,
+    ): CompositionPanel? {
+        if (measurements.isEmpty()) return null
+
+        fun <T> newest(select: (MeasurementEntity) -> T?): T? =
+            measurements.firstNotNullOfOrNull(select)
+
+        val circumferences = Circumferences(
+            neckCm = newest { it.neckCm },
+            waistCm = newest { it.waistCm },
+            hipCm = newest { it.hipCm },
+            chestCm = newest { it.chestCm },
+            thighCm = newest { it.thighCm },
+            armCm = newest { it.armCm },
+            calfCm = newest { it.calfCm },
+        )
+
+        return CompositionAnalyser.analyse(
+            profile = profile,
+            circumferences = circumferences,
+            bodyFatPercent = bodyFatPercent,
+            weightKg = newest { it.weightKg },
+            currentYear = LocalDate.now().year,
+        )
     }
 
     /**
