@@ -1,11 +1,14 @@
 package com.squeeze.app
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -60,6 +63,25 @@ class MainActivity : FragmentActivity() {
 
     private var unlocked by mutableStateOf(false)
 
+    /**
+     * True once the user has got in at least once during this activity's life.
+     *
+     * This is what keeps the app's UI composed behind the lock instead of being torn down
+     * and rebuilt. See [setContent] below for why that matters.
+     */
+    private var everUnlocked by mutableStateOf(false)
+
+    /** Guards against stacking prompts when onStart runs again with one already showing. */
+    private var promptShowing = false
+
+    /** Elapsed-realtime clock reading from when the app last left the foreground. */
+    private var leftForegroundAt = 0L
+
+    private fun biometricsAvailable(): Boolean =
+        BiometricManager.from(this)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -67,14 +89,11 @@ class MainActivity : FragmentActivity() {
         applyScreenshotPolicy()
         applyAmbientPolicy()
 
-        val biometricsAvailable = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
-            BiometricManager.BIOMETRIC_SUCCESS
-
         // With no enrolled biometric there is nothing to prompt for. Blocking access would
         // lock the user out of their own data with no recovery path, since there is no
         // account to reset against.
-        unlocked = !biometricsAvailable
+        unlocked = !biometricsAvailable()
+        everUnlocked = unlocked
 
         setContent {
             // Read here rather than inside SqueezeApp so the lock screen — which renders
@@ -83,16 +102,55 @@ class MainActivity : FragmentActivity() {
 
             SqueezeTheme(themeMode = themeMode) {
                 CompositionLocalProvider(LocalSoundEngine provides soundEngine) {
-                    if (unlocked) {
-                        SqueezeApp()
-                    } else {
-                        LockScreen(onAuthenticate = ::promptForBiometric)
+                    Box(Modifier.fillMaxSize()) {
+                        // Kept in the composition while locked, and covered rather than
+                        // replaced. Swapping it out for the lock screen destroyed the
+                        // NavController and every ViewModel hanging off it, so returning
+                        // from a biometric prompt dropped the user back at the dashboard
+                        // and threw away whatever they were part-way through. A scan whose
+                        // results had not been saved yet was simply gone — the app looked
+                        // like it had reset itself, because it had.
+                        //
+                        // Not composed at all before the first unlock: there is no state to
+                        // preserve yet, and building the dashboard behind the gate would
+                        // read the database before the user has proven the phone is theirs.
+                        if (everUnlocked) SqueezeApp()
+
+                        // LockScreen draws an opaque Surface over the full size, so nothing
+                        // underneath is visible here or in the recents thumbnail.
+                        if (!unlocked) LockScreen(onAuthenticate = ::promptForBiometric)
                     }
                 }
             }
         }
+    }
 
-        if (biometricsAvailable) promptForBiometric()
+    /**
+     * Asks for the biometric on the way in, rather than making the user tap first.
+     *
+     * In [onStart] rather than [onCreate] so it also covers coming back from the background,
+     * which is the common case: the previous version prompted only on creation, so every
+     * return left the user staring at a lock screen waiting to be tapped.
+     */
+    override fun onStart() {
+        super.onStart()
+
+        if (unlocked || !biometricsAvailable()) return
+
+        // A short absence is not a handover. Stepping out to the gallery to pick a photo,
+        // answering a permission dialog, or glancing at a notification all stop the activity,
+        // and demanding a fingerprint for each of them teaches the user to resent the lock.
+        // Longer than this and the phone has plausibly left the user's hands, which is the
+        // case the gate exists for.
+        if (everUnlocked &&
+            leftForegroundAt != 0L &&
+            SystemClock.elapsedRealtime() - leftForegroundAt < GRACE_PERIOD_MS
+        ) {
+            unlocked = true
+            return
+        }
+
+        promptForBiometric()
     }
 
     /**
@@ -148,15 +206,27 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun promptForBiometric() {
+        if (promptShowing) return
+        promptShowing = true
+
         val prompt = BiometricPrompt(
             this,
             ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    promptShowing = false
                     unlocked = true
+                    everUnlocked = true
                     // The ambient collector already ran while locked and chose silence, and
                     // it will not re-emit for a change it cannot see. Start it here instead.
                     if (uiSettings.ambientEnabled.value) soundEngine.startAmbient()
+                }
+
+                // Cancelling leaves the lock screen up with its button, which is the right
+                // outcome. What this has to do is clear the flag, or that button and the
+                // next onStart would both be dead.
+                override fun onAuthenticationError(code: Int, message: CharSequence) {
+                    promptShowing = false
                 }
             },
         )
@@ -175,13 +245,27 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         soundEngine.stopAmbient()
 
-        // Re-lock whenever the app leaves the foreground, so handing someone the phone
-        // does not hand them the measurement history.
-        if (BiometricManager.from(this)
-                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
-            BiometricManager.BIOMETRIC_SUCCESS
-        ) {
+        // Cover the UI the moment the app leaves the foreground, so handing someone the
+        // phone does not hand them the measurement history, and so the recents thumbnail
+        // shows the lock screen rather than the dashboard.
+        //
+        // Whether the user has to authenticate again is decided in onStart, not here: this
+        // only draws the cover. The app itself stays composed underneath, so restoring is
+        // free and nothing they were doing is lost either way.
+        if (biometricsAvailable()) {
+            leftForegroundAt = SystemClock.elapsedRealtime()
             unlocked = false
         }
+    }
+
+    private companion object {
+        /**
+         * How long the app may be away before it insists on a fingerprint again.
+         *
+         * Short enough that a phone put down on a desk is protected within about the time it
+         * takes to walk away from it, long enough to cover the gallery picker and permission
+         * dialogs the app itself puts the user through.
+         */
+        const val GRACE_PERIOD_MS = 30_000L
     }
 }
