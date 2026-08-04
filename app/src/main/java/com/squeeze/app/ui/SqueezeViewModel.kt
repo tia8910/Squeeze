@@ -92,7 +92,13 @@ class SqueezeViewModel @Inject constructor(
      * defaulted height would silently mis-scale every photo scan, which is worse than
      * having no profile at all, because the failure would be invisible.
      */
-    fun updateProfile(heightCm: Double?, birthYear: Int?, sex: Sex?) {
+    fun updateProfile(
+        heightCm: Double?,
+        birthYear: Int?,
+        sex: Sex?,
+        targetBodyFatPercent: Double? = null,
+        targetEpochDay: Long? = null,
+    ) {
         if (heightCm == null || birthYear == null || sex == null) return
         if (heightCm !in 100.0..250.0) return
         if (birthYear !in 1900..LocalDate.now().year) return
@@ -108,8 +114,11 @@ class SqueezeViewModel @Inject constructor(
                     trainingAge = existing?.trainingAge ?: TrainingAge.NOVICE.name,
                     goal = existing?.goal ?: Goal.HYPERTROPHY.name,
                     unitSystem = existing?.unitSystem ?: UnitSystem.METRIC.name,
-                    targetBodyFatPercent = existing?.targetBodyFatPercent,
-                    targetEpochDay = existing?.targetEpochDay,
+                    // A goal supplied here wins; otherwise whatever is already stored
+                    // survives, so editing height in Settings cannot silently clear it.
+                    targetBodyFatPercent = targetBodyFatPercent
+                        ?: existing?.targetBodyFatPercent,
+                    targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
                 ),
             )
             refresh()

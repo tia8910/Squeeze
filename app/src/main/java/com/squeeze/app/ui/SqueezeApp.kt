@@ -111,8 +111,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     // fails after they have undressed and framed a photograph.
     if (state.profile == null) {
         OnboardingScreen(
-            onComplete = { heightCm, birthYear, sex ->
-                viewModel.updateProfile(heightCm, birthYear, sex)
+            onComplete = { heightCm, birthYear, sex, targetBodyFat, targetDay ->
+                viewModel.updateProfile(heightCm, birthYear, sex, targetBodyFat, targetDay)
             },
         )
         return

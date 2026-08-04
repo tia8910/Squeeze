@@ -56,11 +56,25 @@ import java.time.LocalDate
  */
 @Composable
 fun OnboardingScreen(
-    onComplete: (heightCm: Double, birthYear: Int, sex: Sex) -> Unit,
+    onComplete: (
+        heightCm: Double,
+        birthYear: Int,
+        sex: Sex,
+        targetBodyFatPercent: Double?,
+        targetEpochDay: Long?,
+    ) -> Unit,
 ) {
     var heightText by remember { mutableStateOf("") }
     var yearText by remember { mutableStateOf("") }
     var sex by remember { mutableStateOf<Sex?>(null) }
+
+    // Optional, unlike the three above, and it has to stay that way. The app produces
+    // nothing at all without height, year and sex; it works perfectly well without a goal,
+    // it just cannot tell the user whether what they are doing is enough. Making this
+    // mandatory would force a number out of someone who has not decided yet, and a target
+    // invented to get past a form is worse than none.
+    var targetText by remember { mutableStateOf("") }
+    var weeks by remember { mutableStateOf(12) }
 
     // Errors stay hidden until the user has tried to continue. Showing them as the screen
     // opens would put a red message under every empty box before anything was typed.
@@ -187,15 +201,35 @@ fun OnboardingScreen(
             }
         }
 
+        Spacer(Modifier.height(18.dp))
+
+        GoalPrompt(
+            targetText = targetText,
+            onTargetChange = { targetText = it },
+            weeks = weeks,
+            onWeeksChange = { weeks = it },
+            muted = muted,
+        )
+
         Spacer(Modifier.height(22.dp))
 
         PrimaryButton(
             text = "Start tracking",
             onClick = {
                 submitted = true
+                val target = targetText.trim().replace(',', '.').toDoubleOrNull()
+                    ?.takeIf { it in 3.0..60.0 }
                 ProfileValidation
                     .build(heightText, yearText, sex, currentYear)
-                    ?.let { onComplete(it.heightCm, it.birthYear, it.sex) }
+                    ?.let {
+                        onComplete(
+                            it.heightCm,
+                            it.birthYear,
+                            it.sex,
+                            target,
+                            target?.let { _ -> LocalDate.now().plusWeeks(weeks.toLong()).toEpochDay() },
+                        )
+                    }
             },
         )
 
@@ -211,5 +245,77 @@ fun OnboardingScreen(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 16.dp),
         )
+    }
+}
+
+/** Preset horizons, in weeks. Matches the Settings editor so the two cannot drift. */
+private val ONBOARDING_HORIZONS = listOf(8, 12, 16, 24)
+
+/**
+ * Asks what the user is actually here for, and by when.
+ *
+ * Optional, and it says so, which is the difference between asking and demanding. Someone
+ * who does not yet know their body fat cannot pick a sensible target, and the field left
+ * blank simply means the dashboard shows a number instead of a verdict — a real loss, but a
+ * smaller one than a target picked to satisfy a form.
+ *
+ * The horizon is a preset rather than a date picker because nobody's goal is "17 September".
+ * It is "before the summer" or "in three months", and a picker turns a choice about pace
+ * into a calendar puzzle. The resulting date is printed so the shorthand stays honest.
+ */
+@Composable
+private fun GoalPrompt(
+    targetText: String,
+    onTargetChange: (String) -> Unit,
+    weeks: Int,
+    onWeeksChange: (Int) -> Unit,
+    muted: androidx.compose.ui.graphics.Color,
+) {
+    val deadline = LocalDate.now().plusWeeks(weeks.toLong())
+
+    BrandCard(Modifier.fillMaxWidth()) {
+        Text("Your goal — optional", style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = "A target with a date is what lets the app tell you whether what you are " +
+                "doing is working, rather than only showing you a number. Skip it if you do " +
+                "not know yet — you can set one any time under You.",
+            style = MaterialTheme.typography.bodySmall,
+            color = muted,
+            modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+        )
+
+        OutlinedTextField(
+            value = targetText,
+            onValueChange = { onTargetChange(it.take(4)) },
+            label = { Text("Target body fat (%)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Decimal,
+                imeAction = ImeAction.Done,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (targetText.isNotBlank()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                ONBOARDING_HORIZONS.forEach { option ->
+                    FilterChip(
+                        selected = weeks == option,
+                        onClick = { onWeeksChange(option) },
+                        label = { Text("${option}w") },
+                    )
+                }
+            }
+            Text(
+                text = "By ${deadline.dayOfMonth} ${deadline.month.name.lowercase()
+                    .replaceFirstChar { it.uppercase() }} ${deadline.year}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = muted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
 }
