@@ -39,6 +39,13 @@ data class MeasurementEntity(
      * file lives in the app's private storage under this name; see ScanPhotoStore.
      */
     val photoId: String? = null,
+    /**
+     * The appearance band the user matched themselves to, if they did.
+     *
+     * Defaulted so existing construction sites and migrated rows both mean "not asked",
+     * which is the truth for every measurement taken before this column existed.
+     */
+    val visualBodyFatPercent: Double? = null,
 )
 
 /**
