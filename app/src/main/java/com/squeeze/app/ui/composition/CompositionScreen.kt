@@ -235,10 +235,17 @@ private fun HeroCard(
             modifier = Modifier.padding(top = 12.dp),
         )
 
-        Sparkline(
-            values = trend.map { it.level },
-            modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-        )
+        // One reading is a dot, not a trend. Reserving the chart's full height for it left
+        // a band of empty white in the middle of the hero card that read as a rendering
+        // fault — the card looked broken rather than early.
+        if (trend.size >= 2) {
+            Sparkline(
+                values = trend.map { it.level },
+                modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+            )
+        } else {
+            Spacer(Modifier.height(16.dp))
+        }
 
         NoticePill(
             text = if (latest.isChangeSignificant) {

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -19,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.BuildConfig
 import com.squeeze.app.ui.brand.SqueezeMark
+import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.theme.ThemeMode
 import com.squeeze.core.model.Sex
 
@@ -112,13 +112,6 @@ fun SettingsScreen(
 }
 
 /**
- * Which build is installed, stated where the user can read it back.
- *
- * Debug builds otherwise all claim the same version, which makes "is the new build
- * actually installed?" unanswerable — a question that has already cost a debugging round
- * on this project. The name carries the commit; the code carries the CI run.
- */
-/**
  * Light, dark or follow the system.
  *
  * An explicit choice is offered rather than only tracking the system because this app is
@@ -127,26 +120,27 @@ fun SettingsScreen(
  */
 @Composable
 private fun ThemeSection(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Theme", style = MaterialTheme.typography.titleSmall)
+    BrandCard(Modifier.fillMaxWidth()) {
+        Text("Theme", style = MaterialTheme.typography.titleSmall)
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = themeMode == mode,
-                        onClick = { onThemeModeChange(mode) },
-                        label = {
-                            Text(
-                                when (mode) {
-                                    ThemeMode.SYSTEM -> "System"
-                                    ThemeMode.LIGHT -> "Light"
-                                    ThemeMode.DARK -> "Dark"
-                                },
-                            )
-                        },
-                    )
-                }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 12.dp),
+        ) {
+            ThemeMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = themeMode == mode,
+                    onClick = { onThemeModeChange(mode) },
+                    label = {
+                        Text(
+                            when (mode) {
+                                ThemeMode.SYSTEM -> "System"
+                                ThemeMode.LIGHT -> "Light"
+                                ThemeMode.DARK -> "Dark"
+                            },
+                        )
+                    },
+                )
             }
         }
     }
@@ -154,22 +148,24 @@ private fun ThemeSection(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) ->
 
 @Composable
 private fun AboutCard() {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                SqueezeMark(size = 28.dp)
-                Text("Squeeze.fit ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
-            }
+    BrandCard(Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SqueezeMark(size = 28.dp)
             Text(
-                text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
-                    "under App info › Permissions.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Squeeze.fit ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.titleSmall,
             )
         }
+        Text(
+            text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
+                "under App info › Permissions.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
@@ -180,9 +176,8 @@ private fun SettingToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    BrandCard(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {

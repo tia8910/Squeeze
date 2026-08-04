@@ -402,6 +402,10 @@ private fun FailureCard(failure: DetectionFailure) {
                     DetectionFailure.PhotoUnreadable ->
                         "That photo could not be opened. Try picking it again, or choose a " +
                             "JPEG or PNG from your gallery."
+
+                    // Carries its own advice: the check knows which way the pose was off,
+                    // and "stand square" alone would not say what to correct.
+                    is DetectionFailure.NotFacingCamera -> failure.advice
                 },
                 style = MaterialTheme.typography.bodySmall,
             )

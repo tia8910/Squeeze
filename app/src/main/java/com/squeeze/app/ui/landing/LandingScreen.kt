@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.ui.brand.FeatureGlyph
@@ -69,18 +70,21 @@ private val features = listOf(
 /**
  * First-run landing screen, laid out as the brand sheet's hero panel.
  *
- * The mark animates its own meaning on entry — the figure appears, then the squeeze bands
- * sweep across it — so the first second explains the name without a word of copy.
+ * The mark settles in ahead of the copy, so the first thing on screen is the logo rather
+ * than a paragraph.
  *
  * This is the only screen that gets to be loud. Everywhere else the data is the subject.
  */
 @Composable
 fun LandingScreen(onGetStarted: () -> Unit) {
-    val squeeze = remember { Animatable(0f) }
+    val markScale = remember { Animatable(0.82f) }
     val contentAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        squeeze.animateTo(1f, tween(1100, easing = FastOutSlowInEasing))
+        // The mark settles in first and the rest of the page follows it. The logo is
+        // artwork now rather than something drawn stroke by stroke, so the entrance is a
+        // scale rather than the mark assembling itself.
+        markScale.animateTo(1f, tween(620, easing = FastOutSlowInEasing))
         contentAlpha.animateTo(1f, tween(600))
     }
 
@@ -94,7 +98,10 @@ fun LandingScreen(onGetStarted: () -> Unit) {
     ) {
         Spacer(Modifier.height(12.dp))
 
-        SqueezeLockup(markSize = 92.dp, squeeze = squeeze.value)
+        SqueezeLockup(
+            markSize = 108.dp,
+            modifier = Modifier.scale(markScale.value),
+        )
 
         Spacer(Modifier.height(28.dp))
 

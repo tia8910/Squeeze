@@ -11,12 +11,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +36,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +56,7 @@ import com.squeeze.app.ui.celebration.CelebrationScreen
 import com.squeeze.app.ui.composition.CompositionScreen
 import com.squeeze.app.ui.landing.LandingScreen
 import com.squeeze.app.ui.measurement.AddMeasurementScreen
+import com.squeeze.app.ui.onboarding.OnboardingScreen
 import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
 import com.squeeze.app.ui.theme.Brand
@@ -61,26 +72,55 @@ private const val ROUTE_SCAN = "scan"
 private const val ROUTE_ADD_MEASUREMENT = "add_measurement"
 private const val ROUTE_CELEBRATION = "celebration"
 
-private enum class Destination(val route: String, val label: String) {
-    COMPOSITION("composition", "Body"),
-    TRAINING("training", "Train"),
-    SETTINGS("settings", "You"),
+private enum class Destination(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+) {
+    COMPOSITION("composition", "Body", Icons.Default.MonitorWeight),
+    TRAINING("training", "Train", Icons.Default.FitnessCenter),
+    SETTINGS("settings", "You", Icons.Default.Person),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     val landingSeen by viewModel.landingSeen.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     if (!landingSeen) {
         LandingScreen(onGetStarted = viewModel::markLandingSeen)
         return
     }
 
+    // Nothing is drawn until the stored profile has actually been read. Deciding on a null
+    // profile while the query is still in flight would flash onboarding at every returning
+    // user for as long as the database takes to open.
+    if (state.loading) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        )
+        return
+    }
+
+    // The three fields the equations and the scale recovery need. Without them the app can
+    // produce no number at all, so they are collected before the app rather than left in a
+    // settings screen a user might never open — a scan that fails for a missing height
+    // fails after they have undressed and framed a photograph.
+    if (state.profile == null) {
+        OnboardingScreen(
+            onComplete = { heightCm, birthYear, sex ->
+                viewModel.updateProfile(heightCm, birthYear, sex)
+            },
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val state by viewModel.state.collectAsStateWithLifecycle()
 
     val activeTab = Destination.entries.firstOrNull { destination ->
         backStackEntry?.destination?.hierarchy?.any { it.route == destination.route } == true
@@ -239,11 +279,17 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 }
 
 /**
- * The brand sheet's navigation: three labels, the active one in blue.
+ * Bottom navigation: an icon over a label, the active item on a tinted pill.
  *
- * Text-only and without icons, which is what the design specifies. With three destinations
- * whose names are concrete nouns, an icon would be decoration rather than a second channel —
- * and a wrong-feeling icon for "You" would cost more clarity than it bought.
+ * The brand sheet draws this as three bare words, because in a static mockup a word is
+ * enough to say which screen is which. On a real device it is not: bare text at the bottom
+ * edge gives no tap target to aim at, no indication of where the touchable area ends, and
+ * nothing to recognise at a glance once the app is familiar. The icon carries recognition,
+ * the pill carries the tap target and the selected state, and the label stays because three
+ * abstract glyphs would be a guessing game.
+ *
+ * Everything else follows the sheet — blue for active, the same muted grey for the rest, and
+ * the hairline rule above.
  */
 @Composable
 private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
@@ -265,33 +311,59 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Destination.entries.forEach { destination ->
                 val selected = destination == active
-                // No ripple: the labels sit on a plain background with no container to
-                // bound the ripple, so it would spill as a bare circle over the bar.
+
+                val tint = when {
+                    selected -> MaterialTheme.colorScheme.primary
+                    dark -> Brand.DarkMuted
+                    else -> Brand.NavIdle
+                }
+
+                // Ripple is suppressed and replaced by the pill, which is a clearer
+                // indication of state than a fading circle and, unlike a ripple, persists.
                 val interaction = remember { MutableInteractionSource() }
 
-                Text(
-                    text = destination.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = when {
-                        selected -> MaterialTheme.colorScheme.primary
-                        dark -> Brand.DarkMuted
-                        else -> Brand.NavIdle
-                    },
+                Column(
                     modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (selected) {
+                                if (dark) Brand.DarkIce else Brand.Ice
+                            } else {
+                                Color.Transparent
+                            },
+                        )
                         .clickable(
                             interactionSource = interaction,
                             indication = null,
+                            role = Role.Tab,
                             onClick = { onSelect(destination) },
                         )
-                        .padding(horizontal = 24.dp, vertical = 6.dp),
-                )
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = destination.icon,
+                        // The label directly beneath already names the destination, so
+                        // repeating it here would make a screen reader say it twice.
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = destination.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = tint,
+                    )
+                }
             }
         }
     }

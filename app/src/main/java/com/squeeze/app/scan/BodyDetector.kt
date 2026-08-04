@@ -9,8 +9,10 @@ import com.google.mediapipe.tasks.vision.imagesegmenter.ImageSegmenter
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.FrontalityCheck
 import com.squeeze.core.scan.PoseAnchors
 import com.squeeze.core.scan.PosePoint
+import com.squeeze.core.scan.TrunkBounds
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
 import javax.inject.Inject
@@ -56,6 +58,18 @@ sealed interface DetectionFailure {
 
     /** The picked file could not be decoded into an image at all. */
     data object PhotoUnreadable : DetectionFailure
+
+    /**
+     * The subject is not square to the camera.
+     *
+     * A front-on width is only a width if the body faces the lens. Rotation foreshortens
+     * every horizontal measurement while the assumed depth stays put, so the result is
+     * wrong by an amount nothing downstream can detect. Mirror selfies are the usual cause
+     * and the worst one: the phone is held out to one side and the body turns with it.
+     *
+     * @param advice what to change, phrased for the person holding the camera
+     */
+    data class NotFacingCamera(val advice: String) : DetectionFailure
 }
 
 sealed interface DetectionResult {
@@ -153,7 +167,13 @@ class BodyDetector @Inject constructor(
         val maskWidth = mask.width
         val maskHeight = mask.height
 
-        val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight)
+        val geometry = buildGeometry(poseResult)
+
+        // Built before extraction, because it changes what extraction measures: it is what
+        // lets a torso run be cut back when an arm is touching the body.
+        val trunk = geometry?.let { TrunkBounds.from(it, maskHeight) }
+
+        val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight, trunk)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
         if (isCropped(poseResult)) {
@@ -169,9 +189,17 @@ class BodyDetector @Inject constructor(
             return DetectionResult.Failure(DetectionFailure.BodyNotFullyVisible)
         }
 
-        return DetectionResult.Success(
-            DetectedBody(profile, anchors, buildGeometry(poseResult)),
-        )
+        // Frontality is checked last, because it needs the measured body height and is the
+        // most specific advice available — telling someone to stand square is only useful
+        // once we know the photo was otherwise good enough to measure.
+        if (geometry != null) {
+            val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+            FrontalityCheck
+                .evaluate(geometry, profile.bodyHeightFraction, aspectRatio)
+                ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
+        }
+
+        return DetectionResult.Success(DetectedBody(profile, anchors, geometry))
     }
 
     /** Normalised landmark coordinates, or null when the pose is too incomplete to use. */
