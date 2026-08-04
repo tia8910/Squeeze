@@ -409,6 +409,14 @@ private fun FailureCard(failure: DetectionFailure) {
                         "That photo could not be opened. Try picking it again, or choose a " +
                             "JPEG or PNG from your gallery."
 
+                    DetectionFailure.ScaleUnreliable ->
+                        "Your outline and your body's landmarks disagree about how tall you " +
+                            "appear, which means the outline picked up something that is not " +
+                            "you — a mirror frame, a doorway, or a strong shadow. Every " +
+                            "measurement is worked out from your height in the photo, so " +
+                            "rather than give you numbers that are all wrong by the same " +
+                            "amount, the scan stopped. Try a plainer background."
+
                     // Carries its own advice: the check knows which way the pose was off,
                     // and "stand square" alone would not say what to correct.
                     is DetectionFailure.NotFacingCamera -> failure.advice
@@ -550,12 +558,25 @@ private fun ResultStep(
                                     "Could not find your ${warning.site.name.lowercase()}."
 
                                 is ScanWarning.ImplausibleMeasurement ->
-                                    "Your ${warning.site.name.lowercase()} came out at " +
-                                        "%.0f cm, which is outside human range, so it was " +
-                                        "discarded rather than saved. Usually this means the " +
-                                        "outline picked up the background or your arms — try " +
-                                        "a plainer background with arms clear of your sides."
-                                            .format(warning.centimetres)
+                                    // Parenthesised deliberately: `.format` binds to the
+                                    // last literal of a concatenation, so without these the
+                                    // %.0f sitting in an earlier segment reached the user
+                                    // verbatim.
+                                    ("Your ${warning.site.name.lowercase()} came out at " +
+                                        "%.0f cm, which is outside the range plausible for " +
+                                        "your height, so it was discarded rather than saved. " +
+                                        "Usually this means the outline picked up the " +
+                                        "background or your arms — try a plainer background " +
+                                        "with arms clear of your sides.")
+                                        .format(warning.centimetres)
+
+                                is ScanWarning.ScaleFromLandmarks ->
+                                    ("Your outline came out %.0f%% taller or shorter than " +
+                                        "your body's landmarks say it should, so the scan " +
+                                        "measured you against the landmarks instead. That is " +
+                                        "the safer of the two, but slightly less precise — a " +
+                                        "plainer background would let it use the sharper one.")
+                                        .format(warning.disagreementPercent)
                             },
                             style = MaterialTheme.typography.bodySmall,
                         )

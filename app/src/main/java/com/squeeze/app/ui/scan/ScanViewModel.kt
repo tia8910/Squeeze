@@ -26,6 +26,7 @@ import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScaleRecovery
+import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanResult
 import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
@@ -215,7 +216,11 @@ class ScanViewModel @Inject constructor(
         val analyser = BodyScanAnalyser(
             scale = ScaleRecovery(
                 heightCm = profile.heightCm,
-                bodyHeightFraction = front.profile.bodyHeightFraction,
+                // The cross-checked figure, not the silhouette's own extent. Detection has
+                // already compared the outline against the pose landmarks and, where they
+                // disagreed, dropped back to the reference that cannot pick up a mirror
+                // frame — see ScaleCrossCheck.
+                bodyHeightFraction = front.scale.bodyHeightFraction,
             ),
             imageAspectRatio = frontAspectRatio,
         )
@@ -228,7 +233,13 @@ class ScanViewModel @Inject constructor(
             warning is ScanWarning.MissingRequiredSite &&
                 warning.site == ScanSite.HIP &&
                 Sex.valueOf(profile.sex) == Sex.MALE
-        }
+        } + listOfNotNull(
+            // Placed at the end because it is the widest-reaching of them: it says something
+            // about every measurement above it rather than about one site.
+            front.scale.takeIf { it.source == ScaleSource.LANDMARK }
+                ?.disagreementPercent
+                ?.let { ScanWarning.ScaleFromLandmarks(it) },
+        )
 
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,

@@ -62,6 +62,18 @@ sealed interface ScanWarning {
      * of seeing a shorter list of results and assuming the rest are sound.
      */
     data class ImplausibleMeasurement(val site: ScanSite, val centimetres: Double) : ScanWarning
+
+    /**
+     * The silhouette's height disagreed with the pose landmarks', so scale came from the
+     * landmarks instead.
+     *
+     * Worth surfacing because it is the one warning that affects every number in the scan at
+     * once — scale multiplies the lot — and because it names a fixable cause: the outline
+     * picked up something that is not the person.
+     *
+     * @param disagreementPercent how far apart the two references were
+     */
+    data class ScaleFromLandmarks(val disagreementPercent: Double) : ScanWarning
 }
 
 /**

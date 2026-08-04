@@ -10,8 +10,11 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.FrontalityCheck
+import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.scan.PoseAnchors
 import com.squeeze.core.scan.PosePoint
+import com.squeeze.core.scan.ScaleCrossCheck
+import com.squeeze.core.scan.ScaleDecision
 import com.squeeze.core.scan.TrunkBounds
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
@@ -30,6 +33,14 @@ data class DetectedBody(
      * tape cannot give: whether the two sides sit level.
      */
     val geometry: FrontPoseGeometry? = null,
+    /**
+     * How the photo's pixels become centimetres, and which reference that came from.
+     *
+     * Carried out of detection rather than recomputed by the caller from
+     * [WidthProfile.bodyHeightFraction], because the silhouette's own extent is exactly the
+     * value that cannot be trusted on its own — see [ScaleCrossCheck].
+     */
+    val scale: ScaleDecision,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -58,6 +69,16 @@ sealed interface DetectionFailure {
 
     /** The picked file could not be decoded into an image at all. */
     data object PhotoUnreadable : DetectionFailure
+
+    /**
+     * The silhouette and the pose landmarks disagree about how tall the subject appears.
+     *
+     * The most damaging failure there is, and the reason [ScaleCrossCheck] exists: scale
+     * multiplies every measurement in the scan, so an outline that has absorbed a mirror
+     * frame or a shadow does not produce one bad number, it produces a complete set of
+     * plausible ones that are all wrong by the same factor. Refused rather than measured.
+     */
+    data object ScaleUnreliable : DetectionFailure
 
     /**
      * The subject is not square to the camera.
@@ -183,23 +204,34 @@ class BodyDetector @Inject constructor(
         val anchors = buildAnchors(poseResult, maskHeight)
             ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
 
+        // Before anything is measured, because this is the number every measurement is
+        // multiplied by. The silhouette's extent alone is not enough to trust it with.
+        val scale = ScaleCrossCheck.resolve(
+            maskFraction = profile.bodyHeightFraction,
+            landmarkFraction = geometry?.let {
+                LandmarkStature.frameFraction(it.nose, it.ankleLeft, it.ankleRight)
+            },
+        ) ?: return DetectionResult.Failure(DetectionFailure.ScaleUnreliable)
+
         // Scale comes from the subject's full height, so a cropped body would silently
         // scale every circumference wrong rather than simply measuring less.
-        if (profile.bodyHeightFraction < MIN_BODY_HEIGHT_FRACTION) {
+        if (scale.bodyHeightFraction < MIN_BODY_HEIGHT_FRACTION) {
             return DetectionResult.Failure(DetectionFailure.BodyNotFullyVisible)
         }
 
         // Frontality is checked last, because it needs the measured body height and is the
         // most specific advice available — telling someone to stand square is only useful
-        // once we know the photo was otherwise good enough to measure.
+        // once we know the photo was otherwise good enough to measure. It is given the
+        // resolved height rather than the raw mask one for the same reason the measurements
+        // are: a contaminated mask would make square shoulders look narrow.
         if (geometry != null) {
             val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
             FrontalityCheck
-                .evaluate(geometry, profile.bodyHeightFraction, aspectRatio)
+                .evaluate(geometry, scale.bodyHeightFraction, aspectRatio)
                 ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
         }
 
-        return DetectionResult.Success(DetectedBody(profile, anchors, geometry))
+        return DetectionResult.Success(DetectedBody(profile, anchors, geometry, scale))
     }
 
     /** Normalised landmark coordinates, or null when the pose is too incomplete to use. */
@@ -216,6 +248,7 @@ class BodyDetector @Inject constructor(
             hipRight = point(LANDMARK_HIP_RIGHT) ?: return null,
             ankleLeft = point(LANDMARK_ANKLE_LEFT),
             ankleRight = point(LANDMARK_ANKLE_RIGHT),
+            nose = point(LANDMARK_NOSE),
         )
     }
 
