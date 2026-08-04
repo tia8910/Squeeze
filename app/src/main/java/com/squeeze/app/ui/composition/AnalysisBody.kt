@@ -1,27 +1,16 @@
 package com.squeeze.app.ui.composition
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +27,7 @@ import com.squeeze.core.bodycomp.ReferenceBand
 import kotlin.math.abs
 
 /**
- * Everything the app can derive from the latest measurement.
+ * Everything the app can derive from one measurement.
  *
  * Three groups rather than one list, because they answer different questions: composition is
  * what you are made of, shape is how it is distributed, and energy is what it costs to run.
@@ -50,67 +39,39 @@ import kotlin.math.abs
  * muscle mass estimate from uncorrected girths. Presenting those at equal visual weight
  * would be the same dishonesty as printing a body fat percentage with no interval.
  *
- * Collapsed by default. The hero number answers the question most people opened the app to
- * ask; this is for the ones who want to interrogate it.
+ * This lives inside a record rather than on the dashboard, and that placement is the point.
+ * On the dashboard it described a body assembled from whichever entry last carried each
+ * field — a waist from Tuesday, a weight from Sunday — which is the right way to answer
+ * "where am I now" and the wrong thing to call an analysis, because no such body was ever
+ * measured. Attached to a record it describes one real session, and every figure in it can
+ * be traced to the numbers shown directly above.
  */
 @Composable
-fun AnalysisSection(panel: CompositionPanel, modifier: Modifier = Modifier) {
+fun AnalysisBody(panel: CompositionPanel, modifier: Modifier = Modifier) {
     if (panel.isEmpty && panel.missing.isEmpty()) return
 
-    var expanded by remember { mutableStateOf(false) }
     val dark = LocalIsDarkTheme.current
     val muted = if (dark) Brand.DarkMuted else Brand.Muted
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { expanded = !expanded }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Full analysis",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (expanded) "Hide" else "Show",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (expanded) "Collapse analysis" else "Expand analysis",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        MetricGroup("Composition", panel.composition)
+        MetricGroup("Shape", panel.shape)
+        MetricGroup("Energy", panel.energy)
 
-        AnimatedVisibility(visible = expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricGroup("Composition", panel.composition)
-                MetricGroup("Shape", panel.shape)
-                MetricGroup("Energy", panel.energy)
-
-                if (panel.missing.isNotEmpty()) {
-                    BrandCard(Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Add to unlock more",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        panel.missing.forEach { gap ->
-                            Text(
-                                text = "${gap.input} → ${gap.unlocks}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = muted,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                    }
+        if (panel.missing.isNotEmpty()) {
+            BrandCard(Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Add to unlock more",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                panel.missing.forEach { gap ->
+                    Text(
+                        text = "${gap.input} → ${gap.unlocks}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             }
         }

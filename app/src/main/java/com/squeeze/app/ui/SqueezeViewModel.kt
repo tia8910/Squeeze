@@ -41,14 +41,6 @@ data class SqueezeUiState(
     val leanMassTrend: List<TrendPoint> = emptyList(),
     val repeatability: RepeatabilityScore? = null,
     val calibration: PersonalCalibration = PersonalCalibration.none(),
-    /**
-     * Everything derivable from the most recent measurement.
-     *
-     * Recomputed on refresh rather than stored, because it is a pure function of the
-     * measurement and the profile — persisting it would create a second copy that could
-     * disagree with the first after a profile edit.
-     */
-    val panel: CompositionPanel? = null,
     val loading: Boolean = true,
 )
 
@@ -141,45 +133,40 @@ class SqueezeViewModel @Inject constructor(
                 leanMassTrend = snapshot.leanMassTrend,
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
-                panel = buildPanel(profile, measurements, snapshot.latest?.level),
                 loading = false,
             )
         }
     }
 
     /**
-     * Derives the analysis panel from the newest measurement.
+     * Derives the full analysis for one stored measurement.
      *
-     * Circumferences and weight are taken from the most recent entry that carries each,
-     * rather than from a single row. A tape session and a weigh-in are usually separate
-     * events, and refusing to combine them would leave the panel empty for users who do
-     * exactly what the app asks of them.
+     * Only that entry's own numbers are used. The dashboard version of this took the most
+     * recent entry carrying each field — a waist from Tuesday, a weight from Sunday — which
+     * is a reasonable way to answer "where am I now" but describes a body that was never
+     * measured, and it has no business being called the analysis *of* a record. Inside a
+     * record, every figure has to be traceable to the measurements printed above it.
+     *
+     * The body-fat figure comes from the entry's own equations rather than from the trend's
+     * current level, for the same reason: a row dated three weeks ago should say what that
+     * day said, not what the filter believes today.
      */
-    private fun buildPanel(
-        profile: Profile,
-        measurements: List<MeasurementEntity>,
-        bodyFatPercent: Double?,
-    ): CompositionPanel? {
-        if (measurements.isEmpty()) return null
-
-        fun <T> newest(select: (MeasurementEntity) -> T?): T? =
-            measurements.firstNotNullOfOrNull(select)
-
-        val circumferences = Circumferences(
-            neckCm = newest { it.neckCm },
-            waistCm = newest { it.waistCm },
-            hipCm = newest { it.hipCm },
-            chestCm = newest { it.chestCm },
-            thighCm = newest { it.thighCm },
-            armCm = newest { it.armCm },
-            calfCm = newest { it.calfCm },
-        )
+    fun analysisFor(entity: MeasurementEntity): CompositionPanel? {
+        val profile = _state.value.profile ?: return null
 
         return CompositionAnalyser.analyse(
             profile = profile,
-            circumferences = circumferences,
-            bodyFatPercent = bodyFatPercent,
-            weightKg = newest { it.weightKg },
+            circumferences = Circumferences(
+                neckCm = entity.neckCm,
+                waistCm = entity.waistCm,
+                hipCm = entity.hipCm,
+                chestCm = entity.chestCm,
+                thighCm = entity.thighCm,
+                armCm = entity.armCm,
+                calfCm = entity.calfCm,
+            ),
+            bodyFatPercent = repository.estimate(profile, entity)?.percent,
+            weightKg = entity.weightKg,
             currentYear = LocalDate.now().year,
         )
     }

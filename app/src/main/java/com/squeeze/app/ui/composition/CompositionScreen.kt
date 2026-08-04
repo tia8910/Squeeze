@@ -71,8 +71,8 @@ fun CompositionScreen(
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
     measurements: List<MeasurementEntity>,
-    panel: CompositionPanel?,
     loadPhoto: suspend (String) -> Bitmap?,
+    analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
@@ -97,7 +97,7 @@ fun CompositionScreen(
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, loadPhoto, onDelete)
+                HistorySection(measurements, loadPhoto, analysisFor, onDelete)
             }
             return@Column
         }
@@ -137,11 +137,11 @@ fun CompositionScreen(
             },
         )
 
-        // Everything derivable from the latest measurement, collapsed. The hero number
-        // answers what most people opened the app to ask; this is for interrogating it.
-        panel?.let { AnalysisSection(it, Modifier.padding(top = 4.dp)) }
-
-        HistorySection(measurements, loadPhoto, onDelete)
+        // The full analysis lives inside each history entry rather than here. On the
+        // dashboard it described whichever fields happened to be newest across different
+        // sessions, which is a fine answer to "where am I now" and a poor thing to call an
+        // analysis, because no single measurement ever produced that combination.
+        HistorySection(measurements, loadPhoto, analysisFor, onDelete)
 
         // Supporting detail, deliberately below the fold. Someone who wants to interrogate
         // the number can; someone who just wants the number never has to scroll past a chart.
@@ -282,6 +282,7 @@ private fun HeroCard(
 private fun HistorySection(
     measurements: List<MeasurementEntity>,
     loadPhoto: suspend (String) -> Bitmap?,
+    analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onDelete: (MeasurementEntity) -> Unit,
 ) {
     if (measurements.isEmpty()) return
@@ -334,6 +335,7 @@ private fun HistorySection(
         MeasurementDetailDialog(
             entry = entry,
             loadPhoto = loadPhoto,
+            panel = analysisFor(entry),
             onDelete = {
                 onDelete(entry)
                 selected = null
