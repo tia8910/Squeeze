@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
@@ -39,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +63,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
+import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.model.Circumferences
+import com.squeeze.core.model.Profile
+import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScanWarning
@@ -431,7 +437,11 @@ private fun AnalysingStep() {
 }
 
 @Composable
-private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> Unit) {
+private fun ResultStep(
+    state: ScanUiState,
+    onSave: (Circumferences, Double?) -> Unit,
+    onRetake: () -> Unit,
+) {
     val result = state.result ?: return
 
     Column(
@@ -471,24 +481,45 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
 
         Text("Measurements", style = MaterialTheme.typography.titleSmall)
 
+        Text(
+            // Said plainly, because the previous version presented these as findings and
+            // they are not: the silhouette gets sites wrong often enough that a value the
+            // user has checked is worth more than one the pipeline is confident about.
+            text = "These are the scan's best reading, not a verdict. Correct anything that " +
+                "looks wrong before saving — a tape around the site takes ten seconds and is " +
+                "more repeatable than any photo method.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         val c = result.circumferences
-        listOfNotNull(
-            c.neckCm?.let { "Neck" to it },
-            c.chestCm?.let { "Chest" to it },
-            c.waistCm?.let { "Waist" to it },
-            c.hipCm?.let { "Hip" to it },
-            c.thighCm?.let { "Thigh" to it },
-        ).forEach { (label, value) ->
-            Card(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
-                    Text("%.1f cm".format(value), style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
+
+        var neck by remember(c) { mutableStateOf(c.neckCm.toField()) }
+        var chest by remember(c) { mutableStateOf(c.chestCm.toField()) }
+        var waist by remember(c) { mutableStateOf(c.waistCm.toField()) }
+        var hip by remember(c) { mutableStateOf(c.hipCm.toField()) }
+        var thigh by remember(c) { mutableStateOf(c.thighCm.toField()) }
+        var weight by remember(c) { mutableStateOf("") }
+
+        val edited = Circumferences(
+            neckCm = neck.toCm(),
+            chestCm = chest.toCm(),
+            waistCm = waist.toCm(),
+            hipCm = hip.toCm(),
+            thighCm = thigh.toCm(),
+        )
+
+        MeasurementField("Neck", neck, { neck = it }, missing = c.neckCm == null)
+        MeasurementField("Chest", chest, { chest = it }, missing = c.chestCm == null)
+        MeasurementField("Waist", waist, { waist = it }, missing = c.waistCm == null)
+        MeasurementField("Hip", hip, { hip = it }, missing = c.hipCm == null)
+        MeasurementField("Thigh", thigh, { thigh = it }, missing = c.thighCm == null)
+        MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
+
+        // The whole point of making these editable: the estimate updates as the user fixes a
+        // value, so a wrong neck stops being a dead end and becomes something they can see
+        // themselves correct.
+        BodyFatPreview(state.profile, edited)
 
         if (result.warnings.isNotEmpty()) {
             Card(
@@ -542,7 +573,10 @@ private fun ResultStep(state: ScanUiState, onSave: () -> Unit, onRetake: () -> U
             )
         }
 
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text("Save measurements") }
+        Button(
+            onClick = { onSave(edited, weight.toCm()) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Save measurements") }
         OutlinedButton(onClick = onRetake, modifier = Modifier.fillMaxWidth()) { Text("Scan again") }
     }
 }
@@ -746,5 +780,104 @@ private fun PostureSection(findings: List<PostureFinding>) {
                 }
             }
         }
+    }
+}
+
+private fun Double?.toField(): String = this?.let { "%.1f".format(it) } ?: ""
+
+private fun String.toCm(): Double? = trim().replace(',', '.').toDoubleOrNull()
+
+/**
+ * One editable measurement.
+ *
+ * A site the scan could not measure is shown empty and labelled, rather than hidden. Hiding
+ * it loses the most useful thing on the screen: that the app knows it is missing and the
+ * user can supply it in ten seconds with a tape.
+ */
+@Composable
+private fun MeasurementField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    missing: Boolean,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' }.take(5)) },
+        label = { Text(label) },
+        supportingText = if (missing) {
+            { Text("The scan could not measure this") }
+        } else {
+            null
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Decimal,
+            imeAction = ImeAction.Next,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * Body fat from whatever is currently in the fields.
+ *
+ * Recomputed on every keystroke, so correcting a neck shows the percentage appear. When it
+ * cannot be computed the reason is named — "no body fat" with no explanation is what sent
+ * the user back here in the first place.
+ */
+@Composable
+private fun BodyFatPreview(profile: Profile?, circumferences: Circumferences) {
+    if (profile == null) return
+
+    val estimate = BodyFatCalculator.navy(profile, circumferences)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (estimate != null) {
+                Text("Body fat", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "%.1f%%".format(estimate.percent),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+                Text(
+                    text = "From the values above. Save to record it.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text("Body fat cannot be calculated yet", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = missingReason(profile, circumferences),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+/** Names the specific thing standing between these values and a percentage. */
+private fun missingReason(profile: Profile, c: Circumferences): String {
+    val needsHip = profile.sex == Sex.FEMALE
+    return when {
+        c.neckCm == null -> "A neck measurement is needed. Put a tape around the narrowest " +
+            "part of your neck, below the Adam's apple."
+
+        c.waistCm == null -> "A waist measurement is needed. Measure at the narrowest point, " +
+            "level with the navel for most people."
+
+        needsHip && c.hipCm == null ->
+            "A hip measurement is needed for the equation used here — around the widest point."
+
+        c.waistCm <= c.neckCm ->
+            "Your waist is not larger than your neck, which the equation cannot use. One of " +
+                "the two is wrong — the neck is the usual culprit."
+
+        else -> "The values above are outside the range the equation is defined for. Check " +
+            "them against a tape."
     }
 }

@@ -8,13 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
+import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.scan.BodyDetector
 import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
+import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.MeasurementSource
+import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyProportions
@@ -58,6 +61,8 @@ data class ScanUiState(
     val proportions: List<Proportion> = emptyList(),
     /** Alignment read from pose landmarks the scan produced anyway. */
     val posture: List<PostureFinding> = emptyList(),
+    /** Needed on the result screen to preview body fat as the user corrects a value. */
+    val profile: Profile? = null,
 )
 
 /**
@@ -227,6 +232,7 @@ class ScanViewModel @Inject constructor(
 
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,
+            profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
             // Ratios divide two measurements from the same photograph, so scale error
             // cancels — they are trustworthy even when the centimetres are not.
@@ -235,12 +241,18 @@ class ScanViewModel @Inject constructor(
         )
     }
 
-    /** Stores the scan as a measurement, tagged so the trend engine weights it correctly. */
-    fun save() {
+    /**
+     * Stores the measurement the user confirmed.
+     *
+     * [edited] rather than the scan's own output, because the silhouette gets sites wrong
+     * often enough that a value the user has corrected is worth more than one the pipeline
+     * is confident about. What the scan produces is a starting point.
+     */
+    fun save(edited: Circumferences, weightKg: Double?) {
         val result = _state.value.result ?: return
 
         viewModelScope.launch {
-            val c = result.circumferences
+            val c = edited
 
             // Written before the row, so a row never references a file that failed to save.
             val photoId = frontBitmap?.let { bitmap ->
@@ -258,7 +270,7 @@ class ScanViewModel @Inject constructor(
                     } else {
                         MeasurementSource.PHOTO.name
                     },
-                    weightKg = null,
+                    weightKg = weightKg,
                     neckCm = c.neckCm,
                     waistCm = c.waistCm,
                     hipCm = c.hipCm,
@@ -297,3 +309,15 @@ class ScanViewModel @Inject constructor(
         detector.close()
     }
 }
+
+/**
+ * The subset of the profile the result screen needs.
+ *
+ * Only the three fields the body-fat equations use. Training age and goal are irrelevant to
+ * a measurement, and defaulting them here keeps this independent of the settings screen.
+ */
+private fun ProfileEntity.toScanProfile() = Profile(
+    heightCm = heightCm,
+    birthYear = birthYear,
+    sex = Sex.valueOf(sex),
+)
