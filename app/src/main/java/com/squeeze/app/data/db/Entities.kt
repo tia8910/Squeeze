@@ -46,6 +46,13 @@ data class MeasurementEntity(
      * which is the truth for every measurement taken before this column existed.
      */
     val visualBodyFatPercent: Double? = null,
+    /**
+     * Body fat read from the silhouette's proportions alone; see SilhouetteBodyFat.
+     *
+     * Stored rather than recomputed because it needs the pixel width profile, which lives
+     * only for the duration of the scan.
+     */
+    val shapeBodyFatPercent: Double? = null,
 )
 
 /**
