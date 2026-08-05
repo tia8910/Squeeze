@@ -161,6 +161,18 @@ class BodyCompositionRepository @Inject constructor(
             ?.let { VisualAssessment.estimate(it, profile.sex) }
             ?.let { candidates += it }
 
+        // Read from the silhouette's proportions rather than from its converted widths, so
+        // it is the only photo-derived estimate that scale recovery cannot corrupt. When it
+        // disagrees loudly with the circumference route, that disagreement is evidence about
+        // the scan rather than noise to be averaged away.
+        entity.shapeBodyFatPercent?.let { shape ->
+            candidates += BodyFatEstimate(
+                percent = shape,
+                method = EstimationMethod.PHOTO_SHAPE,
+                standardErrorPercent = EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+            )
+        }
+
         // Every method that could run, merged rather than ranked. Two routes to the same
         // quantity constrain it better than the better one alone, and MethodFusion handles
         // the two things that would otherwise make that a false economy: the methods are

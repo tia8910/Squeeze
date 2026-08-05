@@ -746,6 +746,15 @@ private fun ResultStep(
         // themselves correct.
         BodyFatPreview(state.profile, edited)
 
+        // Above the tape-equation preview in importance even though it sits below it on
+        // screen, because it is the number that did not come through the circumferences.
+        state.shapeBodyFatPercent?.let { shape ->
+            ShapeEstimateCard(
+                shapePercent = shape,
+                tapePercent = profile?.let { BodyFatCalculator.navy(it, edited)?.percent },
+            )
+        }
+
         var visualPercent by remember(c) { mutableStateOf<Double?>(null) }
 
         if (profile != null) {
@@ -1363,6 +1372,57 @@ private fun VisualMatchSection(
                         .format(measured, selected),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Body fat read from the outline's proportions, and how it compares with the measured route.
+ *
+ * The comparison is the point. Every other number on this screen is a function of the same
+ * converted widths, so when scale recovery fails they all fail together and agreeing with
+ * each other proves nothing. This one is computed from ratios between widths in the same
+ * image, where the scale divides out exactly — so when the two disagree, the disagreement is
+ * evidence rather than noise, and it points at the circumference route as the broken one.
+ */
+@Composable
+private fun ShapeEstimateCard(shapePercent: Double, tapePercent: Double?) {
+    val gap = tapePercent?.let { kotlin.math.abs(it - shapePercent) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (gap != null && gap > 6.0) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "From your shape: %.1f%%".format(shapePercent),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "Read from your outline's proportions — how wide your waist is " +
+                    "relative to your shoulders and hips. It never converts pixels to " +
+                    "centimetres, so nothing about your height in the frame can affect it. " +
+                    "That makes it coarser than a good tape measurement and immune to the " +
+                    "error that makes a bad scan wrong.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            if (gap != null && gap > 6.0) {
+                Text(
+                    text = ("Your measurements give %.1f%% and your shape gives %.1f%%. " +
+                        "A gap this size is not noise — the circumferences above have most " +
+                        "likely been scaled wrong, and the shape figure is the one that " +
+                        "cannot be. Check the weight warning above, or correct a site by " +
+                        "tape.").format(tapePercent, shapePercent),
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }

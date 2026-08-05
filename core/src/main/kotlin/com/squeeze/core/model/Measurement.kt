@@ -156,4 +156,20 @@ enum class EstimationMethod(
      * same one next month unless something actually changed.
      */
     VISUAL_ASSESSMENT(5.0, 1.8, "Visual match"),
+
+    /**
+     * Body fat read from the silhouette's proportions, without converting to centimetres.
+     *
+     * The one photo method that scale recovery cannot corrupt. Every other route through a
+     * photograph divides a pixel width by the body's pixel height and multiplies by the
+     * stated stature, which makes all of them hostage to the mask's top and bottom rows;
+     * a ratio of two widths in the same image divides that error out exactly.
+     *
+     * Coarser than a measured girth, because two people with the same outline can differ by
+     * several points depending on the muscle beneath it — hence the wide interval, which has
+     * to stay wide or a silhouette would outvote a tape. Its value is not its accuracy but
+     * its independence: it is the only estimate that can disagree with the others for a
+     * reason, and that disagreement is how the app detects a broken scan at all.
+     */
+    PHOTO_SHAPE(6.0, 1.2, "Photo shape"),
 }

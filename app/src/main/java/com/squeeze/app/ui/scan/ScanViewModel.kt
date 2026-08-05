@@ -30,6 +30,7 @@ import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanResult
 import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
+import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,13 @@ data class ScanUiState(
     val posture: List<PostureFinding> = emptyList(),
     /** Needed on the result screen to preview body fat as the user corrects a value. */
     val profile: Profile? = null,
+    /**
+     * Body fat read from the silhouette's proportions, independent of scale recovery.
+     *
+     * Carried separately from the circumferences because it is the one number on the result
+     * screen that did not come through them, and so the only one that can contradict them.
+     */
+    val shapeBodyFatPercent: Double? = null,
 )
 
 /**
@@ -259,6 +267,13 @@ class ScanViewModel @Inject constructor(
 
         val result = analyser.analyse(markers)
 
+        // Computed from the pixel profile before it is discarded. Nothing here converts to
+        // centimetres, so a mask that misjudged the body's height cannot reach it.
+        val shape = SilhouetteBodyFat
+            .indicesFrom(front.profile, front.anchors)
+            ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
+            ?.percent
+
         // The female Navy equation needs a hip; the male one does not. Reporting a missing
         // hip to a man would be noise, so the warning is filtered by profile here.
         val relevantWarnings = result.warnings.filterNot { warning ->
@@ -280,6 +295,7 @@ class ScanViewModel @Inject constructor(
             // Ratios divide two measurements from the same photograph, so scale error
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
+            shapeBodyFatPercent = shape,
             posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
         )
     }
@@ -292,6 +308,7 @@ class ScanViewModel @Inject constructor(
      * is confident about. What the scan produces is a starting point.
      */
     fun save(edited: Circumferences, weightKg: Double?, visualBodyFatPercent: Double? = null) {
+        val shape = _state.value.shapeBodyFatPercent
         val result = _state.value.result ?: return
 
         viewModelScope.launch {
@@ -330,6 +347,7 @@ class ScanViewModel @Inject constructor(
                     // The one input that did not come from the photograph, and so the one
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
+                    shapeBodyFatPercent = shape,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,
                 ),
