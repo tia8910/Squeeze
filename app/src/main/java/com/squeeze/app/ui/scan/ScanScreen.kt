@@ -627,7 +627,7 @@ private fun AnalysingStep() {
 @Composable
 private fun ResultStep(
     state: ScanUiState,
-    onSave: (Circumferences, Double?, Double?) -> Unit,
+    onSave: (Circumferences, Double?, Double?, Double?) -> Unit,
     onRetake: () -> Unit,
 ) {
     val result = state.result ?: return
@@ -748,6 +748,13 @@ private fun ResultStep(
 
         // Above the tape-equation preview in importance even though it sits below it on
         // screen, because it is the number that did not come through the circumferences.
+        // The escape hatch, and after three measured attempts at reading adiposity off a
+        // phone photo, the honest centre of the feature rather than a footnote to it. A
+        // number entered here is stored as this scan's reference, which fits the offset for
+        // this method immediately — see BodyCompositionRepository.fitCalibration.
+        var knownPercent by remember(c) { mutableStateOf("") }
+        KnownBodyFatCard(knownPercent) { knownPercent = it }
+
         state.shapeBodyFatPercent?.let { shape ->
             ShapeEstimateCard(
                 shapePercent = shape,
@@ -832,7 +839,7 @@ private fun ResultStep(
         }
 
         Button(
-            onClick = { onSave(edited, weight.toCm(), visualPercent) },
+            onClick = { onSave(edited, weight.toCm(), visualPercent, knownPercent.toCm()) },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Save measurements") }
         OutlinedButton(onClick = onRetake, modifier = Modifier.fillMaxWidth()) { Text("Scan again") }
@@ -1425,6 +1432,53 @@ private fun ShapeEstimateCard(shapePercent: Double, tapePercent: Double?) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Lets the user tell the app what they actually are, once.
+ *
+ * Three separate photo-native methods were built and measured against labelled reference
+ * charts, and all three failed in the same place: below about twenty per cent, what
+ * distinguishes one body from another is abdominal definition, and that is swamped by
+ * lighting, pose and camera before it ever reaches a number. A phone photograph analysed
+ * on-device cannot resolve the lean range, and no amount of further arithmetic changes that.
+ *
+ * What it can do is be told once. The app's founding claim is that a method's error is a
+ * systematic, person-specific offset — the same size in the same direction every time — and
+ * a single honest anchor removes it permanently. Everything after this is corrected, and the
+ * trend, which was always the point, was never affected by the offset anyway.
+ *
+ * This was previously reachable only by adding a separate manual entry, and even then the
+ * fit accepted tape measurements alone, so a photo scan could never be calibrated at all.
+ * That is why the number stayed wrong however many methods were added to the pool.
+ */
+@Composable
+private fun KnownBodyFatCard(value: String, onValueChange: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Know your real number?", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "If you have a DEXA, a BodPod, or you simply know roughly where you " +
+                    "are, put it here once. The app will work out how far this method sits " +
+                    "from the truth for your body and correct every future scan by the same " +
+                    "amount. It is the fastest way to make the number mean something.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { onValueChange(it.filter { ch -> ch.isDigit() || ch == '.' }.take(4)) },
+                label = { Text("Actual body fat (%)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

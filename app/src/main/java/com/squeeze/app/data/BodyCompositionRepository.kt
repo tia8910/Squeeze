@@ -67,7 +67,8 @@ class BodyCompositionRepository @Inject constructor(
 
         val estimates = measurements.mapNotNull { entity ->
             val estimate = estimate(profile, entity) ?: return@mapNotNull null
-            entity.epochDay to calibration.apply(estimate)
+            val fitted = calibration[estimate.method] ?: PersonalCalibration.none()
+            entity.epochDay to fitted.apply(estimate)
         }
 
         // Trend uses repeatability, not standard error: a systematic offset shifts the whole
@@ -98,7 +99,10 @@ class BodyCompositionRepository @Inject constructor(
             bodyFatTrend = trendEngine.filter(fatObservations),
             leanMassTrend = TrendEngine(TrendEngine.BODYWEIGHT_PROCESS_NOISE).filter(leanObservations),
             repeatability = Repeatability.score(fatObservations),
-            calibration = calibration,
+            // Surfaced for the UI's "uncalibrated" notice. Any active fit means the user
+            // has anchored at least one method, which is what that notice is asking for.
+            calibration = calibration.values.firstOrNull { it.isActive }
+                ?: PersonalCalibration.none(),
         )
     }
 
@@ -114,13 +118,22 @@ class BodyCompositionRepository @Inject constructor(
      * number for "where am I now"; it is the wrong number to print inside a row dated three
      * weeks ago, which should say what that day's measurements said.
      */
-    fun estimate(profile: Profile, entity: MeasurementEntity): BodyFatEstimate? {
+    fun estimate(
+        profile: Profile,
+        entity: MeasurementEntity,
+        includeReference: Boolean = true,
+    ): BodyFatEstimate? {
         val age = profile.ageAt(LocalDate.now().year)
         val candidates = mutableListOf<BodyFatEstimate>()
 
         // A reference scan is not an equation applied to this entry, it is a measurement of
         // the thing itself, so it enters the pool at its own much tighter error.
-        entity.referenceBodyFatPercent?.let { reference ->
+        //
+        // Excluded when fitting calibration, and that exclusion is load-bearing: the whole
+        // point is to compare what the equations said against what the truth was, and a
+        // reference that had already been folded into the estimate would compare the truth
+        // against itself and fit an offset of zero.
+        entity.referenceBodyFatPercent?.takeIf { includeReference }?.let { reference ->
             candidates += BodyFatEstimate(
                 percent = reference,
                 method = EstimationMethod.REFERENCE_SCAN,
@@ -187,31 +200,55 @@ class BodyCompositionRepository @Inject constructor(
      * truth for this person, and pooling methods would fit the difference between equations
      * instead. In practice tape is the dominant method, so this is usually a single group.
      */
+    /**
+     * One calibration per estimation method.
+     *
+     * A single shared fit would be wrong: a tape reading, a photo scan and a BMI estimate sit
+     * at quite different distances from the truth for the same person, and averaging those
+     * offsets corrects none of them.
+     */
     private fun fitCalibration(
         profile: Profile,
         measurements: List<MeasurementEntity>,
-    ): PersonalCalibration {
+    ): Map<EstimationMethod, PersonalCalibration> {
         val scans = measurements.filter { it.referenceBodyFatPercent != null }
-        if (scans.isEmpty()) return PersonalCalibration.none()
+        if (scans.isEmpty()) return emptyMap()
 
         val points = scans.mapNotNull { scan ->
             val reference = scan.referenceBodyFatPercent ?: return@mapNotNull null
 
-            // The equation's reading on the same day as the scan. Anything further away is
-            // comparing two different bodies, so a scan with no nearby measurement is skipped.
-            val sameDay = measurements.firstOrNull {
-                it.referenceBodyFatPercent == null &&
-                    kotlin.math.abs(it.epochDay - scan.epochDay) <= SCAN_PAIRING_WINDOW_DAYS
-            } ?: return@mapNotNull null
+            // The reference may sit on the scan's own row, which is the case that matters:
+            // a user who looks at a wrong number and types what they actually are gets their
+            // offset fitted from that one action. Failing that, a measurement within a few
+            // days describes the same body and will do.
+            val paired = scan.takeIf { it.hasMeasurableInputs() }
+                ?: measurements.firstOrNull {
+                    it.referenceBodyFatPercent == null &&
+                        kotlin.math.abs(it.epochDay - scan.epochDay) <= SCAN_PAIRING_WINDOW_DAYS
+                }
+                ?: return@mapNotNull null
 
-            val estimated = estimate(profile, sameDay) ?: return@mapNotNull null
-            if (estimated.method != EstimationMethod.NAVY_CIRCUMFERENCE) return@mapNotNull null
+            val estimated = estimate(profile, paired, includeReference = false)
+                ?: return@mapNotNull null
 
-            CalibrationPoint(estimatedPercent = estimated.percent, referencePercent = reference)
+            // Previously this accepted only NAVY_CIRCUMFERENCE, which meant a photo scan
+            // could never be calibrated at all — the one thing in this app that most needs
+            // it, since its offset is the largest and the most person-specific. Every method
+            // now gets its own fit, because each carries a different systematic error and
+            // correcting a photo scan by a tape-derived offset would be worse than not
+            // correcting it.
+            estimated.method to
+                CalibrationPoint(estimated.percent, referencePercent = reference)
         }
 
-        return PersonalCalibration.fit(points)
+        return points
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, group) -> PersonalCalibration.fit(group) }
     }
+
+    /** Whether the row carries anything an equation can run on, ignoring the reference. */
+    private fun MeasurementEntity.hasMeasurableInputs(): Boolean =
+        waistCm != null || chestMm != null || weightKg != null || shapeBodyFatPercent != null
 
     suspend fun insert(entity: MeasurementEntity): Long = measurementDao.insert(entity)
 
