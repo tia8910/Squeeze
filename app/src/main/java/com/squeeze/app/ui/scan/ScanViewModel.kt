@@ -307,7 +307,12 @@ class ScanViewModel @Inject constructor(
      * often enough that a value the user has corrected is worth more than one the pipeline
      * is confident about. What the scan produces is a starting point.
      */
-    fun save(edited: Circumferences, weightKg: Double?, visualBodyFatPercent: Double? = null) {
+    fun save(
+        edited: Circumferences,
+        weightKg: Double?,
+        visualBodyFatPercent: Double? = null,
+        knownBodyFatPercent: Double? = null,
+    ) {
         val shape = _state.value.shapeBodyFatPercent
         val result = _state.value.result ?: return
 
@@ -343,7 +348,9 @@ class ScanViewModel @Inject constructor(
                     thighMm = null,
                     tricepsMm = null,
                     suprailiacMm = null,
-                    referenceBodyFatPercent = null,
+                    // Stored on the scan's own row so calibration fits from this one action:
+                    // the row carries both what the equations said and what the truth is.
+                    referenceBodyFatPercent = knownBodyFatPercent?.takeIf { it in 2.0..70.0 },
                     // The one input that did not come from the photograph, and so the one
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
