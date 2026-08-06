@@ -144,22 +144,45 @@ class BodyCompositionRepository @Inject constructor(
         BodyFatCalculator.jacksonPollock3(profile, entity.toSkinfolds(), age)
             ?.let { candidates += it }
 
-        BodyFatCalculator.navy(profile, entity.toCircumferences())?.let { navy ->
-            // A photo-derived circumference set runs the same equation but scatters more,
-            // because scale recovery adds error the tape does not have.
-            candidates += when (entity.source) {
-                MeasurementSource.PHOTO.name -> navy.copy(
-                    method = EstimationMethod.PHOTO_SILHOUETTE,
-                    standardErrorPercent = EstimationMethod.PHOTO_SILHOUETTE.standardErrorPercent,
-                )
+        val fromCircumferences = BodyFatCalculator.navy(profile, entity.toCircumferences())
+            ?.let { navy ->
+                // A photo-derived circumference set runs the same equation but scatters more,
+                // because scale recovery adds error the tape does not have.
+                when (entity.source) {
+                    MeasurementSource.PHOTO.name -> navy.copy(
+                        method = EstimationMethod.PHOTO_SILHOUETTE,
+                        standardErrorPercent =
+                            EstimationMethod.PHOTO_SILHOUETTE.standardErrorPercent,
+                    )
 
-                MeasurementSource.PHOTO_FRONT_ONLY.name -> navy.copy(
-                    method = EstimationMethod.PHOTO_FRONT_ONLY,
-                    standardErrorPercent = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent,
-                )
+                    MeasurementSource.PHOTO_FRONT_ONLY.name -> navy.copy(
+                        method = EstimationMethod.PHOTO_FRONT_ONLY,
+                        standardErrorPercent =
+                            EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent,
+                    )
 
-                else -> navy
+                    else -> navy
+                }
             }
+
+        // When the outline and the circumferences disagree past this, the circumferences are
+        // not merely noisy — they have failed a validity check, and the shape figure is the
+        // evidence. Both quantities describe the same photograph; the difference between
+        // them is that one passed through `widthCm = widthPixels / bodyHeightPixels × height`
+        // and the other did not. Only one of them can be wrong for that reason.
+        //
+        // So they are discarded rather than down-weighted, which is how every other failed
+        // plausibility gate in this codebase behaves. Leaving a known-corrupt estimate in an
+        // inverse-variance fusion does not hedge the answer, it drags it: on a real scan the
+        // circumference route read 32.1% against a shape reading of 19.6% on a body nearer
+        // 10%, and averaging those is worse than either.
+        val circumferencesContradicted = fromCircumferences != null &&
+            entity.shapeBodyFatPercent != null &&
+            kotlin.math.abs(fromCircumferences.percent - entity.shapeBodyFatPercent) >
+            SHAPE_DISAGREEMENT_POINTS
+
+        if (!circumferencesContradicted) {
+            fromCircumferences?.let { candidates += it }
         }
 
         entity.weightKg
@@ -257,6 +280,17 @@ class BodyCompositionRepository @Inject constructor(
 
         /** A scan and a tape reading within three days describe the same body. */
         const val SCAN_PAIRING_WINDOW_DAYS = 3L
+
+        /**
+         * How far the outline and the circumferences may differ before the circumferences
+         * are treated as broken rather than imprecise.
+         *
+         * Wide enough that ordinary disagreement between a coarse shape reading and a decent
+         * girth reading passes — the two genuinely differ by several points on the same body.
+         * Narrow enough to catch a scale failure, which does not produce a few points, it
+         * produces a dozen.
+         */
+        const val SHAPE_DISAGREEMENT_POINTS = 6.0
     }
 }
 
