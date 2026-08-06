@@ -205,6 +205,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 composable(Destination.COMPOSITION.route) {
                     CompositionScreen(
                         trend = state.bodyFatTrend,
+                        weightTrend = state.weightTrend,
                         leanMassTrend = state.leanMassTrend,
                         repeatability = state.repeatability,
                         calibration = state.calibration,

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,11 +45,14 @@ import com.squeeze.app.ui.components.StatRow
 import com.squeeze.app.ui.components.StatTile
 import com.squeeze.app.ui.components.NoticePill
 import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.theme.chartPalette
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.trend.RepeatabilityScore
+import com.squeeze.core.trend.TrendFactor
+import com.squeeze.core.trend.TrendFactors
 import com.squeeze.core.trend.TrendPoint
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -68,6 +72,7 @@ import kotlin.math.abs
 @Composable
 fun CompositionScreen(
     trend: List<TrendPoint>,
+    weightTrend: List<TrendPoint>,
     leanMassTrend: List<TrendPoint>,
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
@@ -122,7 +127,9 @@ fun CompositionScreen(
                 modifier = Modifier.weight(1f),
             )
             StatTile(
-                value = latestWeight(measurements)?.let { "%.1f".format(it) } ?: "—",
+                value = weightTrend.lastOrNull()?.let { "%.1f".format(it.level) }
+                    ?: latestWeight(measurements)?.let { "%.1f".format(it) }
+                    ?: "—",
                 label = "Weight (kg)",
                 modifier = Modifier.weight(1f),
             )
@@ -135,21 +142,17 @@ fun CompositionScreen(
 
         // On the dashboard, not below the history. The hero says where you are; this says
         // how you got there, and that is the second question almost everyone asks.
-        if (trend.size >= 2) {
-            TrendChart(
-                title = "Body fat",
-                unitSuffix = "%",
-                points = trend,
-                lineColor = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            // Said rather than left blank. An empty space where a chart belongs reads as a
-            // broken feature; naming what is missing turns it into an instruction.
-            InfoCard(
-                "Scan or weigh in once more and the trend appears here. One reading is a " +
-                    "point — the direction only exists once there are two.",
-            )
-        }
+        //
+        // One chart with a filter rather than three stacked charts. Stacked, the second and
+        // third are below the fold and effectively never seen; filtered, all three occupy the
+        // same well-placed slot and switching between them is a tap. It also puts the three
+        // series at the same size in the same position, which is the only way a user can
+        // compare their shapes by eye.
+        FilteredTrend(
+            bodyFat = trend,
+            weight = weightTrend,
+            muscle = leanMassTrend,
+        )
 
         StatRow {
             StatTile(
@@ -190,19 +193,84 @@ fun CompositionScreen(
         // analysis, because no single measurement ever produced that combination.
         HistorySection(measurements, loadPhoto, analysisFor, onDelete)
 
-        // A separate chart rather than a second axis. Body fat and lean mass are different
-        // quantities on different scales; sharing an axis would let the apparent crossing
-        // point be decided by axis choice instead of by the data.
-        if (leanMassTrend.size >= 2) {
-            TrendChart(
-                title = "Lean mass",
-                unitSuffix = " kg",
-                points = leanMassTrend,
-                lineColor = Brand.Navy,
-            )
+        repeatability?.let { RepeatabilityCard(it) }
+    }
+}
+
+/**
+ * The trend chart with a factor filter above it.
+ *
+ * The three chips are the three things a body does independently, and the reason to switch
+ * between them is diagnostic rather than decorative: body fat falling with muscle holding is
+ * a cut working, body fat falling with muscle falling too is a cut going wrong, and the
+ * percentage on its own reads identically in both cases.
+ *
+ * A chip appears only when its series has data. Someone who has never entered a bodyweight
+ * has neither a weight series nor a muscle series — muscle is derived from the two together —
+ * and a chip leading to an empty chart is worse than no chip.
+ */
+@Composable
+private fun FilteredTrend(
+    bodyFat: List<TrendPoint>,
+    weight: List<TrendPoint>,
+    muscle: List<TrendPoint>,
+) {
+    val available = TrendFactors.available(bodyFat, weight, muscle)
+    var chosen by remember { mutableStateOf<TrendFactor?>(null) }
+
+    // Resolved every recomposition rather than stored. Deleting the entry that carried the
+    // only weight while Weight is selected must not leave the chart on an empty series.
+    val factor = TrendFactors.resolve(chosen, available)
+
+    if (factor == null) {
+        InfoCard(
+            "Scan or weigh in once more and the trend appears here. One reading is a " +
+                "point — the direction only exists once there are two.",
+        )
+        return
+    }
+
+    val points = when (factor) {
+        TrendFactor.BODY_FAT -> bodyFat
+        TrendFactor.WEIGHT -> weight
+        TrendFactor.MUSCLE -> muscle
+    }
+    val palette = chartPalette
+    val colour = when (factor) {
+        TrendFactor.BODY_FAT -> palette.bodyFat
+        TrendFactor.WEIGHT -> palette.weight
+        TrendFactor.MUSCLE -> palette.leanMass
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Shown even when there is only one factor. A row that appears the day a second
+        // series arrives moves everything below it and reads as the layout having shifted;
+        // a stable single chip reads as a label.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            available.forEach { option ->
+                FilterChip(
+                    selected = option == factor,
+                    onClick = { chosen = option },
+                    label = { Text(option.label) },
+                )
+            }
         }
 
-        repeatability?.let { RepeatabilityCard(it) }
+        if (points.size >= 2) {
+            TrendChart(
+                title = factor.label,
+                unitSuffix = factor.unitSuffix,
+                points = points,
+                lineColor = colour,
+            )
+        } else {
+            // Said rather than left blank. An empty space where a chart belongs reads as a
+            // broken feature; naming what is missing turns it into an instruction.
+            InfoCard(
+                "Only one ${factor.label.lowercase()} reading so far. One reading is a " +
+                    "point — the direction only exists once there are two.",
+            )
+        }
     }
 }
 
