@@ -50,7 +50,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -76,17 +75,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
-import com.squeeze.core.bodycomp.BodyFatCalculator
-import com.squeeze.core.bodycomp.NeckEstimate
-import com.squeeze.core.bodycomp.NeckEstimator
 import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.model.Circumferences
-import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
-import com.squeeze.core.scan.PostureFinding
-import com.squeeze.core.scan.Proportion
-import com.squeeze.core.scan.ScanWarning
-import com.squeeze.core.scan.WeightScaleCheck
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -660,219 +651,55 @@ private fun ResultStep(
     ) {
         Text("Scan results", style = MaterialTheme.typography.headlineSmall)
 
-        if (result.depthAssumed) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
-                ),
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Measured from the front photo", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        // The honest framing: worse absolute number, nearly the same ability
-                        // to detect change, because the assumption is a constant offset.
-                        text = "Depth was assumed rather than photographed, so the absolute " +
-                            "centimetres are less reliable than a two-photo scan. Because the " +
-                            "assumption is the same every time, tracking change is barely " +
-                            "affected — add a side photo when you want the numbers themselves " +
-                            "to be right.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-
-        ProportionsSection(state.proportions)
-        PostureSection(state.posture)
-
-        Text("Measurements", style = MaterialTheme.typography.titleSmall)
-
-        Text(
-            // Said plainly, because the previous version presented these as findings and
-            // they are not: the silhouette gets sites wrong often enough that a value the
-            // user has checked is worth more than one the pipeline is confident about.
-            text = "These are the scan's best reading, not a verdict. Correct anything that " +
-                "looks wrong before saving — a tape around the site takes ten seconds and is " +
-                "more repeatable than any photo method.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
+        // Four things, and nothing else.
+        //
+        // The screen used to show the circumference route in full — seven editable girths, a
+        // body-fat figure derived from them, a warning when they disagreed with the weight,
+        // and another when they disagreed with the outline. All of that described a
+        // measurement the app no longer uses: a contradicted circumference set is dropped
+        // from the estimate outright, so showing it invited the user to correct numbers that
+        // were not going to be believed either way. Editing a value that feeds nothing is
+        // worse than not offering the edit.
+        //
+        // What is left is what the answer is actually made of: the figure read from the
+        // outline, the weight, an optional true value to calibrate against, and the
+        // appearance match. The girths are still measured and still saved for history — they
+        // are simply no longer presented as something to argue with.
         val c = result.circumferences
 
-        // First, because it is the figure the app keeps. Everything below it is the
-        // circumference route, which is shown so the user can correct it and which is
-        // dropped from the estimate entirely when it contradicts this one.
-        state.shapeBodyFatPercent?.let { shape ->
-            ShapeHeadline(shape)
-        }
+        state.shapeBodyFatPercent?.let { ShapeHeadline(it) }
 
-        // Directly under the figure the light affects, so the caveat and the number it
-        // qualifies are read together.
+        // Only ever present when something is wrong with the light, and when it is, it is
+        // the reason to distrust the figure directly above it.
         state.lightingAdvice?.let { InfoCard(it) }
 
-        var neck by remember(c) { mutableStateOf(c.neckCm.toField()) }
-        var chest by remember(c) { mutableStateOf(c.chestCm.toField()) }
-        var waist by remember(c) { mutableStateOf(c.waistCm.toField()) }
-        var hip by remember(c) { mutableStateOf(c.hipCm.toField()) }
-        var thigh by remember(c) { mutableStateOf(c.thighCm.toField()) }
         var weight by remember(c) { mutableStateOf("") }
-
-        val edited = Circumferences(
-            neckCm = neck.toCm(),
-            chestCm = chest.toCm(),
-            waistCm = waist.toCm(),
-            hipCm = hip.toCm(),
-            thighCm = thigh.toCm(),
-        )
-
-        MeasurementField("Neck", neck, { neck = it }, missing = c.neckCm == null)
-        MeasurementField("Chest", chest, { chest = it }, missing = c.chestCm == null)
-        MeasurementField("Waist", waist, { waist = it }, missing = c.waistCm == null)
-        MeasurementField("Hip", hip, { hip = it }, missing = c.hipCm == null)
-        MeasurementField("Thigh", thigh, { thigh = it }, missing = c.thighCm == null)
-        MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
-
-        val profile = state.profile
-        val weightKg = weight.toCm()
-
-        // Filled in for the user rather than offered behind a button. The neck is the site
-        // the silhouette misses most often, and leaving the field blank stopped the entire
-        // estimate on a measurement that height and weight predict about as well as anything
-        // does. A blank field asks the user to go and find a tape; a filled one they can
-        // correct asks nothing and is right more often than not.
-        //
-        // It is still theirs to overwrite, and the card beneath says plainly that it was
-        // worked out rather than measured — an estimate presented as a measurement would be
-        // the one dishonesty this screen cannot afford.
-        var neckAutoFilled by remember(c) { mutableStateOf(false) }
-        val neckEstimate = profile?.let {
-            NeckEstimator.estimate(it.heightCm, weightKg, it.sex)
-        }
-
-        LaunchedEffect(neckEstimate, c) {
-            if (c.neckCm == null && neck.isBlank() && neckEstimate != null) {
-                neck = "%.1f".format(neckEstimate.centimetres)
-                neckAutoFilled = true
-            }
-        }
-
-        if (profile != null && neckAutoFilled) {
-            NeckEstimateNote(neckEstimate)
-        }
-
-        if (profile != null) {
-            ScaleCorrectionCard(profile, edited, weightKg) { factor ->
-                chest = chest.scaledBy(factor)
-                waist = waist.scaledBy(factor)
-                hip = hip.scaledBy(factor)
-                thigh = thigh.scaledBy(factor)
-            }
-        }
-
-        // The whole point of making these editable: the estimate updates as the user fixes a
-        // value, so a wrong neck stops being a dead end and becomes something they can see
-        // themselves correct.
-        BodyFatPreview(state.profile, edited)
-
-        // Above the tape-equation preview in importance even though it sits below it on
-        // screen, because it is the number that did not come through the circumferences.
-        // The escape hatch, and after three measured attempts at reading adiposity off a
-        // phone photo, the honest centre of the feature rather than a footnote to it. A
-        // number entered here is stored as this scan's reference, which fits the offset for
-        // this method immediately — see BodyCompositionRepository.fitCalibration.
         var knownPercent by remember(c) { mutableStateOf("") }
-        KnownBodyFatCard(knownPercent) { knownPercent = it }
-
-        state.shapeBodyFatPercent?.let { shape ->
-            ShapeDisagreementNote(
-                shapePercent = shape,
-                tapePercent = profile?.let { BodyFatCalculator.navy(it, edited)?.percent },
-            )
-        }
-
         var visualPercent by remember(c) { mutableStateOf<Double?>(null) }
 
-        if (profile != null) {
+        MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
+
+        KnownBodyFatCard(knownPercent) { knownPercent = it }
+
+        state.profile?.let { profile ->
             VisualMatchSection(
                 sex = profile.sex,
                 selected = visualPercent,
                 onSelect = { visualPercent = if (visualPercent == it) null else it },
-                measured = BodyFatCalculator.navy(profile, edited)?.percent,
-            )
-        }
-
-        if (result.warnings.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                ),
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Worth checking", style = MaterialTheme.typography.titleSmall)
-                    result.warnings.forEach { warning ->
-                        Text(
-                            text = when (warning) {
-                                ScanWarning.FramingTooTight ->
-                                    "You filled most of the frame, which stretches the " +
-                                        "measurements. Stand further back next time."
-
-                                is ScanWarning.LevelMismatch ->
-                                    "Your ${warning.site.name.lowercase()} was found at " +
-                                        "different heights in the two photos, so that " +
-                                        "measurement is less reliable."
-
-                                is ScanWarning.ImplausibleShape ->
-                                    "The ${warning.site.name.lowercase()} shape looks off, " +
-                                        "usually meaning the side photo was not square-on."
-
-                                is ScanWarning.MissingRequiredSite ->
-                                    "Could not find your ${warning.site.name.lowercase()}."
-
-                                is ScanWarning.ImplausibleMeasurement ->
-                                    // Parenthesised deliberately: `.format` binds to the
-                                    // last literal of a concatenation, so without these the
-                                    // %.0f sitting in an earlier segment reached the user
-                                    // verbatim.
-                                    ("Your ${warning.site.name.lowercase()} came out at " +
-                                        "%.0f cm, which is outside the range plausible for " +
-                                        "your height, so it was discarded rather than saved. " +
-                                        "Usually this means the outline picked up the " +
-                                        "background or your arms — try a plainer background " +
-                                        "with arms clear of your sides.")
-                                        .format(warning.centimetres)
-
-                                is ScanWarning.ScaleFromLandmarks ->
-                                    ("Your outline came out %.0f%% taller or shorter than " +
-                                        "your body's landmarks say it should, so the scan " +
-                                        "measured you against the landmarks instead. That is " +
-                                        "the safer of the two, but slightly less precise — a " +
-                                        "plainer background would let it use the sharper one.")
-                                        .format(warning.disagreementPercent)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        }
-
-        if (!result.usableForBodyFat) {
-            Text(
-                text = "Not enough sites were found for a body fat estimate, but these " +
-                    "measurements can still be saved.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                measured = state.shapeBodyFatPercent,
             )
         }
 
         Button(
-            onClick = { onSave(edited, weight.toCm(), visualPercent, knownPercent.toCm()) },
+            onClick = { onSave(c, weight.toCm(), visualPercent, knownPercent.toCm()) },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save measurements") }
-        OutlinedButton(onClick = onRetake, modifier = Modifier.fillMaxWidth()) { Text("Scan again") }
+        ) {
+            Text("Save")
+        }
+
+        OutlinedButton(onClick = onRetake, modifier = Modifier.fillMaxWidth()) {
+            Text("Scan again")
+        }
     }
 }
 
@@ -1039,106 +866,9 @@ private fun ExtraOption(
     }
 }
 
-/**
- * Ratios, shown above the raw centimetres.
- *
- * A ratio divides two measurements taken from one photograph at one scale, so the scale
- * error cancels out. That makes these more trustworthy than the numbers they are computed
- * from, and worth more prominence than a footnote.
- */
-@Composable
-private fun ProportionsSection(proportions: List<Proportion>) {
-    if (proportions.isEmpty()) return
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Proportions", style = MaterialTheme.typography.titleSmall)
-        Text(
-            text = "These divide one measurement by another from the same photo, so they " +
-                "stay right even if the scale is slightly off.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        proportions.forEach { proportion ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = if (proportion.flagged) {
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
-                    )
-                } else {
-                    CardDefaults.cardColors()
-                },
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(proportion.name, style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = "%.2f".format(proportion.value),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                    Text(
-                        text = proportion.interpretation,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Shoulder and hip alignment, read from landmarks the scan produced anyway. */
-@Composable
-private fun PostureSection(findings: List<PostureFinding>) {
-    if (findings.isEmpty()) return
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Alignment", style = MaterialTheme.typography.titleSmall)
-        Text(
-            // The caveat is not optional. One photograph cannot separate a real asymmetry
-            // from how someone happened to stand, and saying so prevents a false alarm.
-            text = "From one photo, so treat a single reading lightly — how you stood can " +
-                "produce a tilt on its own. What matters is whether it repeats.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        findings.forEach { finding ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(finding.name, style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = "%.1f°".format(kotlin.math.abs(finding.degrees)),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                    Text(
-                        text = finding.interpretation,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
 private fun Double?.toField(): String = this?.let { "%.1f".format(it) } ?: ""
 
 private fun String.toCm(): Double? = trim().replace(',', '.').toDoubleOrNull()
-
-/** Rescales a field's contents, leaving anything unparseable alone. */
-private fun String.scaledBy(factor: Double): String =
-    toCm()?.let { "%.1f".format(it * factor) } ?: this
 
 /**
  * Offers a neck worked out from height and weight when the scan could not find one.
@@ -1147,92 +877,6 @@ private fun String.scaledBy(factor: Double): String =
  * leans on hardest, so missing it costs the whole estimate. It is also the site that varies
  * least between people of the same size, which is what makes inferring it defensible at all.
  */
-/**
- * Says where the pre-filled neck came from.
- *
- * The field is already populated by the time this is read, so the job here is not to sell
- * the estimate but to stop it being mistaken for a measurement. The error is quoted in
- * points of body fat rather than centimetres, because centimetres of neck sound harmless
- * and two of them are worth about two points.
- */
-@Composable
-private fun NeckEstimateNote(estimate: NeckEstimate?) {
-    if (estimate == null) return
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Neck was estimated", style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = ("The scan could not find your neck, so it was worked out from your " +
-                    "height and weight — deliberately not from the scan's own chest, which " +
-                    "would inherit whatever the scan got wrong. Two people your size differ " +
-                    "by about %.1f cm here, roughly %.1f points of body fat, so overwrite it " +
-                    "with a tape measurement when you can.")
-                    .format(
-                        estimate.standardErrorCm,
-                        estimate.standardErrorCm * NeckEstimator.BODY_FAT_POINTS_PER_CM,
-                    ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-/**
- * Flags a scan whose measurements describe a body that does not weigh what the user does.
- *
- * The failure this catches is invisible from inside the scan: scale error multiplies every
- * circumference at once, so each one stays individually plausible and every per-site check in
- * the app passes them. Weight is the only number here measured by an instrument, and a body's
- * girths and its mass cannot disagree.
- */
-@Composable
-private fun ScaleCorrectionCard(
-    profile: Profile,
-    edited: Circumferences,
-    weightKg: Double?,
-    onApply: (Double) -> Unit,
-) {
-    val finding = WeightScaleCheck.evaluate(edited, profile.heightCm, weightKg)
-        ?.takeIf { it.significant }
-        ?: return
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                "These measurements do not match your weight",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = ("A body with these girths at your height would weigh about %.0f kg, " +
-                    "but you entered %.0f kg. Every measurement in a photo scan is worked " +
-                    "out from one height reference, so when that reference is off they are " +
-                    "all wrong by the same %.0f%% — which is why each one looks believable " +
-                    "on its own.")
-                    .format(
-                        finding.impliedWeightKg,
-                        finding.actualWeightKg,
-                        finding.errorPercent,
-                    ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            TextButton(onClick = { onApply(finding.correctionFactor) }) {
-                Text("Rescale to match my weight")
-            }
-        }
-    }
-}
-
 /**
  * One editable measurement.
  *
@@ -1263,76 +907,6 @@ private fun MeasurementField(
         ),
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-/**
- * Body fat from whatever is currently in the fields.
- *
- * Recomputed on every keystroke, so correcting a neck shows the percentage appear. When it
- * cannot be computed the reason is named — "no body fat" with no explanation is what sent
- * the user back here in the first place.
- */
-@Composable
-private fun BodyFatPreview(profile: Profile?, circumferences: Circumferences) {
-    if (profile == null) return
-
-    val estimate = BodyFatCalculator.navy(profile, circumferences)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (estimate != null) {
-                Text("Body fat", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "%.1f%%".format(estimate.percent),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    text = "From the values above. Save to record it.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                Text("Body fat cannot be calculated yet", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = missingReason(profile, circumferences),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-}
-
-/** Names the specific thing standing between these values and a percentage. */
-private fun missingReason(profile: Profile, c: Circumferences): String {
-    val needsHip = profile.sex == Sex.FEMALE
-
-    // Bound to locals rather than smart-cast from the earlier null checks: `Circumferences`
-    // lives in `:core`, and Kotlin will not smart-cast a public property across a module
-    // boundary because the other module is free to change it under us.
-    val neck = c.neckCm
-    val waist = c.waistCm
-
-    return when {
-        neck == null -> "A neck measurement is needed. Put a tape around the narrowest " +
-            "part of your neck, below the Adam's apple."
-
-        waist == null -> "A waist measurement is needed. Measure at the narrowest point, " +
-            "level with the navel for most people."
-
-        needsHip && c.hipCm == null ->
-            "A hip measurement is needed for the equation used here — around the widest point."
-
-        waist <= neck ->
-            "Your waist is not larger than your neck, which the equation cannot use. One of " +
-                "the two is wrong — the neck is the usual culprit."
-
-        else -> "The values above are outside the range the equation is defined for. Check " +
-            "them against a tape."
-    }
 }
 
 /**
@@ -1417,57 +991,6 @@ private fun VisualMatchSection(
                         .format(measured, selected),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
-}
-
-/**
- * Body fat read from the outline's proportions, and how it compares with the measured route.
- *
- * The comparison is the point. Every other number on this screen is a function of the same
- * converted widths, so when scale recovery fails they all fail together and agreeing with
- * each other proves nothing. This one is computed from ratios between widths in the same
- * image, where the scale divides out exactly — so when the two disagree, the disagreement is
- * evidence rather than noise, and it points at the circumference route as the broken one.
- */
-@Composable
-private fun ShapeDisagreementNote(shapePercent: Double, tapePercent: Double?) {
-    val gap = tapePercent?.let { kotlin.math.abs(it - shapePercent) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (gap != null && gap > 6.0) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer
-            },
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "From your shape: %.1f%%".format(shapePercent),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = "Read from your outline's proportions — how wide your waist is " +
-                    "relative to your shoulders and hips. It never converts pixels to " +
-                    "centimetres, so nothing about your height in the frame can affect it. " +
-                    "That makes it coarser than a good tape measurement and immune to the " +
-                    "error that makes a bad scan wrong.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-
-            if (gap != null && gap > 6.0) {
-                Text(
-                    text = ("Your measurements give %.1f%% and your shape gives %.1f%%. " +
-                        "A gap this size is not noise — the circumferences above have most " +
-                        "likely been scaled wrong, and the shape figure is the one that " +
-                        "cannot be. Check the weight warning above, or correct a site by " +
-                        "tape.").format(tapePercent, shapePercent),
-                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
