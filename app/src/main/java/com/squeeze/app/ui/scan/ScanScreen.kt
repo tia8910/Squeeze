@@ -14,7 +14,9 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -318,6 +320,23 @@ private fun CaptureStep(
                     }
                 }.getOrNull()
                 zoomRatio = 1f
+
+                // Focus and expose for the body, not the scene. Left to its own devices the
+                // camera meters the whole frame, so a bright wall behind the subject pulls
+                // the exposure down and flattens exactly the abdominal contrast the scan
+                // needs to read. Metering on the centre — where the capture guide puts the
+                // torso — costs nothing and sharpens the mask edge as well.
+                camera?.let { bound ->
+                    runCatching {
+                        val factory = SurfaceOrientedMeteringPointFactory(1f, 1f)
+                        val torso = factory.createPoint(0.5f, TORSO_METERING_Y)
+                        bound.cameraControl.startFocusAndMetering(
+                            FocusMeteringAction.Builder(torso, FocusMeteringAction.FLAG_AF)
+                                .addPoint(torso, FocusMeteringAction.FLAG_AE)
+                                .build(),
+                        )
+                    }
+                }
             }
 
             AndroidView(
@@ -883,6 +902,14 @@ private fun ImageProxy.decodeToBitmap(): Bitmap? {
 
 private val TIMER_OPTIONS = listOf(0, 5, 10, 15)
 private const val DEFAULT_TIMER_SECONDS = 10
+
+/**
+ * Where down the frame the torso sits when the subject fills the capture guide.
+ *
+ * Slightly above centre: the guide centres the whole body, so the midsection lands above
+ * the middle of the frame rather than on it.
+ */
+private const val TORSO_METERING_Y = 0.45f
 
 /** Wide, and framed from across a room. See the chip row for why these two. */
 private val ZOOM_STEPS = listOf(1f, 2f)
