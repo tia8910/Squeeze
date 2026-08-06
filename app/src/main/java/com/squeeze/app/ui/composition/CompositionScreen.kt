@@ -112,15 +112,42 @@ fun CompositionScreen(
         // enough and what to change if it is not.
         goalProgress?.let { GoalCard(it, onEditGoal) }
 
+        // Body fat alone answers half the question. A percentage can fall because fat went
+        // or because muscle did, and those want opposite responses — so the two masses sit
+        // beside it rather than behind a scroll.
+        StatRow {
+            StatTile(
+                value = "%.1f%%".format(latest.level),
+                label = "Body fat",
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                value = latestWeight(measurements)?.let { "%.1f".format(it) } ?: "—",
+                label = "Weight (kg)",
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "—",
+                label = "Muscle (kg)",
+                modifier = Modifier.weight(1f),
+            )
+        }
+
         // On the dashboard, not below the history. The hero says where you are; this says
-        // how you got there, and that is the second question almost everyone asks — putting
-        // it behind a scroll past every stored entry answered it for nobody.
+        // how you got there, and that is the second question almost everyone asks.
         if (trend.size >= 2) {
             TrendChart(
                 title = "Body fat",
                 unitSuffix = "%",
                 points = trend,
                 lineColor = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            // Said rather than left blank. An empty space where a chart belongs reads as a
+            // broken feature; naming what is missing turns it into an instruction.
+            InfoCard(
+                "Scan or weigh in once more and the trend appears here. One reading is a " +
+                    "point — the direction only exists once there are two.",
             )
         }
 
@@ -541,5 +568,26 @@ private fun RepeatabilityCard(score: RepeatabilityScore) {
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
+}
+
+/** Most recent recorded bodyweight, or null when none has been entered. */
+private fun latestWeight(measurements: List<MeasurementEntity>): Double? =
+    measurements.firstNotNullOfOrNull { it.weightKg }
+
+/**
+ * A short, quiet notice.
+ *
+ * Used where a section would otherwise be empty. Blank space where a chart belongs reads as
+ * something broken; a sentence saying what is missing reads as a next step.
+ */
+@Composable
+private fun InfoCard(text: String) {
+    BrandCard(Modifier.fillMaxWidth()) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+        )
     }
 }
