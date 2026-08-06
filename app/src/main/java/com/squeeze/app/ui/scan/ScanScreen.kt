@@ -690,6 +690,8 @@ private fun ResultStep(
             )
         }
 
+        AccuracyDisclaimer()
+
         Button(
             onClick = { onSave(c, weight.toCm(), visualPercent, knownPercent.toCm()) },
             modifier = Modifier.fillMaxWidth(),
@@ -1078,6 +1080,73 @@ private fun ShapeHeadline(shapePercent: Double) {
                     "hips. It never converts pixels to centimetres, so nothing about how " +
                     "you were framed can reach it — which is why the scan keeps this figure " +
                     "and not the one the circumferences give.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/**
+ * What this number is and is not.
+ *
+ * Placed immediately above Save, where it is read at the moment the figure is about to be
+ * committed rather than skimmed past on the way in.
+ *
+ * Written after three photo-native methods were built and measured against labelled
+ * reference photographs, and all three failed the same way below twenty per cent: what
+ * separates a lean body from a very lean one is abdominal definition, and in an uncontrolled
+ * phone photograph that signal sits underneath lighting, pose and camera. So this is not a
+ * disclaimer in the legal sense of covering the app — it is the honest description of a
+ * measurement whose limits are known and measured, and it names them specifically enough to
+ * be acted on rather than hedging in general.
+ *
+ * The last line is the one that matters. Absolute accuracy is a systematic offset that
+ * cancels when you compare yourself against yourself, and the direction of travel survives
+ * every error listed above it. Someone who reads only that sentence has taken the right
+ * thing from the screen.
+ */
+@Composable
+private fun AccuracyDisclaimer() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Treat this as an estimate",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "A single percentage read from one photograph is not a measurement in " +
+                    "the way a DEXA scan is, and it can be several points out. What it " +
+                    "depends on:",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            listOf(
+                "Lighting, most of all. A lamp off to one side carves shadows that look " +
+                    "like muscle definition; flat overhead light hides it. Even light from " +
+                    "in front of you is best.",
+                "Photo quality — focus, distance, and whether your outline separates " +
+                    "cleanly from the background.",
+                "Pose and clothing. Standing square, arms clear of your sides, and the same " +
+                    "clothing each time.",
+                "Your build. Two people with the same outline can differ by several points " +
+                    "depending on the muscle underneath it.",
+            ).forEach { line ->
+                Text(
+                    text = "· $line",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = "So watch the direction, not the number. Whatever this method gets " +
+                    "wrong, it gets wrong the same way every time — which means the trend " +
+                    "across scans is trustworthy even when a single reading is not. Keep " +
+                    "your conditions consistent and the line will tell you the truth long " +
+                    "before any one figure does.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
