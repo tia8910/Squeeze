@@ -14,7 +14,9 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -318,6 +320,23 @@ private fun CaptureStep(
                     }
                 }.getOrNull()
                 zoomRatio = 1f
+
+                // Focus and expose for the body, not the scene. Left to its own devices the
+                // camera meters the whole frame, so a bright wall behind the subject pulls
+                // the exposure down and flattens exactly the abdominal contrast the scan
+                // needs to read. Metering on the centre — where the capture guide puts the
+                // torso — costs nothing and sharpens the mask edge as well.
+                camera?.let { bound ->
+                    runCatching {
+                        val factory = SurfaceOrientedMeteringPointFactory(1f, 1f)
+                        val torso = factory.createPoint(0.5f, TORSO_METERING_Y)
+                        bound.cameraControl.startFocusAndMetering(
+                            FocusMeteringAction.Builder(torso, FocusMeteringAction.FLAG_AF)
+                                .addPoint(torso, FocusMeteringAction.FLAG_AE)
+                                .build(),
+                        )
+                    }
+                }
             }
 
             AndroidView(
@@ -682,6 +701,13 @@ private fun ResultStep(
 
         val c = result.circumferences
 
+        // First, because it is the figure the app keeps. Everything below it is the
+        // circumference route, which is shown so the user can correct it and which is
+        // dropped from the estimate entirely when it contradicts this one.
+        state.shapeBodyFatPercent?.let { shape ->
+            ShapeHeadline(shape)
+        }
+
         var neck by remember(c) { mutableStateOf(c.neckCm.toField()) }
         var chest by remember(c) { mutableStateOf(c.chestCm.toField()) }
         var waist by remember(c) { mutableStateOf(c.waistCm.toField()) }
@@ -756,7 +782,7 @@ private fun ResultStep(
         KnownBodyFatCard(knownPercent) { knownPercent = it }
 
         state.shapeBodyFatPercent?.let { shape ->
-            ShapeEstimateCard(
+            ShapeDisagreementNote(
                 shapePercent = shape,
                 tapePercent = profile?.let { BodyFatCalculator.navy(it, edited)?.percent },
             )
@@ -876,6 +902,14 @@ private fun ImageProxy.decodeToBitmap(): Bitmap? {
 
 private val TIMER_OPTIONS = listOf(0, 5, 10, 15)
 private const val DEFAULT_TIMER_SECONDS = 10
+
+/**
+ * Where down the frame the torso sits when the subject fills the capture guide.
+ *
+ * Slightly above centre: the guide centres the whole body, so the midsection lands above
+ * the middle of the frame rather than on it.
+ */
+private const val TORSO_METERING_Y = 0.45f
 
 /** Wide, and framed from across a room. See the chip row for why these two. */
 private val ZOOM_STEPS = listOf(1f, 2f)
@@ -1395,7 +1429,7 @@ private fun VisualMatchSection(
  * evidence rather than noise, and it points at the circumference route as the broken one.
  */
 @Composable
-private fun ShapeEstimateCard(shapePercent: Double, tapePercent: Double?) {
+private fun ShapeDisagreementNote(shapePercent: Double, tapePercent: Double?) {
     val gap = tapePercent?.let { kotlin.math.abs(it - shapePercent) }
 
     Card(
@@ -1478,6 +1512,46 @@ private fun KnownBodyFatCard(value: String, onValueChange: (String) -> Unit) {
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * The figure the scan actually keeps.
+ *
+ * Promoted above the measurements because it is what the estimate is built from, not a
+ * second opinion on it. Everything below reaches a percentage through
+ * `widthCm = widthPixels / bodyHeightPixels × height`, and that division is where a scan
+ * goes wrong — one bad mask edge moves every girth together while each stays individually
+ * plausible. This number never performs that division, so the failure cannot reach it.
+ *
+ * It is not presented as precise, and the copy says so. It is presented as the one reading
+ * on this screen whose errors are its own.
+ */
+@Composable
+private fun ShapeHeadline(shapePercent: Double) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "From your shape",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Text(
+                text = "%.1f%%".format(shapePercent),
+                style = MaterialTheme.typography.displaySmall,
+            )
+            Text(
+                text = "Read from how wide your waist is relative to your shoulders and " +
+                    "hips. It never converts pixels to centimetres, so nothing about how " +
+                    "you were framed can reach it — which is why the scan keeps this figure " +
+                    "and not the one the circumferences give.",
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
