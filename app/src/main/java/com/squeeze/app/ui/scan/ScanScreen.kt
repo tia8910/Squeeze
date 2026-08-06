@@ -669,6 +669,12 @@ private fun ResultStep(
 
         state.shapeBodyFatPercent?.let { ShapeHeadline(it) }
 
+        // Above the lighting note, because it is the bigger error and the easier fix. An arm
+        // resting against the waist does not blur the reading, it replaces it: the app cuts
+        // the arm off using a skeleton-derived bound, and what it then measures is that
+        // bound. Two different bodies come back with nearly the same number.
+        state.poseAdvice?.let { InfoCard(it) }
+
         // Only ever present when something is wrong with the light, and when it is, it is
         // the reason to distrust the figure directly above it.
         state.lightingAdvice?.let { InfoCard(it) }

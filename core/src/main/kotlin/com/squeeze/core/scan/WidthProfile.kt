@@ -18,19 +18,50 @@ package com.squeeze.core.scan
  * @param legWidths width of one leg per row, 0 where a single leg cannot be isolated
  * @param topRow first row containing the body, i.e. the crown of the head
  * @param bottomRow last row containing the body, normally the feet
+ * @param clippedRows rows whose torso width was cut back by the pose-derived trunk bound,
+ *   i.e. rows where an arm was touching the body. See [wasClippedAt] — those widths are the
+ *   bound, not the body, and nothing anatomical may be measured on them.
  */
 data class WidthProfile(
     val torsoWidths: DoubleArray,
     val legWidths: DoubleArray,
     val topRow: Int,
     val bottomRow: Int,
+    val clippedRows: BooleanArray = BooleanArray(torsoWidths.size),
 ) {
     init {
         require(torsoWidths.isNotEmpty()) { "profile cannot be empty" }
         require(legWidths.size == torsoWidths.size) { "width arrays must be the same length" }
+        require(clippedRows.size == torsoWidths.size) { "clip flags must match the profile" }
         require(topRow in torsoWidths.indices) { "topRow $topRow outside profile" }
         require(bottomRow in torsoWidths.indices) { "bottomRow $bottomRow outside profile" }
         require(topRow < bottomRow) { "topRow must be above bottomRow" }
+    }
+
+    /**
+     * Whether this row's torso width came from the trunk bound rather than the silhouette.
+     *
+     * A clipped row is missing data, not a narrow body. The bound is interpolated from the
+     * shoulder and hip landmarks and widened by fixed margins, so when it bites, the width it
+     * returns is a function of those constants and of the subject's skeleton — never of their
+     * adiposity. A whole trunk band of clipped rows produces very nearly the same shape
+     * ratios for any two people of similar frame, which is how a silhouette estimate can
+     * report the same nineteen per cent to a lean body and a heavy one.
+     */
+    fun wasClippedAt(row: Int): Boolean = clippedRows.getOrElse(row) { false }
+
+    /**
+     * What share of [fromRow]..[toRow] was cut back by the bound.
+     *
+     * Used to decide whether to tell the user to move their arms, rather than to decide any
+     * measurement — measurements skip clipped rows one at a time.
+     */
+    fun clippedFractionBetween(fromRow: Int, toRow: Int): Double {
+        val start = maxOf(fromRow, topRow, 0)
+        val end = minOf(toRow, bottomRow, clippedRows.lastIndex)
+        if (start > end) return 0.0
+        val clipped = (start..end).count { clippedRows[it] }
+        return clipped.toDouble() / (end - start + 1).toDouble()
     }
 
     /** How much of the frame the body occupies vertically; the basis of scale recovery. */
@@ -51,12 +82,17 @@ data class WidthProfile(
         return topRow == other.topRow &&
             bottomRow == other.bottomRow &&
             torsoWidths.contentEquals(other.torsoWidths) &&
-            legWidths.contentEquals(other.legWidths)
+            legWidths.contentEquals(other.legWidths) &&
+            clippedRows.contentEquals(other.clippedRows)
     }
 
     override fun hashCode(): Int =
-        ((torsoWidths.contentHashCode() * 31 + legWidths.contentHashCode()) * 31 + topRow) * 31 +
-            bottomRow
+        (
+            (
+                (torsoWidths.contentHashCode() * 31 + legWidths.contentHashCode()) * 31 +
+                    clippedRows.contentHashCode()
+                ) * 31 + topRow
+            ) * 31 + bottomRow
 
     companion object {
         /** Convenience for callers with no leg data, e.g. a side-on view. */
@@ -172,11 +208,18 @@ object AnatomicalLevelFinder {
     }
 
     /**
-     * Row with the smallest non-zero width in [fromRow, toRow].
+     * Row with the smallest non-zero, unclipped width in [fromRow, toRow].
      *
      * Zero-width rows are skipped rather than winning: a gap in the mask is missing data,
      * not an infinitely narrow waist. Ignoring this is how a segmentation hole becomes a
      * 20 cm waist measurement.
+     *
+     * Clipped rows are skipped for the same reason and it matters more here than anywhere
+     * else in this file. Where an arm rests against the waist, the trunk bound cuts the run
+     * back to its own allowance, and that allowance narrows steadily from the shoulders to
+     * the hips — so the narrowest row in a fully clipped band is always the bottom of it,
+     * whatever the body looks like. The search would return the bound's shape rather than
+     * the person's, confidently and every time.
      */
     fun narrowestBetween(
         profile: WidthProfile,
@@ -189,6 +232,7 @@ object AnatomicalLevelFinder {
         var bestRow: Int? = null
         var bestWidth = Double.MAX_VALUE
         for (row in range) {
+            if (!useLegWidth && profile.wasClippedAt(row)) continue
             val width = if (useLegWidth) profile.legWidthAt(row) else profile.torsoWidthAt(row)
             if (width > 0.0 && width < bestWidth) {
                 bestWidth = width
@@ -198,7 +242,7 @@ object AnatomicalLevelFinder {
         return bestRow
     }
 
-    /** Row with the largest width in [fromRow, toRow]. */
+    /** Row with the largest unclipped width in [fromRow, toRow]. */
     fun widestBetween(
         profile: WidthProfile,
         fromRow: Int,
@@ -210,6 +254,12 @@ object AnatomicalLevelFinder {
         var bestRow: Int? = null
         var bestWidth = 0.0
         for (row in range) {
+            if (!useLegWidth) {
+                // A clipped row cannot be the widest anything. It is the bound's width, and
+                // the bound is at its most generous exactly where the body is not — at the
+                // hips, where the margin doubles to clear the glutes.
+                if (profile.wasClippedAt(row)) continue
+            }
             val width = if (useLegWidth) profile.legWidthAt(row) else profile.torsoWidthAt(row)
             if (width > bestWidth) {
                 bestWidth = width

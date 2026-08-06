@@ -32,6 +32,7 @@ import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
 import com.squeeze.app.scan.AbdomenCrop
 import com.squeeze.core.scan.AbdominalDefinition
+import com.squeeze.core.scan.ArmClearance
 import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -82,6 +83,14 @@ data class ScanUiState(
      * whole of what it can do about it.
      */
     val lightingAdvice: String? = null,
+    /**
+     * What the arms were doing, when they were doing something that ruins the measurement.
+     *
+     * Null when they were clear of the body. Ranked above lighting in the result screen
+     * because it is a larger error and a cheaper fix: bad light widens the answer, arms
+     * against the waist replace it with a number derived from the trunk bound.
+     */
+    val poseAdvice: String? = null,
 )
 
 /**
@@ -342,6 +351,7 @@ class ScanViewModel @Inject constructor(
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
             shapeBodyFatPercent = shape,
+            poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
             posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
         )

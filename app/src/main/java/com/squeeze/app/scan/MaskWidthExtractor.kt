@@ -97,6 +97,7 @@ object MaskWidthExtractor {
 
         val torsoWidths = DoubleArray(height)
         val legWidths = DoubleArray(height)
+        val clippedRows = BooleanArray(height)
 
         for (row in topRow..bottomRow) {
             val runs = rowRuns[row] ?: continue
@@ -107,7 +108,7 @@ object MaskWidthExtractor {
                 // cut back to where the skeleton says the trunk can reach. When no pose
                 // geometry is available the raw run is used, which is the previous
                 // behaviour rather than a failure.
-                val clipped = trunk?.clip(
+                val clipped = trunk?.clipRun(
                     startX = torso.start.toDouble() / width.toDouble(),
                     endX = (torso.end + 1).toDouble() / width.toDouble(),
                     row = row,
@@ -115,12 +116,17 @@ object MaskWidthExtractor {
 
                 torsoWidths[row] = when {
                     trunk == null -> torso.width.toDouble() / width.toDouble()
-                    clipped != null -> clipped.endInclusive - clipped.start
+                    clipped != null -> clipped.width
                     // The midline run fell entirely outside the trunk bound. That is not a
                     // narrow torso, it is a torso that was not found, and recording a width
                     // here would invent one.
                     else -> 0.0
                 }
+
+                // Recorded, not just applied. Where the bound bit, the width above is the
+                // allowance rather than the body, and anything measured on it would describe
+                // this codebase's margin constants instead of the person in the photograph.
+                clippedRows[row] = clipped?.cut ?: false
             }
 
             runs.filter { it !== torso }
@@ -140,6 +146,7 @@ object MaskWidthExtractor {
             legWidths = legWidths,
             topRow = topRow,
             bottomRow = bottomRow,
+            clippedRows = clippedRows,
         )
     }
 

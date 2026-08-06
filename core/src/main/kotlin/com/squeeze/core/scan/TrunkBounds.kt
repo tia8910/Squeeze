@@ -101,15 +101,51 @@ data class TrunkBounds(
      * Returns null when the run lies entirely outside the trunk — that is an arm, measured
      * on its own, and it is not a torso width.
      */
-    fun clip(startX: Double, endX: Double, row: Int): ClosedFloatingPointRange<Double>? {
+    fun clip(startX: Double, endX: Double, row: Int): ClosedFloatingPointRange<Double>? =
+        clipRun(startX, endX, row)?.let { it.start..it.endInclusive }
+
+    /**
+     * The same clip, but reporting whether it actually cut anything.
+     *
+     * That flag is the important half. When the bound bites, the number that comes back is
+     * the bound — a function of the landmark spans and the margin constants — and not a
+     * measurement of the body at all. Two different men produce nearly the same clipped
+     * profile, so the ratios read off it produce nearly the same body fat, which is exactly
+     * the failure this reports: a scan that returned nineteen per cent for everyone because
+     * every width in the trunk band had been replaced by the allowance.
+     *
+     * A cut is not an error in itself. It is doing its job, cutting an arm away from a
+     * waist. The error is treating what remains as measured, so callers are told.
+     */
+    fun clipRun(startX: Double, endX: Double, row: Int): ClippedSpan? {
         val centre = centreAt(row)
         val half = maxHalfWidthAt(row)
         val low = maxOf(startX, centre - half)
         val high = minOf(endX, centre + half)
-        return if (low >= high) null else low..high
+        if (low >= high) return null
+
+        return ClippedSpan(
+            start = low,
+            endInclusive = high,
+            // Either side is enough. An arm on one side only — the common case, since one
+            // hand is usually holding the phone — corrupts the width just as thoroughly.
+            cut = low > startX + CLIP_TOLERANCE || high < endX - CLIP_TOLERANCE,
+        )
     }
 
     companion object {
+
+        /**
+         * How far the bound may cut before it counts as having cut, in fractions of image
+         * width.
+         *
+         * Mask runs are whole pixels while the bound is continuous, so the two almost never
+         * coincide exactly and a strict comparison would flag every row. Two thousandths of
+         * the width is about one pixel on a typical mask — below anything that could change
+         * a measurement, above the quantisation.
+         */
+        const val CLIP_TOLERANCE = 0.002
+
         /**
          * How far past the acromion the shoulder may extend, as a fraction of its half-span.
          *
@@ -154,6 +190,20 @@ data class TrunkBounds(
             )
         }
     }
+}
+
+/**
+ * A torso run after the trunk bound has been applied to it.
+ *
+ * @param cut true when the bound moved either edge, meaning the width is the allowance
+ *   rather than the body
+ */
+data class ClippedSpan(
+    val start: Double,
+    val endInclusive: Double,
+    val cut: Boolean,
+) {
+    val width: Double get() = endInclusive - start
 }
 
 /**
