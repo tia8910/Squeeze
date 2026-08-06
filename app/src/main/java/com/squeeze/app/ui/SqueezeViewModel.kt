@@ -40,6 +40,7 @@ data class SqueezeUiState(
     /** Raw history, newest first, for the log and for delete. */
     val measurements: List<MeasurementEntity> = emptyList(),
     val bodyFatTrend: List<TrendPoint> = emptyList(),
+    val weightTrend: List<TrendPoint> = emptyList(),
     val leanMassTrend: List<TrendPoint> = emptyList(),
     val repeatability: RepeatabilityScore? = null,
     val calibration: PersonalCalibration = PersonalCalibration.none(),
@@ -170,6 +171,7 @@ class SqueezeViewModel @Inject constructor(
                 profile = profile,
                 measurements = measurements,
                 bodyFatTrend = snapshot.bodyFatTrend,
+                weightTrend = snapshot.weightTrend,
                 leanMassTrend = snapshot.leanMassTrend,
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,

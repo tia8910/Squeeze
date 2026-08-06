@@ -26,6 +26,7 @@ import javax.inject.Singleton
  * Everything the dashboard needs about the user's composition, in one place.
  *
  * @param bodyFatTrend filtered body fat over time
+ * @param weightTrend filtered bodyweight in kg, present only where weight was recorded
  * @param leanMassTrend filtered fat-free mass in kg, present only when weight was recorded
  * @param repeatability how precisely the user reproduces their own measurement, null until
  *   they have taken repeat measurements in a single session
@@ -33,6 +34,7 @@ import javax.inject.Singleton
  */
 data class CompositionSnapshot(
     val bodyFatTrend: List<TrendPoint>,
+    val weightTrend: List<TrendPoint>,
     val leanMassTrend: List<TrendPoint>,
     val repeatability: RepeatabilityScore?,
     val calibration: PersonalCalibration,
@@ -81,6 +83,20 @@ class BodyCompositionRepository @Inject constructor(
             )
         }
 
+        // The scale's own reading is near-exact; what makes bodyweight noisy is the body —
+        // gut contents, glycogen and the water bound to it swing a couple of pounds within a
+        // single day. That physiological scatter, not the instrument, is what the filter has
+        // to see through, and it scales with body size rather than being a fixed number of
+        // kilograms.
+        val weightObservations = measurements.mapNotNull { entity ->
+            val weight = entity.weightKg ?: return@mapNotNull null
+            Observation(
+                epochDay = entity.epochDay,
+                value = weight,
+                standardError = weight * DAILY_WEIGHT_SCATTER_FRACTION,
+            )
+        }
+
         val leanObservations = measurements.mapNotNull { entity ->
             val weight = entity.weightKg ?: return@mapNotNull null
             val estimate = estimates.firstOrNull { it.first == entity.epochDay }?.second
@@ -97,6 +113,7 @@ class BodyCompositionRepository @Inject constructor(
 
         return CompositionSnapshot(
             bodyFatTrend = trendEngine.filter(fatObservations),
+            weightTrend = TrendEngine(TrendEngine.BODYWEIGHT_PROCESS_NOISE).filter(weightObservations),
             leanMassTrend = TrendEngine(TrendEngine.BODYWEIGHT_PROCESS_NOISE).filter(leanObservations),
             repeatability = Repeatability.score(fatObservations),
             // Surfaced for the UI's "uncalibrated" notice. Any active fit means the user
@@ -291,6 +308,17 @@ class BodyCompositionRepository @Inject constructor(
          * produces a dozen.
          */
         const val SHAPE_DISAGREEMENT_POINTS = 6.0
+
+        /**
+         * Within-day bodyweight scatter, as a fraction of bodyweight.
+         *
+         * Roughly 1%: about 0.7 kg on a 70 kg body, which is what gut contents, glycogen and
+         * its bound water move between a morning and an evening weigh-in. Passing the scale's
+         * own precision instead — a few tens of grams — would tell the filter the series is
+         * far cleaner than it is, and it would then draw a confident line through exactly the
+         * noise this app exists to see past.
+         */
+        const val DAILY_WEIGHT_SCATTER_FRACTION = 0.01
     }
 }
 
