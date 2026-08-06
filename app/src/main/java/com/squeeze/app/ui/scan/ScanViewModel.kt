@@ -402,7 +402,6 @@ class ScanViewModel @Inject constructor(
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
                     shapeBodyFatPercent = shape,
-            lightingAdvice = lighting?.advice,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,
                 ),
