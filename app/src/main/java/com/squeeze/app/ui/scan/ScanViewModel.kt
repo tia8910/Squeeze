@@ -74,6 +74,14 @@ data class ScanUiState(
      * screen that did not come through them, and so the only one that can contradict them.
      */
     val shapeBodyFatPercent: Double? = null,
+    /**
+     * What the light was doing, when it is doing something that matters.
+     *
+     * Null when the light was fine. The app cannot supply light at scan distance — an LED
+     * two metres further away delivers a hundredth as much — so telling the user is the
+     * whole of what it can do about it.
+     */
+    val lightingAdvice: String? = null,
 )
 
 /**
@@ -292,10 +300,17 @@ class ScanViewModel @Inject constructor(
         // the only signal available that separates those bodies, so it is read here and used
         // to place the result inside that band rather than at its midpoint.
         val definition = frontBitmap?.let { AbdomenCrop.measure(it, front.geometry) }
+        val lighting = frontBitmap?.let { AbdomenCrop.lighting(it, front.geometry) }
         val onPlateau = shapeEstimate != null &&
             shapeEstimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
 
-        val shape = if (onPlateau && definition != null) {
+        // Definition is only allowed to move the answer when the light was good enough to
+        // have measured it. Under a hard side light the score is the lamp's, and placing a
+        // body at the lean end because of a shadow is the same error the app has spent this
+        // whole effort removing.
+        val definitionTrusted = lighting?.usableForDefinition ?: false
+
+        val shape = if (onPlateau && definition != null && definitionTrusted) {
             AbdominalDefinition.placeWithinPlateau(
                 reading = definition,
                 leanEnd = PLATEAU_LEAN_END,
@@ -327,6 +342,7 @@ class ScanViewModel @Inject constructor(
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
             shapeBodyFatPercent = shape,
+            lightingAdvice = lighting?.advice,
             posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
         )
     }
@@ -386,6 +402,7 @@ class ScanViewModel @Inject constructor(
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
                     shapeBodyFatPercent = shape,
+            lightingAdvice = lighting?.advice,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,
                 ),

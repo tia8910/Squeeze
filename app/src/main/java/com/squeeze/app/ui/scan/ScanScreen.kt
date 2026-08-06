@@ -708,6 +708,10 @@ private fun ResultStep(
             ShapeHeadline(shape)
         }
 
+        // Directly under the figure the light affects, so the caveat and the number it
+        // qualifies are read together.
+        state.lightingAdvice?.let { InfoCard(it) }
+
         var neck by remember(c) { mutableStateOf(c.neckCm.toField()) }
         var chest by remember(c) { mutableStateOf(c.chestCm.toField()) }
         var waist by remember(c) { mutableStateOf(c.waistCm.toField()) }

@@ -5,6 +5,8 @@ import androidx.core.graphics.get
 import com.squeeze.core.scan.AbdominalDefinition
 import com.squeeze.core.scan.DefinitionReading
 import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.LightingQuality
+import com.squeeze.core.scan.LightingVerdict
 
 /**
  * Pulls the midsection out of a full-body photograph and measures its definition.
@@ -49,12 +51,18 @@ object AbdomenCrop {
      *   a crop. Never a fabricated score.
      */
     fun measure(bitmap: Bitmap, geometry: FrontPoseGeometry?): DefinitionReading {
-        val unusable = DefinitionReading(0.0, usable = false)
-        if (geometry == null) return unusable
+        val crop = luminanceOf(bitmap, geometry)
+            ?: return DefinitionReading(0.0, usable = false)
+        return AbdominalDefinition.measure(crop.first, crop.second)
+    }
+
+    /** Luminance of the abdomen crop and its row length, or null when it cannot be taken. */
+    private fun luminanceOf(bitmap: Bitmap, geometry: FrontPoseGeometry?): Pair<IntArray, Int>? {
+        if (geometry == null) return null
 
         val shoulderY = (geometry.shoulderLeft.y + geometry.shoulderRight.y) / 2.0
         val hipY = (geometry.hipLeft.y + geometry.hipRight.y) / 2.0
-        if (hipY <= shoulderY) return unusable
+        if (hipY <= shoulderY) return null
 
         val span = hipY - shoulderY
         val top = ((shoulderY + span * TOP_FRACTION) * bitmap.height).toInt()
@@ -73,7 +81,7 @@ object AbdomenCrop {
 
         val cropWidth = x1 - x0
         val cropHeight = y1 - y0
-        if (cropWidth < MIN_CROP_PIXELS || cropHeight < MIN_CROP_PIXELS) return unusable
+        if (cropWidth < MIN_CROP_PIXELS || cropHeight < MIN_CROP_PIXELS) return null
 
         val luminance = IntArray(cropWidth * cropHeight)
         for (y in 0 until cropHeight) {
@@ -89,6 +97,18 @@ object AbdomenCrop {
             }
         }
 
-        return AbdominalDefinition.measure(luminance, cropWidth)
+        return luminance to cropWidth
+    }
+
+    /**
+     * The light the abdomen was under, from the same crop.
+     *
+     * Read here rather than from the whole frame because the background's lighting is not
+     * the subject's: a bright window behind someone says nothing about whether their
+     * midsection is side-lit, and that is the only thing that matters for definition.
+     */
+    fun lighting(bitmap: Bitmap, geometry: FrontPoseGeometry?): LightingVerdict? {
+        val crop = luminanceOf(bitmap, geometry) ?: return null
+        return LightingQuality.evaluate(crop.first, crop.second)
     }
 }
