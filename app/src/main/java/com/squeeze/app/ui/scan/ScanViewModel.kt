@@ -19,6 +19,7 @@ import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
+import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
@@ -27,6 +28,7 @@ import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScaleSource
+import com.squeeze.core.scan.ScanFraming
 import com.squeeze.core.scan.ScanResult
 import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
@@ -75,6 +77,14 @@ data class ScanUiState(
      */
     val shapeBodyFatPercent: Double? = null,
     /**
+     * Body fat read from the abdomen's side-on depth, when a side photograph was taken.
+     *
+     * Separate from [shapeBodyFatPercent] because they measure perpendicular axes. The front
+     * view reads width, which is the axis abdominal fat moves along least; this reads depth,
+     * which is the one it moves along most.
+     */
+    val abdominalBodyFatPercent: Double? = null,
+    /**
      * What the light was doing, when it is doing something that matters.
      *
      * Null when the light was fine. The app cannot supply light at scan distance — an LED
@@ -90,6 +100,14 @@ data class ScanUiState(
      * against the waist replace it with a number derived from the trunk bound.
      */
     val poseAdvice: String? = null,
+    /**
+     * How much of the body the photograph held, and so what this result may claim.
+     *
+     * At [ScanFraming.TORSO] there are no centimetres — the stature they scale from was not
+     * in shot. The shape figure and the ratios are unaffected, because none of them ever
+     * used it.
+     */
+    val framing: ScanFraming = ScanFraming.FULL_BODY,
 )
 
 /**
@@ -172,7 +190,7 @@ class ScanViewModel @Inject constructor(
                 DetectionFailure.NoPersonDetected -> "Step into frame."
                 DetectionFailure.BodyNotFullyVisible,
                 DetectionFailure.BodyCropped,
-                -> "Step back until your head and feet are both in shot."
+                -> "Get your shoulders and hips both in shot."
 
                 DetectionFailure.PoseImplausible -> "Stand upright, arms clear of your sides."
                 DetectionFailure.SegmentationFailed ->
@@ -271,19 +289,29 @@ class ScanViewModel @Inject constructor(
             backAnchors = back?.anchors,
         )
 
-        val analyser = BodyScanAnalyser(
-            scale = ScaleRecovery(
-                heightCm = profile.heightCm,
-                // The cross-checked figure, not the silhouette's own extent. Detection has
-                // already compared the outline against the pose landmarks and, where they
-                // disagreed, dropped back to the reference that cannot pick up a mirror
-                // frame — see ScaleCrossCheck.
-                bodyHeightFraction = front.scale.bodyHeightFraction,
-            ),
-            imageAspectRatio = frontAspectRatio,
+        // Centimetres only where the photograph can support them. A trunk-framed shot has
+        // no stature in it, and the one thing this codebase has learned the hard way is that
+        // a fabricated stature does not produce a slightly wrong scan, it produces a
+        // confidently wrong one — every girth is multiplied by the same bad number.
+        val result = front.scale?.let { scale ->
+            BodyScanAnalyser(
+                scale = ScaleRecovery(
+                    heightCm = profile.heightCm,
+                    // The cross-checked figure, not the silhouette's own extent. Detection
+                    // has already compared the outline against the pose landmarks and, where
+                    // they disagreed, dropped back to the reference that cannot pick up a
+                    // mirror frame — see ScaleCrossCheck.
+                    bodyHeightFraction = scale.bodyHeightFraction,
+                ),
+                imageAspectRatio = frontAspectRatio,
+            ).analyse(markers)
+        } ?: ScanResult(
+            circumferences = Circumferences(),
+            warnings = emptyList(),
+            // Not usable for the tape equations, which is what this flag means. The shape
+            // figure below does not go through them and is unaffected.
+            usableForBodyFat = false,
         )
-
-        val result = analyser.analyse(markers)
 
         // Computed from the pixel profile before it is discarded. Nothing here converts to
         // centimetres, so a mask that misjudged the body's height cannot reach it.
@@ -311,6 +339,17 @@ class ScanViewModel @Inject constructor(
         // and printing it to two decimal places made it look like the opposite.
         val shape = shapeEstimate?.percent
 
+        // The abdomen, measured on the axis it actually moves along. Only a side photograph
+        // can supply it: from the front, fat that accumulates in depth is invisible, which is
+        // why four separate front-view indices in this project came back flat or out of
+        // order. It is also the one measurement here an arm cannot corrupt, because edge-on
+        // an arm lies inside the torso's front-to-back extent rather than extending it.
+        val abdominal = side?.let { view ->
+            AbdominalProfile.depthsFrom(view.profile, view.anchors)
+                ?.let { AbdominalProfile.estimate(it, Sex.valueOf(profile.sex)) }
+                ?.percent
+        }
+
         // The female Navy equation needs a hip; the male one does not. Reporting a missing
         // hip to a man would be noise, so the warning is filtered by profile here.
         val relevantWarnings = result.warnings.filterNot { warning ->
@@ -320,7 +359,7 @@ class ScanViewModel @Inject constructor(
         } + listOfNotNull(
             // Placed at the end because it is the widest-reaching of them: it says something
             // about every measurement above it rather than about one site.
-            front.scale.takeIf { it.source == ScaleSource.LANDMARK }
+            front.scale?.takeIf { it.source == ScaleSource.LANDMARK }
                 ?.disagreementPercent
                 ?.let { ScanWarning.ScaleFromLandmarks(it) },
         )
@@ -333,6 +372,8 @@ class ScanViewModel @Inject constructor(
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
             shapeBodyFatPercent = shape,
+            framing = front.framing,
+            abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
             posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
@@ -353,6 +394,7 @@ class ScanViewModel @Inject constructor(
         knownBodyFatPercent: Double? = null,
     ) {
         val shape = _state.value.shapeBodyFatPercent
+        val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
 
         viewModelScope.launch {
@@ -394,6 +436,7 @@ class ScanViewModel @Inject constructor(
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
                     shapeBodyFatPercent = shape,
+                    abdominalBodyFatPercent = abdominal,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,
                 ),

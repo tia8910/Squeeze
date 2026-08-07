@@ -53,6 +53,15 @@ data class MeasurementEntity(
      * only for the duration of the scan.
      */
     val shapeBodyFatPercent: Double? = null,
+    /**
+     * Body fat read from the abdomen's side-on depth; see AbdominalProfile.
+     *
+     * Present only when a side photograph was taken. Stored separately from the shape figure
+     * because the two measure different axes and carry different offsets — the front view
+     * measures the axis abdominal fat moves along least, which is why it needed a companion
+     * rather than a correction.
+     */
+    val abdominalBodyFatPercent: Double? = null,
 )
 
 /**
