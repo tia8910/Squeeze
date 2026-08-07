@@ -44,9 +44,9 @@ object ArmClearance {
         val clipped = profile.clippedFractionBetween(anchors.shoulderRow, anchors.hipRow)
         if (clipped <= TOLERATED_CLIPPED_FRACTION) return null
 
-        return "Your arms were resting against your sides, so the app could not tell where " +
-            "your waist ended and your arms began. Stand with your arms held clear of your " +
-            "body — about a hand's width away, palms forward — and scan again. This is the " +
-            "single largest thing you can do for accuracy."
+        return "Both of your arms were against your sides, so neither edge of your waist " +
+            "was visible. One arm touching is fine — the app measures the other side and " +
+            "mirrors it — but with both there is nothing left to measure from. Hold your " +
+            "arms about a hand's width clear of your body, palms forward, and scan again."
     }
 }
