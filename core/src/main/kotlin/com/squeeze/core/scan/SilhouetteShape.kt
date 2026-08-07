@@ -168,6 +168,29 @@ object SilhouetteBodyFat {
     const val PLATEAU_ERROR_PERCENT = 9.0
 
     /**
+     * The highest percentage a plateau reading can produce, for a given sex.
+     *
+     * Derived from [LEAN_PLATEAU_RATIO] through the same anchors [estimate] uses, so it moves
+     * automatically if those are ever recalibrated. About 11.6 for men and 21.2 for women.
+     *
+     * Exists so callers can recognise a plateau reading from the percentage alone, without
+     * needing the ratio that produced it. That matters because the percentage is what gets
+     * stored: a saved figure at or below this line is not a measurement of adiposity, it is
+     * the outline saying "somewhere in the lean range, I cannot narrow it further", and it
+     * must not be treated as evidence about anything else.
+     */
+    fun plateauCeilingPercent(sex: Sex): Double {
+        val female = sex == Sex.FEMALE
+        return interpolate(
+            LEAN_PLATEAU_RATIO,
+            if (female) FEMALE_LEAN_RATIO else MALE_LEAN_RATIO,
+            if (female) FEMALE_HIGH_RATIO else MALE_HIGH_RATIO,
+            if (female) FEMALE_LEAN_PERCENT else MALE_LEAN_PERCENT,
+            if (female) FEMALE_HIGH_PERCENT else MALE_HIGH_PERCENT,
+        )
+    }
+
+    /**
      * @return the estimate, or null when the indices fall outside anything a standing adult
      *   silhouette produces — which means the outline is not a body, not that the body is
      *   unusual

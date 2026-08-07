@@ -122,6 +122,18 @@ object AbdominalDefinition {
      * defined / somewhat / smooth" would be inventing precision that a later scan under a
      * different lamp would contradict.
      *
+     * **Not wired into the scan, and should not be wired back in without new evidence.**
+     * Measured against a labelled reference set the score runs 5.76 at eight per cent, 6.15
+     * at ten, 7.44 at fifteen, 6.03 at twenty, 7.28 at twenty-five, 5.48 at thirty and 4.51
+     * at thirty-five. It is not weakly monotonic, it is not monotonic at all — what it tracks
+     * is how hard the light was. Driving a percentage from it put a body with no abdominal
+     * definition at exactly 8.00 per cent, because the lean end of the plateau is a constant
+     * and this chose it.
+     *
+     * Kept because the shape of the calculation is right and a future version reading a
+     * controlled-lighting capture could use it. Its lighting companion, [LightingQuality], is
+     * still live and still useful — that half of the work stands.
+     *
      * @param leanEnd the lowest body fat the plateau covers
      * @param plateauEnd the highest
      * @return a percentage inside that range, or null when the reading was unusable, in
