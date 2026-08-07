@@ -146,19 +146,23 @@ class SilhouetteShapeTest {
         // silhouette knows where the body ends and nothing about the surface inside it, so
         // it genuinely cannot separate those. Reporting a confident number there would be
         // the app's original sin repeated in a new place.
+        // Both hips are omitted, because the plateau now belongs to the shoulder path
+        // alone: the flatness was measured on the waist-to-shoulder ratio off the reference
+        // charts, and a hip-based reading was never shown to have it. The comparison is
+        // against a reading that had a hip, which is the one that should be tightest.
         val lean = SilhouetteBodyFat.estimate(
-            ShapeIndices(waistToShoulder = 0.68, waistToHip = 0.78), Sex.MALE,
+            ShapeIndices(waistToShoulder = 0.68, waistToHip = null), Sex.MALE,
         )
-        val midRange = SilhouetteBodyFat.estimate(
-            ShapeIndices(waistToShoulder = 0.90, waistToHip = 0.95), Sex.MALE,
+        val hipBased = SilhouetteBodyFat.estimate(
+            ShapeIndices(waistToShoulder = 0.90, waistToHip = 0.87), Sex.MALE,
         )
 
         assertNotNull(lean)
-        assertNotNull(midRange)
+        assertNotNull(hipBased)
         assertTrue(
-            lean.standardErrorPercent > midRange.standardErrorPercent + 2.0,
+            lean.standardErrorPercent > hipBased.standardErrorPercent + 2.0,
             "the plateau has to widen the interval: ${lean.standardErrorPercent} vs " +
-                "${midRange.standardErrorPercent}",
+                "${hipBased.standardErrorPercent}",
         )
         assertTrue(lean.percent < 16.0, "it should still say 'lean': ${lean.percent}")
     }

@@ -28,11 +28,13 @@ import com.squeeze.core.model.Sex
  * it needs the pixel stature, which is precisely the fragile quantity being routed around,
  * and including one here reintroduced the bug this class was written to escape.
  *
- * @param waistToShoulder narrowest torso width between shoulders and hips, over the
- *   shoulder width. The single most informative front-view shape signal there is.
- * @param waistToHip the same waist over the widest width below the hip landmark. Weaker on
- *   its own but useful as a temper, because shoulder breadth varies between frames far more
- *   than hip breadth does.
+ * @param waistToShoulder abdominal width over shoulder width. A fallback only, and a poor
+ *   one: at the shoulder line the arms are attached, so the silhouette's run there spans
+ *   deltoid to deltoid and is not a torso width at all. Kept because a photograph cropped
+ *   below the hips has nothing else to offer.
+ * @param waistToHip the same waist over the widest width below the hip landmark, and the
+ *   ratio the estimate is actually built on. The hip sits below the arms, is skeletal
+ *   rather than muscular, and is measured by the same rule as the waist.
  */
 data class ShapeIndices(
     val waistToShoulder: Double,
@@ -86,20 +88,27 @@ object SilhouetteBodyFat {
     private const val FEMALE_HIGH_PERCENT = 42.0
 
     /**
-     * The same anchors for waist over hip width.
+     * The same anchors for waist over hip width — **the primary mapping**.
      *
-     * A second, weaker signal used only to temper the first. A very broad-shouldered lifter
-     * posts a low waist-to-shoulder ratio at a body fat that is not especially low; the hip
-     * is a steadier denominator, because pelvic breadth is skeletal and varies less with
-     * training than deltoid breadth does.
+     * Promoted from a tempering second opinion after a real scan showed why. The hip is
+     * pelvic breadth: skeletal, so it does not move with training; below the arms, so no
+     * limb can be counted into it; and read by exactly the same torso-run rule as the waist,
+     * so numerator and denominator mean the same thing. None of those is true of the
+     * shoulder.
      */
     private const val MALE_LEAN_HIP_RATIO = 0.80
     private const val MALE_HIGH_HIP_RATIO = 1.06
     private const val FEMALE_LEAN_HIP_RATIO = 0.72
     private const val FEMALE_HIGH_HIP_RATIO = 0.98
 
-    /** How much of the answer comes from the shoulder ratio rather than the hip one. */
-    private const val SHOULDER_WEIGHT = 0.6
+    /**
+     * The interval carried when only the shoulder ratio was available.
+     *
+     * Wider than the method's ordinary error, because a shoulder denominator is contaminated
+     * by however much of the arms the band caught, and the silhouette gives no way to know
+     * how much that was.
+     */
+    private const val SHOULDER_ONLY_ERROR_PERCENT = 8.0
 
     /**
      * Reads the descriptors from a profile and its pose anchors.
@@ -231,8 +240,26 @@ object SilhouetteBodyFat {
             indices.waistToShoulder, leanRatio, highRatio, leanPercent, highPercent,
         )
 
-        // The hip reading only joins in when there is one. A missing hip narrows the
-        // evidence rather than invalidating it, so the shoulder ratio simply stands alone.
+        // **The hip is the denominator, whenever there is one.**
+        //
+        // Shoulder width from a front silhouette is not a torso width and cannot be made
+        // into one. At the shoulder line the arms are attached, so the mask has a single run
+        // spanning deltoid to deltoid; a few centimetres lower the arms separate and the run
+        // is the trunk alone. Measured on a real scan: 495 pixels at the shoulder band
+        // against 304 immediately below it, on the same body in the same photograph.
+        //
+        // That makes the shoulder ratio a comparison between two things measured different
+        // ways — a numerator with the arms excluded over a denominator with them included —
+        // and it deflates the ratio by however much arm happened to be in the band. On that
+        // scan it produced 0.687, six per cent, for a body with no abdominal definition at
+        // all. The same waist over the hip gave 0.87 and fifteen.
+        //
+        // The hip has none of that. It sits below the arms entirely, it is pelvic breadth
+        // rather than muscle so it does not move with training or with how someone is
+        // standing, and it is measured by exactly the same torso-run rule as the waist.
+        // Waist over hip is also the ratio the anthropometric literature actually uses,
+        // which is not a coincidence — it is the pairing that survives contact with real
+        // photographs of real people.
         val fromHip = indices.waistToHip
             ?.takeIf { it in PLAUSIBLE_HIP_RATIO }
             ?.let {
@@ -245,21 +272,26 @@ object SilhouetteBodyFat {
                 )
             }
 
-        val percent = if (fromHip == null) {
-            fromShoulder
-        } else {
-            SHOULDER_WEIGHT * fromShoulder + (1.0 - SHOULDER_WEIGHT) * fromHip
+        if (fromHip != null) {
+            return BodyFatEstimate(
+                percent = fromHip.coerceIn(MIN_PERCENT, MAX_PERCENT),
+                method = EstimationMethod.PHOTO_SHAPE,
+                standardErrorPercent = EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+            )
         }
 
-        // On the plateau the number is still reported, because "lean" is worth saying, but
-        // its interval is widened to cover the whole range the outline cannot separate.
-        // Fusion weights by precision, so this makes it inform the answer without pretending
-        // to settle it.
+        // No hip in the silhouette. The shoulder ratio is all that is left, and it keeps its
+        // plateau behaviour — the flatness measured on the reference charts was measured on
+        // this ratio, so it belongs here and nowhere else.
+        val percent = fromShoulder
         val onPlateau = indices.waistToShoulder < LEAN_PLATEAU_RATIO
         val error = if (onPlateau) {
             PLATEAU_ERROR_PERCENT
         } else {
-            EstimationMethod.PHOTO_SHAPE.standardErrorPercent
+            // Widened even off the plateau, because the denominator is contaminated by
+            // whatever share of the arms the shoulder band caught, and that share is not
+            // knowable from the silhouette.
+            SHOULDER_ONLY_ERROR_PERCENT
         }
 
         return BodyFatEstimate(

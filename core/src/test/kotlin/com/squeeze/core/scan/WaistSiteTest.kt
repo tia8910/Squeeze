@@ -108,8 +108,10 @@ class WaistSiteTest {
         val estimate = SilhouetteBodyFat.estimate(indices, Sex.MALE)
 
         assertNotNull(estimate)
-        // The hip ratio pulls the fused figure a little above the shoulder-derived 11.6.
-        assertTrue(estimate.percent in 9.0..17.0, "got ${estimate.percent}")
+        // The hip is now the denominator, and it puts this body at about 17.8 rather than
+        // the 11.6 the shoulder ratio gave. That is the right direction: the person whose
+        // photograph this reconstructs put themselves above seventeen.
+        assertTrue(estimate.percent in 9.0..20.0, "got ${estimate.percent}")
     }
 
     @Test
