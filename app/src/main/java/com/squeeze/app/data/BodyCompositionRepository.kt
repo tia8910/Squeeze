@@ -218,6 +218,19 @@ class BodyCompositionRepository @Inject constructor(
         // it is the only photo-derived estimate that scale recovery cannot corrupt. When it
         // disagrees loudly with the circumference route, that disagreement is evidence about
         // the scan rather than noise to be averaged away.
+        // The abdomen's own reading, and the only candidate here measured across the body's
+        // depth rather than its width. Every other photo route reads the coronal axis, which
+        // is the one abdominal fat moves along least — so this does not merely add a vote, it
+        // adds the axis the rest of them are blind to.
+        entity.abdominalBodyFatPercent?.let { abdominal ->
+            candidates += BodyFatEstimate(
+                percent = abdominal,
+                method = EstimationMethod.PHOTO_ABDOMINAL_PROFILE,
+                standardErrorPercent =
+                    EstimationMethod.PHOTO_ABDOMINAL_PROFILE.standardErrorPercent,
+            )
+        }
+
         entity.shapeBodyFatPercent?.let { shape ->
             candidates += BodyFatEstimate(
                 percent = shape,

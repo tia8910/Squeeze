@@ -19,6 +19,7 @@ import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
+import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
@@ -75,6 +76,14 @@ data class ScanUiState(
      * screen that did not come through them, and so the only one that can contradict them.
      */
     val shapeBodyFatPercent: Double? = null,
+    /**
+     * Body fat read from the abdomen's side-on depth, when a side photograph was taken.
+     *
+     * Separate from [shapeBodyFatPercent] because they measure perpendicular axes. The front
+     * view reads width, which is the axis abdominal fat moves along least; this reads depth,
+     * which is the one it moves along most.
+     */
+    val abdominalBodyFatPercent: Double? = null,
     /**
      * What the light was doing, when it is doing something that matters.
      *
@@ -329,6 +338,17 @@ class ScanViewModel @Inject constructor(
             shapeEstimate?.percent
         }
 
+        // The abdomen, measured on the axis it actually moves along. Only a side photograph
+        // can supply it: from the front, fat that accumulates in depth is invisible, which is
+        // why four separate front-view indices in this project came back flat or out of
+        // order. It is also the one measurement here an arm cannot corrupt, because edge-on
+        // an arm lies inside the torso's front-to-back extent rather than extending it.
+        val abdominal = side?.let { view ->
+            AbdominalProfile.depthsFrom(view.profile, view.anchors)
+                ?.let { AbdominalProfile.estimate(it, Sex.valueOf(profile.sex)) }
+                ?.percent
+        }
+
         // The female Navy equation needs a hip; the male one does not. Reporting a missing
         // hip to a man would be noise, so the warning is filtered by profile here.
         val relevantWarnings = result.warnings.filterNot { warning ->
@@ -351,6 +371,7 @@ class ScanViewModel @Inject constructor(
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
             shapeBodyFatPercent = shape,
+            abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
             posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
@@ -371,6 +392,7 @@ class ScanViewModel @Inject constructor(
         knownBodyFatPercent: Double? = null,
     ) {
         val shape = _state.value.shapeBodyFatPercent
+        val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
 
         viewModelScope.launch {
@@ -412,6 +434,7 @@ class ScanViewModel @Inject constructor(
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
                     shapeBodyFatPercent = shape,
+                    abdominalBodyFatPercent = abdominal,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,
                 ),
