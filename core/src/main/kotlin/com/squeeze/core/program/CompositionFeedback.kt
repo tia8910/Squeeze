@@ -1,6 +1,7 @@
 package com.squeeze.core.program
 
 import com.squeeze.core.model.Goal
+import com.squeeze.core.text.fixed
 import com.squeeze.core.trend.TrendPoint
 
 /**
@@ -75,16 +76,17 @@ object CompositionFeedback {
         if (lean != null && lean.isChangeSignificant && lean.weeklyChange < -ACCEPTABLE_LEAN_LOSS_PER_WEEK) {
             return VolumeAdjustment(
                 volumeMultiplier = 0.8,
-                rationale = "You are losing lean mass at %.2f kg/week, faster than a cut should. Volume is reduced to protect muscle. Consider a smaller deficit and more protein."
-                    .format(-lean.weeklyChange),
+                rationale = "You are losing lean mass at ${(-lean.weeklyChange).fixed(2)} " +
+                    "kg/week, faster than a cut should. Volume is reduced to protect " +
+                    "muscle. Consider a smaller deficit and more protein.",
             )
         }
 
         if (fat.weeklyChange < -AGGRESSIVE_FAT_LOSS_PER_WEEK) {
             return VolumeAdjustment(
                 volumeMultiplier = 0.9,
-                rationale = "Fat loss is running at %.2f%%/week, which is aggressive. Volume is trimmed so recovery keeps pace."
-                    .format(-fat.weeklyChange),
+                rationale = "Fat loss is running at ${(-fat.weeklyChange).fixed(2)}%/week, " +
+                    "which is aggressive. Volume is trimmed so recovery keeps pace.",
             )
         }
 
@@ -109,8 +111,8 @@ object CompositionFeedback {
             }
             return VolumeAdjustment(
                 volumeMultiplier = 1.0,
-                rationale = "Body fat is rising %.2f%%/week.$leanNote Reduce the surplus rather than the training."
-                    .format(fat.weeklyChange),
+                rationale = "Body fat is rising ${fat.weeklyChange.fixed(2)}%/week.$leanNote " +
+                    "Reduce the surplus rather than the training.",
             )
         }
 

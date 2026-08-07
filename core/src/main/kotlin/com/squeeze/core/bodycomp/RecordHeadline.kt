@@ -1,5 +1,6 @@
 package com.squeeze.core.bodycomp
 
+import com.squeeze.core.text.fixed
 import kotlin.math.abs
 
 /**
@@ -78,10 +79,10 @@ object RecordHeadline {
      */
     fun format(value: Double, unit: String): String {
         val text = when {
-            unit == "kcal/day" -> "%.0f".format(value)
-            abs(value) >= 100 -> "%.0f".format(value)
-            abs(value) >= 10 -> "%.1f".format(value)
-            else -> "%.2f".format(value)
+            unit == "kcal/day" -> value.fixed(0)
+            abs(value) >= 100 -> value.fixed(0)
+            abs(value) >= 10 -> value.fixed(1)
+            else -> value.fixed(2)
         }
         return if (unit.isEmpty()) text else "$text $unit"
     }
