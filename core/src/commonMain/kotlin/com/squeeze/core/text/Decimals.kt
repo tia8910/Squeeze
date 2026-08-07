@@ -1,7 +1,7 @@
 package com.squeeze.core.text
 
 import kotlin.math.abs
-import kotlin.math.round
+import kotlin.math.roundToLong
 
 /**
  * Fixed-point number formatting that does not need a JVM.
@@ -30,6 +30,12 @@ object Decimals {
      *
      * Rounds half away from zero, matching `%.1f`, so no printed figure in the app changes.
      *
+     * That is [roundToLong] and deliberately not `kotlin.math.round`, which the first version
+     * of this used. They are not the same function: `round` rounds ties to the **even**
+     * integer — it is `Math.rint`, not `Math.round` — so `round(4.5)` is 4 and `0.45` printed
+     * as `0.4` where `%.1f` gives `0.5`. `roundToLong` rounds ties towards positive infinity,
+     * which on a magnitude is half-up.
+     *
      * @param digits how many decimal places, zero or more
      */
     fun fixed(value: Double, digits: Int): String {
@@ -40,7 +46,7 @@ object Decimals {
         var factor = 1L
         repeat(digits) { factor *= 10L }
 
-        val scaled = round(abs(value) * factor).toLong()
+        val scaled = (abs(value) * factor).roundToLong()
         val whole = scaled / factor
         val fraction = scaled % factor
 
