@@ -251,8 +251,22 @@ class ScanViewModel @Inject constructor(
                     ScanStep.BACK -> backBody = detection.body
                     else -> {
                         frontBody = detection.body
-                        frontAspectRatio = aspectRatio
-                        frontBitmap = bitmap
+
+                        // Stored the same way up as it was measured. The detector stands a
+                        // sideways photograph up before reading it; keeping the original
+                        // here would put a sideways image in the record beside a correct
+                        // number, which reads as a broken scan and cannot be told apart
+                        // from one.
+                        val upright = detector.orientForStorage(
+                            bitmap,
+                            detection.body.quarterTurnsApplied,
+                        )
+                        frontAspectRatio = if (detection.body.quarterTurnsApplied % 2 == 0) {
+                            aspectRatio
+                        } else {
+                            1.0 / aspectRatio
+                        }
+                        frontBitmap = upright
                     }
                 }
 

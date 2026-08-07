@@ -2,6 +2,7 @@ package com.squeeze.app.scan
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -18,6 +19,7 @@ import com.squeeze.core.scan.ScaleCrossCheck
 import com.squeeze.core.scan.ScaleDecision
 import com.squeeze.core.scan.TorsoFraming
 import com.squeeze.core.scan.TrunkBounds
+import com.squeeze.core.scan.Uprightness
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
 import javax.inject.Inject
@@ -49,6 +51,14 @@ data class DetectedBody(
     val scale: ScaleDecision?,
     /** How much of the body the photo contains, and therefore what may be claimed from it. */
     val framing: ScanFraming = ScanFraming.FULL_BODY,
+    /**
+     * Quarter-turns clockwise applied to the photograph before it was measured.
+     *
+     * Surfaced so the caller can store the image the same way up as the numbers taken from
+     * it. A record showing a sideways photograph next to a correct measurement reads as a
+     * broken scan, and the user has no way to tell that it is not.
+     */
+    val quarterTurnsApplied: Int = 0,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -167,8 +177,90 @@ class BodyDetector @Inject constructor(
      * Never throws. MediaPipe surfaces problems as native exceptions, and a scan that
      * crashes the app teaches the user nothing; a named failure tells them what to change.
      */
-    fun detect(bitmap: Bitmap): DetectionResult = runCatching { detectOrThrow(bitmap) }
+    fun detect(bitmap: Bitmap): DetectionResult = runCatching { detectUpright(bitmap) }
         .getOrElse { DetectionResult.Failure(DetectionFailure.SegmentationFailed) }
+
+    /**
+     * Detects, standing the photograph up first if it arrived lying down.
+     *
+     * The rotation is worked out from the body rather than from the file, because the file
+     * frequently does not know: EXIF orientation is stripped by screenshots, by most share
+     * sheets and by anything that re-encodes, so a photograph of a standing person can reach
+     * here running left to right with nothing in its metadata admitting it. Every row index
+     * downstream is a horizontal slice, so on such a frame the waist band lands on a thigh
+     * and the shoulder band on a forearm. One scan of a sideways photograph reported 5.0%.
+     *
+     * The user is never asked to fix this. [Uprightness] reads the shoulder-to-hip vector,
+     * which points down the image whenever the image is upright — a fact about anatomy rather
+     * than about any file format, so it survives every pipeline that discards metadata.
+     *
+     * Costs nothing on a correctly-oriented photograph: the pose model runs once, the trunk
+     * is found to be vertical, and no pixels are copied.
+     */
+    private fun detectUpright(bitmap: Bitmap): DetectionResult {
+        ensureLoaded()
+
+        val turns = quarterTurnsFor(bitmap)
+        if (turns == 0) return detectOrThrow(bitmap)
+
+        val turned = rotate(bitmap, turns)
+        return try {
+            when (val result = detectOrThrow(turned)) {
+                is DetectionResult.Success ->
+                    DetectionResult.Success(result.body.copy(quarterTurnsApplied = turns))
+
+                else -> result
+            }
+        } finally {
+            if (turned != bitmap) turned.recycle()
+        }
+    }
+
+    /** Turns a photograph the way [detect] turned it, for callers that keep the image. */
+    fun orientForStorage(bitmap: Bitmap, quarterTurnsClockwise: Int): Bitmap =
+        rotate(bitmap, quarterTurnsClockwise)
+
+    /**
+     * How far to turn the photograph, from a first look at the pose.
+     *
+     * When the model finds a body, the body says which way is up. When it finds nothing, the
+     * rotations are tried in turn — a pose model is trained on upright people and a sideways
+     * one is exactly the case it fails on, so "no person detected" on a photograph that
+     * plainly contains a person is usually this and not the subject.
+     */
+    private fun quarterTurnsFor(bitmap: Bitmap): Int {
+        geometryOf(bitmap)?.let { return Uprightness.quarterTurnsClockwise(it) }
+
+        Uprightness.SEARCH_ORDER.filter { it != 0 }.forEach { turns ->
+            val turned = rotate(bitmap, turns)
+            try {
+                val geometry = geometryOf(turned)
+                if (geometry != null) {
+                    // Compose the two: this rotation found the body, and the body may still
+                    // be lying down within it.
+                    return (turns + Uprightness.quarterTurnsClockwise(geometry)) % 4
+                }
+            } finally {
+                if (turned != bitmap) turned.recycle()
+            }
+        }
+
+        // Nothing found at any rotation. Left alone so the failure reported is the real one.
+        return 0
+    }
+
+    /** Pose geometry for one frame, or null when no usable body is in it. */
+    private fun geometryOf(bitmap: Bitmap): FrontPoseGeometry? {
+        val result = poseLandmarker?.detect(BitmapImageBuilder(bitmap).build()) ?: return null
+        if (result.landmarks().isEmpty()) return null
+        return buildGeometry(result)
+    }
+
+    private fun rotate(bitmap: Bitmap, quarterTurnsClockwise: Int): Bitmap {
+        if (quarterTurnsClockwise % 4 == 0) return bitmap
+        val matrix = Matrix().apply { postRotate(90f * (quarterTurnsClockwise % 4)) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
 
     private fun detectOrThrow(bitmap: Bitmap): DetectionResult {
         ensureLoaded()
