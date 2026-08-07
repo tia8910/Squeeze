@@ -266,6 +266,25 @@ object FrontalityCheck {
                 "your sides."
         }
 
+        return evaluateTorso(geometry)
+    }
+
+    /**
+     * The half of the check that does not need the subject's stature.
+     *
+     * Used for a trunk-framed photograph, where the crown and feet are out of shot and
+     * [evaluate]'s shoulder-against-height test therefore has nothing to work with. The
+     * shoulder-against-hip test does not care: both spans are fractions of the same image
+     * width, so it holds at any framing.
+     *
+     * Split out rather than reached by passing a zero height, which would silently skip both
+     * tests and leave a twisted trunk unremarked.
+     */
+    fun evaluateTorso(geometry: FrontPoseGeometry): String? {
+        val shoulderSpan = abs(geometry.shoulderRight.x - geometry.shoulderLeft.x)
+        val hipSpan = abs(geometry.hipRight.x - geometry.hipLeft.x)
+        if (shoulderSpan <= 0.0 || hipSpan <= 0.0) return null
+
         val shoulderToHip = shoulderSpan / hipSpan
         if (shoulderToHip < MIN_SHOULDER_TO_HIP || shoulderToHip > MAX_SHOULDER_TO_HIP) {
             return "Your upper and lower body look twisted relative to each other. Stand " +

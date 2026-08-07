@@ -13,8 +13,10 @@ import com.squeeze.core.scan.FrontalityCheck
 import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.scan.PoseAnchors
 import com.squeeze.core.scan.PosePoint
+import com.squeeze.core.scan.ScanFraming
 import com.squeeze.core.scan.ScaleCrossCheck
 import com.squeeze.core.scan.ScaleDecision
+import com.squeeze.core.scan.TorsoFraming
 import com.squeeze.core.scan.TrunkBounds
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
@@ -39,8 +41,14 @@ data class DetectedBody(
      * Carried out of detection rather than recomputed by the caller from
      * [WidthProfile.bodyHeightFraction], because the silhouette's own extent is exactly the
      * value that cannot be trusted on its own — see [ScaleCrossCheck].
+     *
+     * Null at [ScanFraming.TORSO], where the subject's stature is not in the photograph.
+     * Nullable rather than defaulted, so that every path which turns pixels into
+     * centimetres has to say out loud what it does when there is no scale to do it with.
      */
-    val scale: ScaleDecision,
+    val scale: ScaleDecision?,
+    /** How much of the body the photo contains, and therefore what may be claimed from it. */
+    val framing: ScanFraming = ScanFraming.FULL_BODY,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -197,41 +205,58 @@ class BodyDetector @Inject constructor(
         val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight, trunk)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
-        if (isCropped(poseResult)) {
-            return DetectionResult.Failure(DetectionFailure.BodyCropped)
+        // Scale, when the photograph can support one. Every step here is a reason the
+        // subject's stature is not reliably in the picture, and each is a veto rather than a
+        // warning: a wrong scale multiplies every centimetre in the scan at once.
+        val scale = when {
+            isCropped(poseResult) -> null
+            else -> ScaleCrossCheck.resolve(
+                maskFraction = profile.bodyHeightFraction,
+                landmarkFraction = geometry?.let {
+                    LandmarkStature.frameFraction(it.nose, it.ankleLeft, it.ankleRight)
+                },
+            )?.takeIf { it.bodyHeightFraction >= MIN_BODY_HEIGHT_FRACTION }
         }
 
-        val anchors = buildAnchors(poseResult, maskHeight)
-            ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
+        if (scale != null) {
+            val anchors = buildAnchors(poseResult, maskHeight)
+                ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
 
-        // Before anything is measured, because this is the number every measurement is
-        // multiplied by. The silhouette's extent alone is not enough to trust it with.
-        val scale = ScaleCrossCheck.resolve(
-            maskFraction = profile.bodyHeightFraction,
-            landmarkFraction = geometry?.let {
-                LandmarkStature.frameFraction(it.nose, it.ankleLeft, it.ankleRight)
-            },
-        ) ?: return DetectionResult.Failure(DetectionFailure.ScaleUnreliable)
+            // Frontality is checked last, because it needs the measured body height and is
+            // the most specific advice available — telling someone to stand square is only
+            // useful once we know the photo was otherwise good enough to measure. It is
+            // given the resolved height rather than the raw mask one for the same reason the
+            // measurements are: a contaminated mask would make square shoulders look narrow.
+            if (geometry != null) {
+                val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+                FrontalityCheck
+                    .evaluate(geometry, scale.bodyHeightFraction, aspectRatio)
+                    ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
+            }
 
-        // Scale comes from the subject's full height, so a cropped body would silently
-        // scale every circumference wrong rather than simply measuring less.
-        if (scale.bodyHeightFraction < MIN_BODY_HEIGHT_FRACTION) {
-            return DetectionResult.Failure(DetectionFailure.BodyNotFullyVisible)
+            return DetectionResult.Success(
+                DetectedBody(profile, anchors, geometry, scale, ScanFraming.FULL_BODY),
+            )
         }
 
-        // Frontality is checked last, because it needs the measured body height and is the
-        // most specific advice available — telling someone to stand square is only useful
-        // once we know the photo was otherwise good enough to measure. It is given the
-        // resolved height rather than the raw mask one for the same reason the measurements
-        // are: a contaminated mask would make square shoulders look narrow.
-        if (geometry != null) {
-            val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
-            FrontalityCheck
-                .evaluate(geometry, scale.bodyHeightFraction, aspectRatio)
+        // No stature in shot. That used to end the scan, and it no longer does: the shape
+        // figure and every ratio the app reports divide one width by another in the same
+        // image, so none of them ever needed a stature. What is lost is centimetres, and
+        // ScanFraming.TORSO is how the rest of the pipeline is told they are gone.
+        if (geometry != null && TorsoFraming.supports(geometry)) {
+            val anchors = TorsoFraming.anchorsFor(geometry, maskHeight)
+                ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
+
+            FrontalityCheck.evaluateTorso(geometry)
                 ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
+
+            return DetectionResult.Success(
+                DetectedBody(profile, anchors, geometry, scale = null, ScanFraming.TORSO),
+            )
         }
 
-        return DetectionResult.Success(DetectedBody(profile, anchors, geometry, scale))
+        // Neither framing. The trunk is cut off too, so there is nothing to measure at all.
+        return DetectionResult.Failure(DetectionFailure.BodyCropped)
     }
 
     /** Normalised landmark coordinates, or null when the pose is too incomplete to use. */

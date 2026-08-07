@@ -78,6 +78,7 @@ import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
+import com.squeeze.core.scan.ScanFraming
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -523,8 +524,11 @@ private fun StepCard(step: ScanStep) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = "Stand inside the guide, whole body from head to feet, plain background, " +
-                    "even light, close-fitting clothing. Loose fabric is measured as body.",
+                text = "Shoulders and hips both in shot, arms held clear of your sides, " +
+                    "plain background, even light, close-fitting clothing. Loose fabric is " +
+                    "measured as body. Head to feet is optional — it adds tape measurements " +
+                    "in centimetres, and framing closer on your trunk reads your shape " +
+                    "better.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -580,7 +584,8 @@ private fun FailureCard(failure: DetectionFailure) {
                         "No person found. Check the lighting and that you are fully in frame."
 
                     DetectionFailure.BodyNotFullyVisible ->
-                        "Your whole body needs to be visible, head to feet. Step further back."
+                        "Too little of you is in shot to measure. Frame at least from your " +
+                            "shoulders to below your hips."
 
                     DetectionFailure.PoseImplausible ->
                         "Stand upright and square to the camera, arms slightly away from your sides."
@@ -590,10 +595,10 @@ private fun FailureCard(failure: DetectionFailure) {
                             "background and more even lighting will help."
 
                     DetectionFailure.BodyCropped ->
-                        "Your head or feet are outside the frame. The scan uses your full " +
-                            "height to convert the photo into centimetres, so a cropped body " +
-                            "makes every measurement too large. Step back until you fit " +
-                            "entirely inside the guide."
+                        "Your shoulders and hips were not both in the picture, so there is " +
+                            "no waist to measure. Your head and feet do not have to be in " +
+                            "shot — frame from your shoulders to below your hips and the " +
+                            "scan will read your shape from that."
 
                     DetectionFailure.PhotoUnreadable ->
                         "That photo could not be opened. Try picking it again, or choose a " +
@@ -668,6 +673,19 @@ private fun ResultStep(
         val c = result.circumferences
 
         state.shapeBodyFatPercent?.let { ShapeHeadline(it) }
+
+        // Said before the advice, because it changes what the advice is for. A trunk scan is
+        // not a degraded full-body scan — it is the framing the shape figure actually wants,
+        // and the only thing it gives up is a set of centimetres the figure never used.
+        if (state.framing == ScanFraming.TORSO) {
+            InfoCard(
+                "Measured from your trunk. Your waist, shoulders and hips were all in " +
+                    "shot, which is everything the shape reading needs — and closer " +
+                    "framing puts far more detail on your midsection. Tape measurements " +
+                    "in centimetres need your full height in the picture, so this scan " +
+                    "does not produce them.",
+            )
+        }
 
         // Above the lighting note, because it is the bigger error and the easier fix. An arm
         // resting against the waist does not blur the reading, it replaces it: the app cuts
