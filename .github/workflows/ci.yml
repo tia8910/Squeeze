@@ -48,14 +48,21 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
 
       - name: Run core tests
-        run: ./gradlew :core:test --no-daemon --stacktrace
+        run: ./gradlew :core:jvmTest --no-daemon --stacktrace
+
+      # The measurement lab runs this module's own code in a browser rather than a port of
+      # it, so the JS target has to keep compiling. Nothing here has a java.* import today
+      # and this is what stops one arriving unnoticed — a JVM-only call would break the lab
+      # silently and only be found the next time someone tried to open it.
+      - name: Check the shared code still leaves the JVM
+        run: ./gradlew :core:compileKotlinJs --no-daemon --stacktrace
 
       - name: Upload test report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: core-test-report
-          path: core/build/reports/tests/test/
+          path: core/build/reports/tests/jvmTest/
           retention-days: 14
 
   debug-apk:

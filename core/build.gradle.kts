@@ -6,30 +6,59 @@ plugins {
     // already loaded fails configuration outright:
     //   "the plugin is already on the classpath with an unknown version"
     // The version lives in the catalog, declared once at the root with `apply false`.
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
 }
 
-// Pure JVM module: no Android dependencies, so the measurement and programming logic can
-// be tested on any machine without an Android SDK. Bytecode targets 17 to match what the
-// Android Gradle Plugin expects, but no specific JDK is required to build it.
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
+/**
+ * The measurement and programming logic, built for two places at once.
+ *
+ * It was a plain JVM module, and the value of that has not changed: no Android dependency,
+ * so every equation here is testable on any machine without an SDK. What multiplatform adds
+ * is a second consumer — a browser.
+ *
+ * That is not a hypothetical. Every measurement bug this pipeline has had was invisible by
+ * construction: the waist band read under the ribs, the shoulder run swallowing both arms,
+ * the hip band landing on a waistband, the whole frame lying on its side. Rows and bands are
+ * numbers here and pixels in a photograph, and nothing in the repository could put the two
+ * together — each was found from a screenshot of a percentage, one round trip at a time.
+ *
+ * MediaPipe publishes a web build of the same models the app ships, so a browser page can
+ * run this exact code over a real photograph and draw the bands where they actually land.
+ * Sharing the code rather than porting it is the whole point: a TypeScript copy would drift
+ * from what ships, and a lab that disagrees with the app is worse than no lab.
+ *
+ * No `java.*` import appears anywhere in this module, which is what makes the JS target
+ * possible at all; `com.squeeze.core.text.Decimals` exists because `String.format` was the
+ * one exception.
+ */
 kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+    jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+
+        // Set on the target rather than through tasks.withType<Test>, which is what tells
+        // the Kotlin plugin to resolve kotlin("test") to its JUnit 5 variant. Configuring
+        // the task alone leaves the wrong engine on the classpath and no tests are found.
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+            testLogging {
+                events("passed", "failed", "skipped")
+            }
+        }
     }
-}
 
-dependencies {
-    testImplementation(kotlin("test"))
-}
+    // IR with a library binary rather than an executable: the lab imports this, it does not
+    // launch it. `browser()` alone would still build, but declaring the environment keeps
+    // the JS test task from looking for a Node it does not need.
+    js(IR) {
+        browser()
+        binaries.library()
+    }
 
-tasks.test {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "failed", "skipped")
+    sourceSets {
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }
