@@ -13,6 +13,7 @@ import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Skinfolds
+import com.squeeze.core.scan.SilhouetteBodyFat
 import com.squeeze.core.trend.Observation
 import com.squeeze.core.trend.Repeatability
 import com.squeeze.core.trend.RepeatabilityScore
@@ -193,8 +194,24 @@ class BodyCompositionRepository @Inject constructor(
         // inverse-variance fusion does not hedge the answer, it drags it: on a real scan the
         // circumference route read 32.1% against a shape reading of 19.6% on a body nearer
         // 10%, and averaging those is worse than either.
+        // A plateau reading is disqualified from vetoing anything.
+        //
+        // Below its lean plateau the outline is not measuring adiposity — it says so itself,
+        // by widening its interval to ±9 points. Something that uncertain cannot be evidence
+        // that another method is broken, and letting it act as one inverted this rule
+        // completely: a scan read the outline at the plateau floor, the girths said
+        // twenty-seven per cent, the gap was nineteen points, and the *girths* were thrown
+        // out. The user was shown eight per cent for a body with no abdominal definition.
+        //
+        // The veto still exists for what it was built for — a scale-recovery failure, which
+        // produces a confident shape reading well above the plateau disagreeing with a
+        // confidently wrong set of girths.
+        val shapeIsPlateauReading = entity.shapeBodyFatPercent != null &&
+            entity.shapeBodyFatPercent <= SilhouetteBodyFat.plateauCeilingPercent(profile.sex)
+
         val circumferencesContradicted = fromCircumferences != null &&
             entity.shapeBodyFatPercent != null &&
+            !shapeIsPlateauReading &&
             kotlin.math.abs(fromCircumferences.percent - entity.shapeBodyFatPercent) >
             SHAPE_DISAGREEMENT_POINTS
 

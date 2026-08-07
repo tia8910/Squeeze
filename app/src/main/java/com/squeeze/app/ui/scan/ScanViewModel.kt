@@ -31,7 +31,6 @@ import com.squeeze.core.scan.ScanResult
 import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
 import com.squeeze.app.scan.AbdomenCrop
-import com.squeeze.core.scan.AbdominalDefinition
 import com.squeeze.core.scan.ArmClearance
 import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -136,18 +135,6 @@ class ScanViewModel @Inject constructor(
      * inference, at which point it no longer says which photograph is in flight.
      */
     private var capturing: ScanStep = ScanStep.FRONT
-
-    private companion object {
-        /**
-         * The band the silhouette cannot resolve, and which definition is used to divide.
-         *
-         * Taken from the reference measurements: waist-to-shoulder reads 0.586 at eight per
-         * cent and 0.580 at fifteen, so everything between those is one flat region as far
-         * as the outline is concerned.
-         */
-        const val PLATEAU_LEAN_END = 8.0
-        const val PLATEAU_UPPER_END = 15.0
-    }
 
     fun addSidePhoto() = moveToCapture(ScanStep.SIDE)
 
@@ -304,30 +291,25 @@ class ScanViewModel @Inject constructor(
             .indicesFrom(front.profile, front.anchors)
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
 
-        // On the plateau the outline has said "lean" and stopped, because below about
-        // fifteen per cent the silhouette genuinely stops changing. Abdominal definition is
-        // the only signal available that separates those bodies, so it is read here and used
-        // to place the result inside that band rather than at its midpoint.
-        val definition = frontBitmap?.let { AbdomenCrop.measure(it, front.geometry) }
         val lighting = frontBitmap?.let { AbdomenCrop.lighting(it, front.geometry) }
-        val onPlateau = shapeEstimate != null &&
-            shapeEstimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
 
-        // Definition is only allowed to move the answer when the light was good enough to
-        // have measured it. Under a hard side light the score is the lamp's, and placing a
-        // body at the lean end because of a shadow is the same error the app has spent this
-        // whole effort removing.
-        val definitionTrusted = lighting?.usableForDefinition ?: false
-
-        val shape = if (onPlateau && definition != null && definitionTrusted) {
-            AbdominalDefinition.placeWithinPlateau(
-                reading = definition,
-                leanEnd = PLATEAU_LEAN_END,
-                plateauEnd = PLATEAU_UPPER_END,
-            ) ?: shapeEstimate?.percent
-        } else {
-            shapeEstimate?.percent
-        }
+        // Abdominal definition used to narrow a plateau reading to a point inside it. It no
+        // longer does, and the reason is measurement rather than taste.
+        //
+        // Read against a labelled reference set the texture score runs 5.76 at eight per cent,
+        // 6.15 at ten, 7.44 at fifteen, 6.03 at twenty, 7.28 at twenty-five, 5.48 at thirty
+        // and 4.51 at thirty-five. That is not a weak signal, it is not a signal: it does not
+        // even move in one direction. What it tracks is how hard the light was, which is why
+        // the lighting gate above it was never enough to save it.
+        //
+        // Left in the codebase and still shown to the user as a lighting observation, because
+        // the lighting half of that work is sound. It simply may not set a number.
+        //
+        // The concrete damage was visible: a body with no abdominal definition at all came
+        // back as exactly 8.00 per cent, because the texture score placed it at the lean end
+        // and the lean end is a constant. A figure that is a constant is not a measurement,
+        // and printing it to two decimal places made it look like the opposite.
+        val shape = shapeEstimate?.percent
 
         // The female Navy equation needs a hip; the male one does not. Reporting a missing
         // hip to a man would be noise, so the warning is filtered by profile here.

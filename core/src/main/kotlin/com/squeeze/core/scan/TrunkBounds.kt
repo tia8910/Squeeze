@@ -127,9 +127,12 @@ data class TrunkBounds(
         return ClippedSpan(
             start = low,
             endInclusive = high,
-            // Either side is enough. An arm on one side only — the common case, since one
-            // hand is usually holding the phone — corrupts the width just as thoroughly.
-            cut = low > startX + CLIP_TOLERANCE || high < endX - CLIP_TOLERANCE,
+            centre = centre,
+            // Reported per side, because which sides were cut decides what can still be
+            // measured. One arm against the body leaves the other edge untouched, and an
+            // untouched edge is a real measurement of a real torso.
+            cutStart = low > startX + CLIP_TOLERANCE,
+            cutEnd = high < endX - CLIP_TOLERANCE,
         )
     }
 
@@ -195,15 +198,46 @@ data class TrunkBounds(
 /**
  * A torso run after the trunk bound has been applied to it.
  *
- * @param cut true when the bound moved either edge, meaning the width is the allowance
- *   rather than the body
+ * @param centre where the bound put the trunk's midline at this row
+ * @param cutStart true when the bound pulled the left edge inward, i.e. something extended
+ *   further left than a trunk can reach
+ * @param cutEnd the same on the right
  */
 data class ClippedSpan(
     val start: Double,
     val endInclusive: Double,
-    val cut: Boolean,
+    val centre: Double,
+    val cutStart: Boolean,
+    val cutEnd: Boolean,
 ) {
     val width: Double get() = endInclusive - start
+
+    /** True when the bound moved either edge. */
+    val cut: Boolean get() = cutStart || cutEnd
+
+    /**
+     * The torso's width inferred from whichever edge the bound did not have to touch.
+     *
+     * One arm against the body is the ordinary case — usually the one not holding the phone —
+     * and it corrupts one edge while leaving the other exactly where the skin is. Doubling the
+     * clean half about the trunk's centre recovers the width from the side that was never in
+     * doubt.
+     *
+     * The assumption is that a torso is roughly symmetric about its midline. That is a far
+     * weaker claim than the alternatives on offer: measuring an arm as part of the waist, or
+     * refusing to measure at all. Refusing was the previous behaviour, and on a body that
+     * simply stands with its arms down it refused every time.
+     *
+     * @return null when both edges were cut, which means both sides are contaminated and
+     *   there is no clean half left to mirror
+     */
+    fun mirroredWidth(): Double? {
+        if (cutStart && cutEnd) return null
+        if (!cutStart && !cutEnd) return width
+
+        val cleanHalf = if (cutStart) endInclusive - centre else centre - start
+        return if (cleanHalf > 0.0) 2.0 * cleanHalf else null
+    }
 }
 
 /**

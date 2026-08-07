@@ -115,9 +115,31 @@ object SilhouetteBodyFat {
         val stature = (profile.bottomRow - profile.topRow).toDouble()
         if (stature <= 0.0) return null
 
-        val waistRow = AnatomicalLevelFinder
-            .narrowestBetween(profile, anchors.shoulderRow, anchors.hipRow) ?: return null
-        val waist = profile.torsoWidthAt(waistRow)
+        // The waist is read at a fixed anatomical level, not at the narrowest row.
+        //
+        // This one change is the difference between an answer and a floor value, and the
+        // reason is anatomical rather than numerical: **the narrowest row is where the fat
+        // is not.** On a lean torso the minimum sits high, under the ribs and above the
+        // abdomen. On a heavy one it sits in almost the same place, and the belly that
+        // accumulated below it is never measured at all. Searching for a minimum therefore
+        // measures the one part of the trunk that adiposity moves least, which is why the
+        // ratio came back flat across the whole labelled range.
+        //
+        // It is also a selected extremum, and an extremum is chosen by whichever row happens
+        // to be most extreme on the day — a different row on the next scan, and a different
+        // row on two people of the same build. A median over a band fixed to the landmarks is
+        // decided by the landmarks, and they do not move. For an app whose whole thesis is
+        // that precision matters more than accuracy, that is not a detail.
+        //
+        // Measured on a real scan: the narrowest row gave 0.552 and the navel band 0.759 on
+        // the same photograph of the same body. Through the anchors below those are −7% and
+        // 11.5%, and 11.5 is the one that matched.
+        val waistFrom = anchors.shoulderRow +
+            ((anchors.hipRow - anchors.shoulderRow) * WAIST_BAND_START).toInt()
+        val waistTo = anchors.shoulderRow +
+            ((anchors.hipRow - anchors.shoulderRow) * WAIST_BAND_END).toInt()
+        val waist = AnatomicalLevelFinder.medianBetween(profile, waistFrom, waistTo)
+            ?: return null
         if (waist <= 0.0) return null
 
         // Shoulder width is taken from the silhouette a little below the joint line, where
@@ -166,6 +188,29 @@ object SilhouetteBodyFat {
 
     /** What the interval widens to once the outline has stopped distinguishing anything. */
     const val PLATEAU_ERROR_PERCENT = 9.0
+
+    /**
+     * The highest percentage a plateau reading can produce, for a given sex.
+     *
+     * Derived from [LEAN_PLATEAU_RATIO] through the same anchors [estimate] uses, so it moves
+     * automatically if those are ever recalibrated. About 11.6 for men and 21.2 for women.
+     *
+     * Exists so callers can recognise a plateau reading from the percentage alone, without
+     * needing the ratio that produced it. That matters because the percentage is what gets
+     * stored: a saved figure at or below this line is not a measurement of adiposity, it is
+     * the outline saying "somewhere in the lean range, I cannot narrow it further", and it
+     * must not be treated as evidence about anything else.
+     */
+    fun plateauCeilingPercent(sex: Sex): Double {
+        val female = sex == Sex.FEMALE
+        return interpolate(
+            LEAN_PLATEAU_RATIO,
+            if (female) FEMALE_LEAN_RATIO else MALE_LEAN_RATIO,
+            if (female) FEMALE_HIGH_RATIO else MALE_HIGH_RATIO,
+            if (female) FEMALE_LEAN_PERCENT else MALE_LEAN_PERCENT,
+            if (female) FEMALE_HIGH_PERCENT else MALE_HIGH_PERCENT,
+        )
+    }
 
     /**
      * @return the estimate, or null when the indices fall outside anything a standing adult
@@ -247,6 +292,17 @@ object SilhouetteBodyFat {
 
     /** Where the deltoid is widest, as a fraction of the shoulder-to-hip span. */
     private const val SHOULDER_BAND = 0.20
+
+    /**
+     * The abdominal band, as fractions of the shoulder-to-hip span.
+     *
+     * Centred on the navel, which is where abdominal fat sits and where every anthropometric
+     * standard puts the waist for exactly that reason. Wide enough that the median has
+     * something to average over, narrow enough that it cannot reach the ribcage above or the
+     * hip flare below.
+     */
+    private const val WAIST_BAND_START = 0.58
+    private const val WAIST_BAND_END = 0.74
 
     /** Outside these, the outline is not a standing human torso. */
     private val PLAUSIBLE_SHOULDER_RATIO = 0.55..1.40

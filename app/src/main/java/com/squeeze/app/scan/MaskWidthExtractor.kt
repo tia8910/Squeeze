@@ -114,19 +114,27 @@ object MaskWidthExtractor {
                     row = row,
                 )
 
+                // Where the bound cut only one side, the other edge is still the skin, and
+                // doubling that clean half about the trunk's centre recovers the width from
+                // the side that was never in doubt. Where it cut both, there is nothing left
+                // to measure and the row is marked unusable.
+                //
+                // Refusing outright was the previous behaviour and it was too strict by half:
+                // a body standing with its arms down has one arm against it far more often
+                // than two, and the scan returned no figure at all rather than the good half
+                // of a good photograph.
+                val recovered = clipped?.mirroredWidth()
+
                 torsoWidths[row] = when {
                     trunk == null -> torso.width.toDouble() / width.toDouble()
-                    clipped != null -> clipped.width
-                    // The midline run fell entirely outside the trunk bound. That is not a
-                    // narrow torso, it is a torso that was not found, and recording a width
-                    // here would invent one.
+                    recovered != null -> recovered
+                    // Either the midline run fell entirely outside the trunk bound, or both
+                    // of its edges were contaminated. Neither is a narrow torso, and
+                    // recording a width here would invent one.
                     else -> 0.0
                 }
 
-                // Recorded, not just applied. Where the bound bit, the width above is the
-                // allowance rather than the body, and anything measured on it would describe
-                // this codebase's margin constants instead of the person in the photograph.
-                clippedRows[row] = clipped?.cut ?: false
+                clippedRows[row] = clipped != null && recovered == null
             }
 
             runs.filter { it !== torso }

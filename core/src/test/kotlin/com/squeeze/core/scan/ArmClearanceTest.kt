@@ -168,6 +168,7 @@ class ArmClearanceTest {
 
         assertNotNull(advice)
         assertTrue(advice.contains("arms"), advice)
+        assertTrue(advice.contains("Both"), advice)
     }
 
     @Test
