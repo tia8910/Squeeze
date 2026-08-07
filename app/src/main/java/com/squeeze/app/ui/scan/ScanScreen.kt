@@ -687,6 +687,24 @@ private fun ResultStep(
             )
         }
 
+        // The abdominal reading gets its own line rather than being folded silently into the
+        // headline, because it answers a different question from the outline above it and
+        // was measured on a different axis. Where they disagree, that disagreement is
+        // information: the front view reads width, this reads depth, and a body can be
+        // narrow and deep.
+        state.abdominalBodyFatPercent?.let { percent ->
+            InfoCard(
+                "From your side profile: about %.0f%%. This is your abdomen measured " +
+                    "against your own ribcage — the axis abdominal fat actually moves " +
+                    "along, and the one a front photo cannot see."
+                    .format(percent),
+            )
+        } ?: InfoCard(
+            "No side photo, so your abdomen was not measured — only your outline from the " +
+                "front. Fat accumulates on the abdomen far more in depth than in width, so " +
+                "a side photo is the single biggest improvement available to this scan.",
+        )
+
         // Above the lighting note, because it is the bigger error and the easier fix. An arm
         // resting against the waist does not blur the reading, it replaces it: the app cuts
         // the arm off using a skeleton-derived bound, and what it then measures is that
@@ -824,8 +842,10 @@ private fun OptionalExtrasStep(
         Text("Front photo captured", style = MaterialTheme.typography.headlineSmall)
 
         Text(
-            text = "That is enough to measure. The extra views below improve accuracy, but " +
-                "neither is required.",
+            text = "Enough to measure — but the side photo is the one worth taking. Fat on " +
+                "the abdomen accumulates far more in depth than in width, and a front view " +
+                "cannot see depth at all. It is the difference between guessing at your " +
+                "midsection and measuring it.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -835,12 +855,12 @@ private fun OptionalExtrasStep(
         }
 
         ExtraOption(
-            title = "Add a side photo",
+            title = "Add a side photo — recommended",
             captured = hasSide,
-            detail = "A front view shows how wide you are but not how deep. Without a side " +
-                "view the depth is assumed from population averages — which is a fixed " +
-                "offset, so it barely affects tracking change, but it does shift the " +
-                "absolute number.",
+            detail = "The one measurement a front photo cannot make. Your abdomen is " +
+                "measured against your own ribcage, in the same picture, so nothing about " +
+                "your height or the framing can affect it — and unlike the front view, an " +
+                "arm at your side cannot get in the way of it.",
             onClick = onAddSide,
         )
 

@@ -172,4 +172,33 @@ enum class EstimationMethod(
      * reason, and that disagreement is how the app detects a broken scan at all.
      */
     PHOTO_SHAPE(6.0, 1.2, "Photo shape"),
+
+    /**
+     * Body fat read from the abdomen's side-on profile.
+     *
+     * The measurement the front view cannot make, and the reason every front-view attempt in
+     * this project has come back flat: **abdominal fat accumulates far more in depth than in
+     * width.** A front photograph measures the axis that moves least. Sagittal abdominal
+     * diameter runs roughly 19 cm in a lean man and 30 in an obese one, while the coronal
+     * waist moves by a fraction of that — and chest depth barely moves at all, which makes it
+     * a stable denominator.
+     *
+     * Two further properties matter as much as the physiology.
+     *
+     * It is **immune to the arm problem**. Arms hang at the sides of the body, so edge-on
+     * they sit inside the torso's own front-to-back extent rather than extending it. The
+     * failure that has dominated this pipeline — an arm merging into the trunk and being
+     * measured as part of it — cannot happen along this axis. That is not a claim about the
+     * implementation; it is a fact about where arms are.
+     *
+     * It is **scale-free**, on the same principle as [PHOTO_SHAPE]: belly depth over chest
+     * depth divides two measurements from one image, so the stature that every centimetre in
+     * this app is hostage to never enters it.
+     *
+     * The interval is wide and stays wide. The anchors are reasoned from published sagittal
+     * diameters rather than fitted to a labelled set — this project has none — so the number
+     * carries a person-specific offset that only calibration removes. What it does not carry
+     * is the flatness: unlike every front-view index tried here, this one moves.
+     */
+    PHOTO_ABDOMINAL_PROFILE(5.5, 1.0, "Abdominal profile"),
 }
