@@ -242,6 +242,31 @@ object AnatomicalLevelFinder {
         return bestRow
     }
 
+    /**
+     * Median unclipped width across [fromRow, toRow], and the row nearest to it.
+     *
+     * The repeatable way to read a fixed anatomical level. Both [narrowestBetween] and
+     * [widestBetween] select an extremum, and an extremum is chosen by whichever row happens
+     * to be most extreme on the day — a different row each scan, and a different row on two
+     * people of the same build. A median over a band is decided by the band, which is decided
+     * by the landmarks, which do not move.
+     *
+     * @return the width itself, not a row: there is no single row that is the median, and
+     *   returning one would invite callers to measure something else at it
+     */
+    fun medianBetween(profile: WidthProfile, fromRow: Int, toRow: Int): Double? {
+        val range = clampRange(profile, fromRow, toRow) ?: return null
+
+        val widths = range
+            .filterNot { profile.wasClippedAt(it) }
+            .map { profile.torsoWidthAt(it) }
+            .filter { it > 0.0 }
+            .sorted()
+
+        if (widths.isEmpty()) return null
+        return widths[widths.size / 2]
+    }
+
     /** Row with the largest unclipped width in [fromRow, toRow]. */
     fun widestBetween(
         profile: WidthProfile,

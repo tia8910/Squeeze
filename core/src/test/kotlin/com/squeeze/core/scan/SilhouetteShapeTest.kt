@@ -164,11 +164,21 @@ class SilhouetteShapeTest {
     }
 
     @Test
-    fun `the waist really is found at the narrowest point`() {
+    fun `the waist is read at the navel band, not at the narrowest point`() {
+        // This test previously asserted 0.20 / 0.32 — the profile's narrowest row — and it
+        // was asserting the bug. That row sits below the navel on this silhouette, and the
+        // narrowest row is where the fat is not: on a lean torso the minimum is under the
+        // ribs, on a heavy one it is in nearly the same place, and the belly between them is
+        // never measured. Reading a fixed band instead is the whole of the change.
         val indices = SilhouetteBodyFat
             .indicesFrom(profile(shoulderWidth = 0.32, waistWidth = 0.20, hipWidth = 0.28), anchors)
 
         assertNotNull(indices)
-        assertEquals(0.20 / 0.32, indices.waistToShoulder, 0.02)
+        assertTrue(
+            indices.waistToShoulder > 0.20 / 0.32,
+            "the navel band must read wider than the narrowest row, got " +
+                "${indices.waistToShoulder}",
+        )
+        assertEquals(0.65, indices.waistToShoulder, 0.02)
     }
 }
