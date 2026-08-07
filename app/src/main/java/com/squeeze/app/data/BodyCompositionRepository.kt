@@ -5,6 +5,7 @@ import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.core.bodycomp.BodyFatCalculator
 import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.bodycomp.CalibrationPoint
+import com.squeeze.core.bodycomp.LeanMassPlausibility
 import com.squeeze.core.bodycomp.MethodFusion
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.BodyFatEstimate
@@ -260,7 +261,23 @@ class BodyCompositionRepository @Inject constructor(
         // quantity constrain it better than the better one alone, and MethodFusion handles
         // the two things that would otherwise make that a false economy: the methods are
         // correlated, and the BMI fallback is not a peer.
-        return MethodFusion.combine(candidates)?.combined
+        //
+        // Filtered first by what the body can physically carry. Every candidate above reads
+        // fat and none of them looks at what would be left, which is how a scan of a
+        // normally-built man returned 36.6% — 43.1 kg of fat-free mass at 68 kg and 1.75 m,
+        // a fat-free mass index of 14.1, which is a wasting patient. The app had already
+        // computed that index and printed it two rows below the figure it contradicted.
+        //
+        // This is the only check here that never touches the silhouette, so it survives every
+        // failure the silhouette has: a clipped arm, a waist read at the rib notch, a hip
+        // band landing on a shadow. See LeanMassPlausibility.
+        val plausible = LeanMassPlausibility.filter(candidates, profile, entity.weightKg)
+
+        return MethodFusion.combine(plausible)?.combined
+            // When nothing survived, the fusion is still shown — moved onto the nearest bound
+            // and with its interval widened to say it was moved. "No more than 28%" is a
+            // weaker claim than a measurement and a far stronger one than silence.
+            ?.let { LeanMassPlausibility.clampToRange(it, profile, entity.weightKg) }
     }
 
     /**
@@ -352,7 +369,8 @@ class BodyCompositionRepository @Inject constructor(
     }
 }
 
-private fun MeasurementEntity.toCircumferences() = Circumferences(
+/** The girths a row holds, as the domain type. Also used to draw the record's figure. */
+fun MeasurementEntity.toCircumferences() = Circumferences(
     neckCm = neckCm,
     waistCm = waistCm,
     hipCm = hipCm,

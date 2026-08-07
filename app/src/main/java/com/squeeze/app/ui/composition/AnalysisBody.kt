@@ -24,7 +24,7 @@ import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.Confidence
 import com.squeeze.core.bodycomp.Metric
 import com.squeeze.core.bodycomp.ReferenceBand
-import kotlin.math.abs
+import com.squeeze.core.bodycomp.formatted
 
 /**
  * Everything the app can derive from one measurement.
@@ -103,7 +103,7 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = format(metric),
+                        text = metric.formatted(),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -136,22 +136,6 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
             }
         }
     }
-}
-
-/**
- * Formats a value at a precision its accuracy can support.
- *
- * A resting energy figure printed to one decimal would imply a precision the equation does
- * not have; a ratio printed as a whole number would hide the change the user is looking for.
- */
-private fun format(metric: Metric): String {
-    val text = when {
-        metric.unit == "kcal/day" -> "%.0f".format(metric.value)
-        abs(metric.value) >= 100 -> "%.0f".format(metric.value)
-        abs(metric.value) >= 10 -> "%.1f".format(metric.value)
-        else -> "%.2f".format(metric.value)
-    }
-    return if (metric.unit.isEmpty()) text else "$text ${metric.unit}"
 }
 
 /**

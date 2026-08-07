@@ -210,6 +210,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         repeatability = state.repeatability,
                         calibration = state.calibration,
                         measurements = state.measurements,
+                        profile = state.profile,
                         loadPhoto = viewModel::loadPhoto,
                         analysisFor = viewModel::analysisFor,
                         goalProgress = state.goalProgress,
