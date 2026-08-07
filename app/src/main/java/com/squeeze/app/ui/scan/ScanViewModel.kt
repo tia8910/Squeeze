@@ -315,8 +315,15 @@ class ScanViewModel @Inject constructor(
 
         // Computed from the pixel profile before it is discarded. Nothing here converts to
         // centimetres, so a mask that misjudged the body's height cannot reach it.
+        // The hip landmarks come along so the shape reader can tell the body from the
+        // clothes on it. Both they and the width profile are fractions of image width, so
+        // they compare directly and the photograph's scale cancels.
+        val pelvisSpan = front.geometry
+            ?.let { kotlin.math.abs(it.hipLeft.x - it.hipRight.x) }
+            ?.takeIf { it > 0.0 }
+
         val shapeEstimate = SilhouetteBodyFat
-            .indicesFrom(front.profile, front.anchors)
+            .indicesFrom(front.profile, front.anchors, pelvisSpan)
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
 
         val lighting = frontBitmap?.let { AbdomenCrop.lighting(it, front.geometry) }

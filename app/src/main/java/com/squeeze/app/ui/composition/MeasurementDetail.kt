@@ -41,11 +41,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.squeeze.app.data.db.MeasurementEntity
+import com.squeeze.app.data.toCircumferences
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.SecondaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
+import com.squeeze.core.bodycomp.RecordHeadline
+import com.squeeze.core.model.Profile
+import com.squeeze.core.render.BodyFigureBuilder
+import com.squeeze.core.render.BodyView
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -62,6 +67,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun MeasurementDetailDialog(
     entry: MeasurementEntity,
+    profile: Profile?,
     loadPhoto: suspend (String) -> Bitmap?,
     panel: CompositionPanel?,
     onDelete: () -> Unit,
@@ -79,6 +85,31 @@ fun MeasurementDetailDialog(
             photoLoading = false
         }
     }
+
+    val figures = remember(entry.id, panel) { RecordHeadline.from(panel, entry.weightKg) }
+
+    // The body this record describes, drawn three ways. Built here rather than in the view
+    // model because it is a pure function of the row and the profile — nothing to load, and
+    // nothing to keep once the dialog closes.
+    val bodyFatPercent = panel?.composition?.firstOrNull { it.name == "Body fat" }?.value
+
+    val views = remember(entry.id, profile, bodyFatPercent) {
+        val subject = profile
+        if (subject == null) {
+            emptyList()
+        } else {
+            BodyView.entries.mapNotNull { view ->
+                BodyFigureBuilder.build(
+                    profile = subject,
+                    circumferences = entry.toCircumferences(),
+                    bodyFatPercent = bodyFatPercent,
+                    view = view,
+                )
+            }
+        }
+    }
+
+    val reference = rememberReferencePhysique(bodyFatPercent, profile?.sex)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -122,6 +153,17 @@ fun MeasurementDetailDialog(
                     .padding(bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // The record's own numbers, over the body they describe. First, because it
+                // is the one thing on this screen a user can check against themselves: if
+                // the figure is not their shape, the scan is wrong, and no amount of detail
+                // below would have told them that.
+                RecordSummary(
+                    figures = figures,
+                    views = views,
+                    estimatedSites = views.firstOrNull()?.estimatedSites.orEmpty(),
+                    reference = reference,
+                )
+
                 when {
                     photoLoading -> Box(
                         Modifier
@@ -230,6 +272,7 @@ fun MeasurementDetailDialog(
             }
         }
     }
+
 }
 
 /**

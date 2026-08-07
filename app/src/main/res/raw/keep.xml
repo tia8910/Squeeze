@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Keeps the reference physique photographs through resource shrinking.
+
+  They are looked up by name at run time (see ReferencePhysique.assetName), so nothing in the
+  compiled code references them and R8 has no way to know they are used. Release builds set
+  isShrinkResources, so without this rule the set would work perfectly in debug and be silently
+  absent from the Play build — the record would fall back to the drawn figure on real devices
+  and nowhere else, which is close to the worst shape a bug can take.
+
+  Written before any of the photographs exist. A keep rule matching nothing is free, and the
+  alternative is remembering this at the moment the assets are added.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/physique_*" />

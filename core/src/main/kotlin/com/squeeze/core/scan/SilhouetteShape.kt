@@ -120,7 +120,20 @@ object SilhouetteBodyFat {
      * @return null when the silhouette does not support the ratios, rather than substituting
      *   defaults. A fabricated shape index would be indistinguishable from a measured one.
      */
-    fun indicesFrom(profile: WidthProfile, anchors: PoseAnchors): ShapeIndices? {
+    fun indicesFrom(
+        profile: WidthProfile,
+        anchors: PoseAnchors,
+        /**
+         * Distance between the two hip landmarks, as a fraction of image width — the same
+         * unit the width profile is in, so the two are directly comparable and the image's
+         * scale cancels.
+         *
+         * Null when no pose geometry reached here, in which case the hip is trusted as
+         * before. See [hipIsSkin] for what it is used for, and for why it is deliberately not
+         * used as a measurement.
+         */
+        pelvisSpan: Double? = null,
+    ): ShapeIndices? {
         val stature = (profile.bottomRow - profile.topRow).toDouble()
         if (stature <= 0.0) return null
 
@@ -161,16 +174,59 @@ object SilhouetteBodyFat {
             ?: return null
         if (shoulder <= 0.0) return null
 
-        val hipSpan = anchors.kneeRow - anchors.hipRow
-        val hip = AnatomicalLevelFinder
-            .widestBetween(profile, anchors.hipRow, anchors.hipRow + (hipSpan * 0.18).toInt())
-            ?.let { profile.torsoWidthAt(it) }
+        // The hip, read narrowly and by median, and then checked against the skeleton.
+        //
+        // The previous version searched for the **widest** row over a band reaching 18% of
+        // the hip-to-knee distance below the hip landmark. Both halves of that were wrong on
+        // a clothed subject, and they compounded:
+        //
+        //  - At [ScanFraming.TORSO] the knee row is synthesised at 1.2 trunk-lengths below
+        //    the hip, so "18% of hip-to-knee" is a fifth of a trunk length — deep into the
+        //    shorts on any photograph framed at the waistband.
+        //  - Inside that band it took the maximum. A maximum over a region containing
+        //    clothing does not sample clothing occasionally; it selects for it, because the
+        //    baggiest row is by construction the widest one.
+        //
+        // On a real scan of a man in loose shorts this returned the waistband rather than the
+        // hip, inflating the denominator and reading **6.83%** for a body with a soft
+        // midsection. A tight band and a median fix the sampling; the check below fixes the
+        // rest.
+        val trunk = anchors.hipRow - anchors.shoulderRow
+        val hipBandDepth = minOf(
+            ((anchors.kneeRow - anchors.hipRow) * HIP_BAND).toInt(),
+            (trunk * HIP_BAND_TRUNK_CAP).toInt(),
+        ).coerceAtLeast(1)
+        val hipWidth = AnatomicalLevelFinder
+            .medianBetween(profile, anchors.hipRow, anchors.hipRow + hipBandDepth)
             ?.takeIf { it > 0.0 }
 
         return ShapeIndices(
             waistToShoulder = waist / shoulder,
-            waistToHip = hip?.let { waist / it },
+            waistToHip = hipWidth?.takeIf { hipIsSkin(it, pelvisSpan) }?.let { waist / it },
         )
+    }
+
+    /**
+     * Whether a hip width measured off the mask is the body, or the clothes on it.
+     *
+     * The pose landmarks put the two hip joint centres somewhere, and the distance between
+     * them is skeletal: it is not changed by a waistband, a towel, laundry hanging behind the
+     * subject, or how baggy a pair of shorts is. The mask width at the same level is changed
+     * by all four.
+     *
+     * So the landmarks are used here as a **veto and not as a denominator**. That distinction
+     * is the whole point. Turning the landmark span into a measurement would mean knowing
+     * what fraction of stature it represents, and every time this pipeline has assumed an
+     * anatomical constant it has been wrong by enough to move the answer ten points. Knowing
+     * only that skin cannot be three times the width of the pelvis it covers requires no such
+     * constant, and it is enough to catch the failure that actually happened.
+     *
+     * The bounds are correspondingly loose. This fires on gross contamination — which is what
+     * loose clothing is — and stays quiet on everything else.
+     */
+    private fun hipIsSkin(hipWidth: Double, pelvisSpan: Double?): Boolean {
+        if (pelvisSpan == null || pelvisSpan <= 0.0) return true
+        return hipWidth / pelvisSpan in PLAUSIBLE_HIP_TO_PELVIS
     }
 
     /**
@@ -339,6 +395,33 @@ object SilhouetteBodyFat {
     /** Outside these, the outline is not a standing human torso. */
     private val PLAUSIBLE_SHOULDER_RATIO = 0.55..1.40
     private val PLAUSIBLE_HIP_RATIO = 0.55..1.45
+
+    /**
+     * How wide the mask at the hip may be relative to the distance between the hip joints.
+     *
+     * Hip breadth over the greater trochanters runs near 0.19 of stature; the landmark span
+     * is nearer 0.10 to 0.12, so a clean silhouette lands somewhere around 1.6 to 1.9. The
+     * bounds here sit well outside that on both sides, because the quantity being ruled out
+     * is not a slightly odd hip — it is a measurement of something that is not a hip.
+     */
+    private val PLAUSIBLE_HIP_TO_PELVIS = 1.15..2.40
+
+    /**
+     * How far below the hip landmark the hip width is read, as a fraction of hip-to-knee.
+     *
+     * A tenth rather than the fifth it was. The hip is at its widest within a few centimetres
+     * of the joint line, and everything gained by reaching further down is trouser.
+     */
+    private const val HIP_BAND = 0.10
+
+    /**
+     * The same band, capped against the trunk instead.
+     *
+     * Load-bearing at [ScanFraming.TORSO], where the knee row is not observed but synthesised
+     * from the trunk length — so a band defined only as a fraction of hip-to-knee is really a
+     * fraction of an assumption, and reaches wherever that assumption puts it.
+     */
+    private const val HIP_BAND_TRUNK_CAP = 0.12
 
     private const val MIN_PERCENT = 3.0
     private const val MAX_PERCENT = 60.0

@@ -50,6 +50,7 @@ import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
 import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
+import com.squeeze.core.model.Profile
 import com.squeeze.core.trend.RepeatabilityScore
 import com.squeeze.core.trend.TrendFactor
 import com.squeeze.core.trend.TrendFactors
@@ -77,6 +78,8 @@ fun CompositionScreen(
     repeatability: RepeatabilityScore?,
     calibration: PersonalCalibration,
     measurements: List<MeasurementEntity>,
+    /** Needed to draw a record's figure: stature sets the scale, sex sets the proportions. */
+    profile: Profile?,
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
     goalProgress: GoalProgress?,
@@ -105,7 +108,7 @@ fun CompositionScreen(
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, loadPhoto, analysisFor, onDelete)
+                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
             }
             return@Column
         }
@@ -191,7 +194,7 @@ fun CompositionScreen(
         // dashboard it described whichever fields happened to be newest across different
         // sessions, which is a fine answer to "where am I now" and a poor thing to call an
         // analysis, because no single measurement ever produced that combination.
-        HistorySection(measurements, loadPhoto, analysisFor, onDelete)
+        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
 
         repeatability?.let { RepeatabilityCard(it) }
     }
@@ -385,6 +388,7 @@ private fun HeroCard(
 @Composable
 private fun HistorySection(
     measurements: List<MeasurementEntity>,
+    profile: Profile?,
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onDelete: (MeasurementEntity) -> Unit,
@@ -438,6 +442,7 @@ private fun HistorySection(
     selected?.let { entry ->
         MeasurementDetailDialog(
             entry = entry,
+            profile = profile,
             loadPhoto = loadPhoto,
             panel = analysisFor(entry),
             onDelete = {
