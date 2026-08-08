@@ -336,8 +336,24 @@ object SilhouetteBodyFat {
         // No hip in the silhouette. The shoulder ratio is all that is left, and it keeps its
         // plateau behaviour — the flatness measured on the reference charts was measured on
         // this ratio, so it belongs here and nowhere else.
-        val percent = fromShoulder
         val onPlateau = indices.waistToShoulder < LEAN_PLATEAU_RATIO
+
+        // **On the plateau, report the plateau — not the line extended past its own data.**
+        //
+        // Below [LEAN_PLATEAU_RATIO] the mapping is an extrapolation of a fit through a
+        // region where the ratio was measured to be flat: 0.586 at eight per cent, 0.592 at
+        // twelve, 0.580 at fifteen. Flat means the ratio does not distinguish those bodies.
+        // Running the line on anyway turns "cannot tell" into a specific small number, and
+        // the smaller the ratio the more confident the falsehood.
+        //
+        // A real scan made that concrete. Arms merged into the shoulder run gave 0.686 —
+        // which is not a lean body, it is a contaminated denominator — and the extrapolation
+        // reported **4.93%**, labelled "below essential", for a man with no abdominal
+        // definition at all. The plateau ceiling with a nine-point interval says the same
+        // thing the data supports: somewhere in the lean region, and this method cannot say
+        // where.
+        val percent = if (onPlateau) plateauCeilingPercent(sex) else fromShoulder
+
         val error = if (onPlateau) {
             PLATEAU_ERROR_PERCENT
         } else {
