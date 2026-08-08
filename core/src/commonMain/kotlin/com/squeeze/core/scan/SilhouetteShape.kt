@@ -156,20 +156,22 @@ object SilhouetteBodyFat {
         // Measured on a real scan: the narrowest row gave 0.552 and the navel band 0.759 on
         // the same photograph of the same body. Through the anchors below those are −7% and
         // 11.5%, and 11.5 is the one that matched.
-        val waistFrom = anchors.shoulderRow +
-            ((anchors.hipRow - anchors.shoulderRow) * WAIST_BAND_START).toInt()
-        val waistTo = anchors.shoulderRow +
-            ((anchors.hipRow - anchors.shoulderRow) * WAIST_BAND_END).toInt()
-        val waist = AnatomicalLevelFinder.medianBetween(profile, waistFrom, waistTo)
+        //
+        // The three row ranges come from [TrunkBands] rather than being computed here, so the
+        // measurement lab can draw exactly the bands that were measured. Two copies of this
+        // arithmetic would make the overlay a picture of something similar, which is worth
+        // nothing: the entire value of drawing a band is that it is the one used.
+        val bands = TrunkBands.from(anchors) ?: return null
+
+        val waist = AnatomicalLevelFinder
+            .medianBetween(profile, bands.waist.fromRow, bands.waist.toRowInclusive)
             ?: return null
         if (waist <= 0.0) return null
 
         // Shoulder width is taken from the silhouette a little below the joint line, where
         // the deltoid is widest, rather than at the landmark row itself.
-        val shoulderBand = anchors.shoulderRow +
-            ((anchors.hipRow - anchors.shoulderRow) * SHOULDER_BAND).toInt()
         val shoulder = AnatomicalLevelFinder
-            .widestBetween(profile, anchors.shoulderRow, shoulderBand)
+            .widestBetween(profile, bands.shoulder.fromRow, bands.shoulder.toRowInclusive)
             ?.let { profile.torsoWidthAt(it) }
             ?: return null
         if (shoulder <= 0.0) return null
@@ -191,13 +193,8 @@ object SilhouetteBodyFat {
         // hip, inflating the denominator and reading **6.83%** for a body with a soft
         // midsection. A tight band and a median fix the sampling; the check below fixes the
         // rest.
-        val trunk = anchors.hipRow - anchors.shoulderRow
-        val hipBandDepth = minOf(
-            ((anchors.kneeRow - anchors.hipRow) * HIP_BAND).toInt(),
-            (trunk * HIP_BAND_TRUNK_CAP).toInt(),
-        ).coerceAtLeast(1)
         val hipWidth = AnatomicalLevelFinder
-            .medianBetween(profile, anchors.hipRow, anchors.hipRow + hipBandDepth)
+            .medianBetween(profile, bands.hip.fromRow, bands.hip.toRowInclusive)
             ?.takeIf { it > 0.0 }
 
         return ShapeIndices(
@@ -379,7 +376,7 @@ object SilhouetteBodyFat {
     }
 
     /** Where the deltoid is widest, as a fraction of the shoulder-to-hip span. */
-    private const val SHOULDER_BAND = 0.20
+    const val SHOULDER_BAND = 0.20
 
     /**
      * The abdominal band, as fractions of the shoulder-to-hip span.
@@ -389,8 +386,8 @@ object SilhouetteBodyFat {
      * something to average over, narrow enough that it cannot reach the ribcage above or the
      * hip flare below.
      */
-    private const val WAIST_BAND_START = 0.58
-    private const val WAIST_BAND_END = 0.74
+    const val WAIST_BAND_START = 0.58
+    const val WAIST_BAND_END = 0.74
 
     /** Outside these, the outline is not a standing human torso. */
     private val PLAUSIBLE_SHOULDER_RATIO = 0.55..1.40
@@ -412,7 +409,7 @@ object SilhouetteBodyFat {
      * A tenth rather than the fifth it was. The hip is at its widest within a few centimetres
      * of the joint line, and everything gained by reaching further down is trouser.
      */
-    private const val HIP_BAND = 0.10
+    const val HIP_BAND = 0.10
 
     /**
      * The same band, capped against the trunk instead.
@@ -421,7 +418,7 @@ object SilhouetteBodyFat {
      * from the trunk length — so a band defined only as a fraction of hip-to-knee is really a
      * fraction of an assumption, and reaches wherever that assumption puts it.
      */
-    private const val HIP_BAND_TRUNK_CAP = 0.12
+    const val HIP_BAND_TRUNK_CAP = 0.12
 
     private const val MIN_PERCENT = 3.0
     private const val MAX_PERCENT = 60.0
