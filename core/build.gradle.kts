@@ -48,12 +48,14 @@ kotlin {
         }
     }
 
-    // IR with a library binary rather than an executable: the lab imports this, it does not
-    // launch it. `browser()` alone would still build, but declaring the environment keeps
-    // the JS test task from looking for a Node it does not need.
+    // ES modules and an executable binary, because the measurement lab is a plain HTML page
+    // that does `import { MeasurementLab } from "./core.mjs"`. A library binary produces a
+    // distribution meant to be consumed by another bundler, which would put a build step
+    // between the lab and the code it exists to inspect.
     js(IR) {
+        useEsModules()
         browser()
-        binaries.library()
+        binaries.executable()
     }
 
     sourceSets {

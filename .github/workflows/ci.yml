@@ -57,6 +57,21 @@ jobs:
       - name: Check the shared code still leaves the JVM
         run: ./gradlew :core:compileKotlinJs --no-daemon --stacktrace
 
+      # The lab's export surface, built the way the lab consumes it. compileKotlinJs alone
+      # does not catch an @JsExport on a type JavaScript cannot represent — a List, a
+      # nullable Double, a data class — because that is rejected when the binary is linked,
+      # not when the module is compiled.
+      - name: Build the measurement lab bundle
+        run: ./gradlew :core:jsBrowserDistribution --no-daemon --stacktrace
+
+      - name: Upload the lab bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: measurement-lab-bundle
+          path: core/build/dist/js/productionExecutable/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Upload test report
         if: failure()
         uses: actions/upload-artifact@v4
