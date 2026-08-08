@@ -1,4 +1,5 @@
 import { homePage, notFoundPage, privacyPage } from "./pages.ts";
+import { handleAssess } from "./lab_api.ts";
 
 /**
  * The Squeeze.fit website.
@@ -95,16 +96,26 @@ async function serveStatic(pathname: string): Promise<Response> {
 export function handler(request: Request): Response | Promise<Response> {
   const url = new URL(request.url);
 
+  // Trailing slashes are normalised so "/privacy/" and "/privacy" are not two URLs with the
+  // same content, which search engines would otherwise treat as duplicates.
+  const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
+
+  // Routed before the method check, because it is the only route that takes a POST. The
+  // site is otherwise read-only and rejects every other verb at the door; keeping that
+  // guard where it is, and letting exactly one path past it, is narrower than relaxing it
+  // to "GET, HEAD, POST" for every URL the site serves.
+  //
+  // It serves the measurement lab, is bearer-token gated, and disables itself unless
+  // configured — see lab_api.ts for why it exists and why the Android app must never call
+  // it. It does its own method handling.
+  if (path === "/lab/assess") return handleAssess(request, SECURITY_HEADERS);
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", {
       status: 405,
       headers: { allow: "GET, HEAD", ...SECURITY_HEADERS },
     });
   }
-
-  // Trailing slashes are normalised so "/privacy/" and "/privacy" are not two URLs with the
-  // same content, which search engines would otherwise treat as duplicates.
-  const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
 
   if (path.startsWith("/static/")) return serveStatic(path);
 
