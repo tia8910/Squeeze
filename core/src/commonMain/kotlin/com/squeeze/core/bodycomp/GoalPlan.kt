@@ -2,6 +2,7 @@ package com.squeeze.core.bodycomp
 
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Sex
+import com.squeeze.core.text.fixed
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -138,11 +139,11 @@ object GoalPlanner {
                 projectedValue = current,
                 daysRemaining = daysRemaining,
                 headline = if (daysRemaining < 0) {
-                    "Your deadline has passed. You are at %.1f%% against a target of %.1f%%."
-                        .format(current, goalValue)
+                    "Your deadline has passed. You are at ${current.fixed(1)}% against " +
+                        "a target of ${goalValue.fixed(1)}%."
                 } else {
-                    "%d days left. You are at %.1f%% against a target of %.1f%%."
-                        .format(daysRemaining, current, goalValue)
+                    "$daysRemaining days left. You are at ${current.fixed(1)}% against " +
+                        "a target of ${goalValue.fixed(1)}%."
                 },
                 actions = if (abs(current - goalValue) < 1.0) {
                     emptyList()
@@ -166,9 +167,9 @@ object GoalPlanner {
                 actualRatePerWeek = actualRatePerWeek,
                 projectedValue = projected,
                 daysRemaining = daysRemaining,
-                headline = "That date needs %.2f points a week, which is faster than is safe. "
-                    .format(abs(requiredRate)) +
-                    "About %d weeks is realistic for this change.".format(weeksNeeded),
+                headline = "That date needs ${abs(requiredRate).fixed(2)} points a week, " +
+                    "which is faster than is safe. About $weeksNeeded weeks is realistic " +
+                    "for this change.",
                 actions = listOf(
                     "Move the date out by about ${weeksNeeded - weeksRemaining.roundToInt()} " +
                         "weeks, or set a less ambitious target.",
@@ -194,7 +195,7 @@ object GoalPlanner {
                 projectedValue = projected,
                 daysRemaining = daysRemaining,
                 headline = "You are moving away from your target, not toward it — " +
-                    "%.2f points a week in the wrong direction.".format(abs(actualRatePerWeek)),
+                    "${abs(actualRatePerWeek).fixed(2)} points a week in the wrong direction.",
                 actions = advice(gap, currentWeightKg, requiredRate, actualRatePerWeek, sex),
             )
         }
@@ -210,12 +211,12 @@ object GoalPlanner {
             projectedValue = projected,
             daysRemaining = daysRemaining,
             headline = if (onTrack) {
-                "On track. At %.2f points a week you reach %.1f%% around your deadline."
-                    .format(abs(actualRatePerWeek), projected ?: goalValue)
+                "On track. At ${abs(actualRatePerWeek).fixed(2)} points a week you reach " +
+                    "${(projected ?: goalValue).fixed(1)}% around your deadline."
             } else {
-                "Behind. You need %.2f points a week and you are doing %.2f, which lands at "
-                    .format(abs(requiredRate), abs(actualRatePerWeek)) +
-                    "about %.1f%% on the day.".format(projected ?: current)
+                "Behind. You need ${abs(requiredRate).fixed(2)} points a week and you are " +
+                    "doing ${abs(actualRatePerWeek).fixed(2)}, which lands at about " +
+                    "${(projected ?: current).fixed(1)}% on the day."
             },
             actions = if (onTrack) emptyList() else {
                 advice(gap, currentWeightKg, requiredRate, actualRatePerWeek, sex)

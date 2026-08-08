@@ -1,5 +1,6 @@
 package com.squeeze.core.scan
 
+import com.squeeze.core.math.toDegrees
 import kotlin.math.abs
 import kotlin.math.atan2
 
@@ -112,7 +113,7 @@ object PostureAnalysis {
         val dx = right.x - left.x
         val dy = right.y - left.y
         if (dx == 0.0 && dy == 0.0) return 0.0
-        return Math.toDegrees(atan2(dy, dx))
+        return atan2(dy, dx).toDegrees()
     }
 
     private fun describeTilt(tilt: Double, level: String, tilted: String): String =

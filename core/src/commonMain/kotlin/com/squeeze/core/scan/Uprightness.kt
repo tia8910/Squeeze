@@ -1,5 +1,6 @@
 package com.squeeze.core.scan
 
+import com.squeeze.core.math.toDegrees
 import kotlin.math.abs
 import kotlin.math.atan2
 
@@ -50,7 +51,7 @@ object Uprightness {
 
         // Image coordinates: y grows downward, so an upright trunk has a positive dy and the
         // reference direction is straight down rather than straight up.
-        return Math.toDegrees(atan2(hipX - shoulderX, hipY - shoulderY))
+        return atan2(hipX - shoulderX, hipY - shoulderY).toDegrees()
     }
 
     /** Whether the subject stands upright enough in this frame to measure rows across. */

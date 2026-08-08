@@ -1,5 +1,6 @@
 package com.squeeze.core.scan
 
+import com.squeeze.core.math.toRadians
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,7 +24,7 @@ class UprightnessTest {
      * straight down, at the centre of the frame.
      */
     private fun trunk(direction: Double): FrontPoseGeometry {
-        val radians = Math.toRadians(direction)
+        val radians = direction.toRadians()
         val dx = kotlin.math.sin(radians) * 0.2
         val dy = kotlin.math.cos(radians) * 0.2
         return FrontPoseGeometry(

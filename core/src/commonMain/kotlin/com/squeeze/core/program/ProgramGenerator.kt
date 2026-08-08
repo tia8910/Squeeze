@@ -3,6 +3,7 @@ package com.squeeze.core.program
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.TrainingAge
+import kotlin.math.roundToInt
 
 /**
  * What the user can train with and how often.
@@ -62,7 +63,7 @@ class ProgramGenerator {
 
                 val volume = startVolume.mapValues { (group, start) ->
                     val peak = peakVolume.getValue(group)
-                    Math.round(start + (peak - start) * progress).toInt()
+                    (start + (peak - start) * progress).roundToInt()
                 }
 
                 // Effort rises as volume rises: early weeks leave reps in reserve, late weeks
@@ -155,7 +156,7 @@ class ProgramGenerator {
     ): Int {
         val prioritised = if (group in constraints.priorityGroups) base * 1.25 else base.toDouble()
         val adjusted = prioritised * adjustment.volumeMultiplier
-        return Math.round(adjusted).toInt()
+        return adjusted.roundToInt()
             // The recoverable ceiling is a hard cap: prioritisation must steal volume from
             // elsewhere rather than push a group past what it can recover from.
             .coerceIn(0, landmarks.maximumRecoverable)

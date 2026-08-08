@@ -1,6 +1,7 @@
 package com.squeeze.core.bodycomp
 
 import com.squeeze.core.model.BodyFatEstimate
+import com.squeeze.core.text.fixed
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -139,8 +140,9 @@ class PersonalCalibration private constructor(
     override fun toString(): String = if (!isActive) {
         "PersonalCalibration(none)"
     } else if (abs(slope - 1.0) < 1e-9) {
-        "PersonalCalibration(offset=%.2f, n=%d)".format(intercept, pointCount)
+        "PersonalCalibration(offset=${intercept.fixed(2)}, n=$pointCount)"
     } else {
-        "PersonalCalibration(slope=%.3f, intercept=%.2f, n=%d)".format(slope, intercept, pointCount)
+        "PersonalCalibration(slope=${slope.fixed(3)}, " +
+            "intercept=${intercept.fixed(2)}, n=$pointCount)"
     }
 }

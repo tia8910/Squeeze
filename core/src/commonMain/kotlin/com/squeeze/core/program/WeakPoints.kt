@@ -2,6 +2,7 @@ package com.squeeze.core.program
 
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
+import com.squeeze.core.text.fixed
 import kotlin.math.abs
 
 /**
@@ -90,9 +91,9 @@ object WeakPointAnalysis {
                     WeakPoint(
                         group = MuscleGroup.BICEPS,
                         severity = it,
-                        finding = "Your arms measure %.0f%% of your chest, where a balanced "
-                            .format(arm / chest * 100) +
-                            "build sits nearer %.0f%%.".format(ARM_TO_CHEST * femaleAdjust * 100),
+                        finding = "Your arms measure ${(arm / chest * 100).fixed(0)}% of " +
+                            "your chest, where a balanced build sits nearer " +
+                            "${(ARM_TO_CHEST * femaleAdjust * 100).fixed(0)}%.",
                         prescription = "Add two to four direct arm sets a week. Arms grow from " +
                             "pressing and pulling, but rarely enough on their own once the " +
                             "big lifts are heavy.",
@@ -116,9 +117,9 @@ object WeakPointAnalysis {
                     WeakPoint(
                         group = MuscleGroup.QUADS,
                         severity = it,
-                        finding = "Your thighs measure %.0f%% of your waist, where a trained "
-                            .format(thigh / waist * 100) +
-                            "lower body sits nearer %.0f%%.".format(THIGH_TO_WAIST * 100),
+                        finding = "Your thighs measure ${(thigh / waist * 100).fixed(0)}% " +
+                            "of your waist, where a trained lower body sits nearer " +
+                            "${(THIGH_TO_WAIST * 100).fixed(0)}%.",
                         prescription = "Prioritise squats or leg press, and add a set or two " +
                             "per session over the block rather than all at once.",
                     ),
@@ -142,8 +143,9 @@ object WeakPointAnalysis {
                     WeakPoint(
                         group = MuscleGroup.CALVES,
                         severity = it,
-                        finding = "Your calves measure %.0f%% of your thighs, against about "
-                            .format(calf / thigh * 100) + "%.0f%%.".format(CALF_TO_THIGH * 100),
+                        finding = "Your calves measure ${(calf / thigh * 100).fixed(0)}% " +
+                            "of your thighs, against about " +
+                            "${(CALF_TO_THIGH * 100).fixed(0)}%.",
                         prescription = "Calves tolerate and need more frequency than anything " +
                             "else — three short sessions a week beats one long one, with a " +
                             "pause at the bottom of each rep.",
@@ -158,9 +160,9 @@ object WeakPointAnalysis {
                     WeakPoint(
                         group = MuscleGroup.BACK,
                         severity = it,
-                        finding = "Your chest measures %.2f times your waist, where a "
-                            .format(chest / waist) +
-                            "developed torso is nearer %.2f.".format(CHEST_TO_WAIST),
+                        finding = "Your chest measures ${(chest / waist).fixed(2)} times " +
+                            "your waist, where a developed torso is nearer " +
+                            "${CHEST_TO_WAIST.fixed(2)}.",
                         prescription = "Width comes from lats more than from chest. Put " +
                             "vertical pulling first in the session, while you are fresh.",
                     ),
@@ -224,8 +226,8 @@ object WeakPointAnalysis {
         if (difference < 5.0) return null
 
         val bigger = if (leftCm > rightCm) "left" else "right"
-        return "Your $bigger $part measures %.0f%% larger. Train unilaterally for a block — "
-            .format(difference) +
+        return "Your $bigger $part measures ${difference.fixed(0)}% larger. " +
+            "Train unilaterally for a block — " +
             "start each set with the smaller side and match its reps on the bigger one."
     }
 

@@ -1,6 +1,7 @@
 package com.squeeze.core.program
 
 import com.squeeze.core.model.TrainingAge
+import kotlin.math.roundToInt
 
 /** Trainable muscle groups, at the granularity a weekly set count is meaningful for. */
 enum class MuscleGroup {
@@ -79,5 +80,5 @@ object VolumeLandmarks {
     }
 
     private fun scaleSets(sets: Int, scale: Double): Int =
-        if (sets == 0) 0 else Math.round(sets * scale).toInt().coerceAtLeast(1)
+        if (sets == 0) 0 else (sets * scale).roundToInt().coerceAtLeast(1)
 }

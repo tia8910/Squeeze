@@ -1,5 +1,6 @@
 package com.squeeze.core.trend
 
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -40,7 +41,7 @@ class RepeatabilityTest {
         assertNotNull(score)
 
         // 1.96 * sqrt(2) * sd, with sd = 0.7071 for a pair one point apart.
-        assertEquals(1.96 * Math.sqrt(2.0) * score.withinSessionStdDev, score.repeatabilityCoefficient, 1e-9)
+        assertEquals(1.96 * sqrt(2.0) * score.withinSessionStdDev, score.repeatabilityCoefficient, 1e-9)
     }
 
     @Test
