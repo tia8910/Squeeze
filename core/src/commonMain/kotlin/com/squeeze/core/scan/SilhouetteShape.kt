@@ -161,7 +161,7 @@ object SilhouetteBodyFat {
         // measurement lab can draw exactly the bands that were measured. Two copies of this
         // arithmetic would make the overlay a picture of something similar, which is worth
         // nothing: the entire value of drawing a band is that it is the one used.
-        val bands = TrunkBands.from(anchors) ?: return null
+        val bands = TrunkBands.from(anchors)
 
         val waist = AnatomicalLevelFinder
             .medianBetween(profile, bands.waist.fromRow, bands.waist.toRowInclusive)

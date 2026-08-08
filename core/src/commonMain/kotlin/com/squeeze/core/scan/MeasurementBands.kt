@@ -46,13 +46,19 @@ data class MeasurementBands(
 object TrunkBands {
 
     /**
+     * Not nullable, and that is [PoseAnchors]' doing rather than an omission here.
+     *
+     * A trunk of zero or negative height would make every band degenerate, and the obvious
+     * shape for this function is one that returns null on it. But `PoseAnchors` requires
+     * `shoulderRow < hipRow` in its own `init`, so anchors with such a trunk cannot be
+     * constructed — the invariant is enforced at the type boundary, one layer up. Returning
+     * an optional here would add a branch that cannot be reached and a null every caller
+     * would have to handle for no reason.
+     *
      * @param anchors the pose landmark rows, already projected into the mask's space
-     * @return the three bands, or null when the anchors leave no room for them — a trunk of
-     *   zero or negative height, which a cropped or mis-detected pose can produce
      */
-    fun from(anchors: PoseAnchors): MeasurementBands? {
+    fun from(anchors: PoseAnchors): MeasurementBands {
         val trunk = anchors.hipRow - anchors.shoulderRow
-        if (trunk <= 0) return null
 
         val waist = MeasurementBand(
             fromRow = anchors.shoulderRow + (trunk * SilhouetteBodyFat.WAIST_BAND_START).toInt(),

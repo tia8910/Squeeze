@@ -4,7 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -33,17 +32,18 @@ class MeasurementBandsTest {
     private val observedKnee = PoseAnchors(shoulderRow, hipRow, kneeRow = 380, chinRow = 40)
 
     @Test
-    fun `a trunk with no height has no bands`() {
-        // A cropped or mis-detected pose can put the hips at or above the shoulders. Better
-        // no bands than three degenerate ones that still produce a number.
-        assertNull(TrunkBands.from(PoseAnchors(200, 200, 300, 100)))
-        assertNull(TrunkBands.from(PoseAnchors(250, 200, 300, 100)))
+    fun `a trunk with no height cannot reach here at all`() {
+        // The first version of this guarded against a zero or inverted trunk and returned
+        // null. It could not happen: PoseAnchors refuses to be constructed with the hips at
+        // or above the shoulders, so the invariant is enforced a layer up and the guard was
+        // unreachable. Asserting it here instead keeps the reason visible.
+        assertFailsWith<IllegalArgumentException> { PoseAnchors(200, 200, 300, 100) }
+        assertFailsWith<IllegalArgumentException> { PoseAnchors(250, 200, 300, 100) }
     }
 
     @Test
     fun `the waist band is at the navel, below the ribs and above the hip`() {
         val bands = TrunkBands.from(synthesisedKnee)
-        assertNotNull(bands)
 
         // 58% to 74% of the way down the trunk. 115 rather than 116 because 0.58 has no
         // exact double and 200 * 0.58 lands a hair under 116; truncation is the behaviour
@@ -57,7 +57,6 @@ class MeasurementBandsTest {
     @Test
     fun `the shoulder band starts at the joint line and reaches the deltoid`() {
         val bands = TrunkBands.from(synthesisedKnee)
-        assertNotNull(bands)
 
         assertEquals(shoulderRow, bands.shoulder.fromRow)
         assertEquals(shoulderRow + 40, bands.shoulder.toRowInclusive)
@@ -70,9 +69,6 @@ class MeasurementBandsTest {
         // and reaches wherever that assumption puts it — in that case, into the shorts.
         val synthesised = TrunkBands.from(synthesisedKnee)
         val observed = TrunkBands.from(observedKnee)
-
-        assertNotNull(synthesised)
-        assertNotNull(observed)
 
         assertEquals(hipRow, synthesised.hip.fromRow)
         // min(10% of hip-to-knee, 12% of trunk) — the trunk cap wins on the synthesised one.
@@ -87,7 +83,6 @@ class MeasurementBandsTest {
         // denominator vanish, silently, on any pose whose knee sits almost at the hip.
         val flat = TrunkBands.from(PoseAnchors(shoulderRow, hipRow, hipRow + 1, 40))
 
-        assertNotNull(flat)
         assertTrue(flat.hip.rowCount >= 1)
         assertTrue(flat.waist.rowCount >= 1)
         assertTrue(flat.shoulder.rowCount >= 1)
@@ -99,7 +94,6 @@ class MeasurementBandsTest {
         // each band covers exactly one distinctive width and everything outside the three
         // bands is absurd. If the estimator read anywhere else, the ratios would show it.
         val bands = TrunkBands.from(synthesisedKnee)
-        assertNotNull(bands)
 
         val rows = 500
         val widths = DoubleArray(rows) { 0.99 }
