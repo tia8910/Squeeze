@@ -169,4 +169,4 @@ jobs:
 
       - name: Test
         working-directory: web
-        run: deno test --allow-read
+        run: deno test --allow-read --allow-env

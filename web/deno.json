@@ -6,7 +6,7 @@
     "dev": "deno run --allow-net --allow-read --watch main.ts",
     "start": "deno run --allow-net --allow-read main.ts",
     "check": "deno check main.ts",
-    "test": "deno test --allow-read"
+    "test": "deno test --allow-read --allow-env"
   },
   "lint": {
     "rules": {

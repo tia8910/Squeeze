@@ -1,4 +1,5 @@
 import { homePage, notFoundPage, privacyPage } from "./pages.ts";
+import { handleAssess } from "./lab_api.ts";
 
 /**
  * The Squeeze.fit website.
@@ -107,6 +108,11 @@ export function handler(request: Request): Response | Promise<Response> {
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
 
   if (path.startsWith("/static/")) return serveStatic(path);
+
+  // The one route that is not part of the public site. It serves the measurement lab, is
+  // bearer-token gated, and disables itself unless configured — see lab_api.ts for why it
+  // exists and why the Android app must never call it.
+  if (path === "/lab/assess") return handleAssess(request, SECURITY_HEADERS);
 
   switch (path) {
     case "":
