@@ -16,7 +16,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -91,6 +91,20 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /**
+     * Adds the shape figure's interval.
+     *
+     * NULL on existing rows, and that is the honest value rather than a convenient one: those
+     * scans genuinely did not record how wide their reading was. What they cannot say is
+     * whether the figure was a measurement or a bound, so the repository infers it from the
+     * value instead — see PlateauPrior.isBounded.
+     */
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE measurements ADD COLUMN shapeStandardErrorPercent REAL")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -104,6 +118,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
+                    MIGRATION_6_7,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to
