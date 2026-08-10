@@ -130,21 +130,4 @@ class PlateauFloorTest {
             }
         }
     }
-
-    @Test
-    fun `two denominators that contradict each other widen the interval`() {
-        // A clean silhouette gives two readings of one trunk, so they land close together. A
-        // wide gap means one of them is measuring something that is not the body, and the
-        // silhouette cannot say which — so neither is trusted at full precision. This is the
-        // only remaining use for the shoulder ratio: as a witness, not a measurement.
-        val agree = SilhouetteBodyFat.estimate(ShapeIndices(0.90, 0.90), Sex.MALE)
-        val contradict = SilhouetteBodyFat.estimate(ShapeIndices(0.68, 0.95), Sex.MALE)
-
-        assertNotNull(agree)
-        assertNotNull(contradict)
-        assertTrue(
-            contradict.standardErrorPercent > agree.standardErrorPercent,
-            "${contradict.standardErrorPercent} vs ${agree.standardErrorPercent}",
-        )
-    }
 }

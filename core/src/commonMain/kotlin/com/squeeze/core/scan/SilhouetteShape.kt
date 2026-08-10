@@ -3,7 +3,6 @@ package com.squeeze.core.scan
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.Sex
-import kotlin.math.abs
 
 /**
  * Scale-free shape descriptors read straight off the silhouette.
@@ -257,16 +256,24 @@ object SilhouetteBodyFat {
         percent.coerceIn(leanestClaimable(sex), MAX_PERCENT)
 
     /**
-     * How far the two denominators may disagree before neither is trusted at full precision.
+     * There is deliberately no rule here that widens the interval when the two denominators
+     * disagree.
      *
-     * Both are read off the same photograph of the same trunk, so on a clean silhouette they
-     * describe one body and land close together. A wide gap means one of them is measuring
-     * something that is not the body, and nothing inside the silhouette says which.
+     * One was written and removed the same day. The reasoning sounded right — both ratios
+     * read the same trunk in the same photograph, so a wide gap means one of them is
+     * measuring something that is not the body — but the threshold had to be invented, and
+     * eight points turned out to fire on ordinary input: a clean 0.90 shoulder against a 0.87
+     * hip reads 24.2 and 15.3, which is 8.9 apart.
+     *
+     * That gap is not evidence of contamination, it is the *expected* offset between the two.
+     * The shoulder ratio is deflated by arm pixels on essentially every photograph, so it
+     * reads systematically leaner than the hip. Treating the normal offset as a fault made
+     * a reading that had a hip *less* trusted than one that had none, which inverts the
+     * reason the hip is preferred at all.
+     *
+     * The gap probably does carry information about contamination. Nothing here knows how
+     * much, and this file has enough constants chosen by reasoning already.
      */
-    private const val DENOMINATOR_DISAGREEMENT_POINTS = 8.0
-
-    /** Interval carried when the two denominators contradict each other. */
-    private const val DISAGREEMENT_ERROR_PERCENT = 9.0
 
     /**
      * Below this waist-to-shoulder ratio the outline stops carrying information.
@@ -368,19 +375,15 @@ object SilhouetteBodyFat {
             }
 
         if (fromHip != null) {
-            // Two denominators that disagree mean one of them is measuring something that is
-            // not the body. Which one cannot be told from inside the silhouette, so neither
-            // is trusted at its usual precision — this is the only place the shoulder ratio
-            // is still of any use, and it is as a witness rather than as a measurement.
-            val disagrees = abs(fromShoulder - fromHip) > DENOMINATOR_DISAGREEMENT_POINTS
-
             return BodyFatEstimate(
                 percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
-                standardErrorPercent = when {
-                    fromHip < leanestClaimable(sex) -> PLATEAU_ERROR_PERCENT
-                    disagrees -> DISAGREEMENT_ERROR_PERCENT
-                    else -> EstimationMethod.PHOTO_SHAPE.standardErrorPercent
+                // A floored reading is a bound rather than a measurement, and carries the
+                // interval that says so.
+                standardErrorPercent = if (fromHip < leanestClaimable(sex)) {
+                    PLATEAU_ERROR_PERCENT
+                } else {
+                    EstimationMethod.PHOTO_SHAPE.standardErrorPercent
                 },
             )
         }
