@@ -3,6 +3,7 @@ package com.squeeze.core.scan
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.Sex
+import kotlin.math.abs
 
 /**
  * Scale-free shape descriptors read straight off the silhouette.
@@ -227,6 +228,47 @@ object SilhouetteBodyFat {
     }
 
     /**
+     * The leanest figure the silhouette alone is allowed to claim, for either sex.
+     *
+     * **Every way this measurement fails makes the body look leaner.** That is not a
+     * generalisation from a small sample, it is a property of the mechanism: contamination
+     * adds pixels to a denominator and never removes them. Arms merging into the shoulder
+     * run, a waistband inside the hip band, laundry joined to the mask — each one widens the
+     * denominator, which shrinks the ratio, which reads as lean.
+     *
+     * Five wrong answers on one body bear it out. Four were absurdly low — 8.00, 6.22, 6.83,
+     * 4.93 — from four different causes, and each was reported with a confident band label
+     * on a body with no abdominal definition at all.
+     *
+     * So a low reading is precisely the reading this method has not earned. Below the plateau
+     * the ratio is flat, which means the outline cannot separate six per cent from twelve; it
+     * follows that a figure below the plateau is never something the outline established, only
+     * something a corrupted denominator produced.
+     *
+     * The floor does not say the subject is not lean. It says **the silhouette cannot be the
+     * thing that decides they are.** A tape measurement, a reference scan, or the user
+     * matching themselves against the appearance bands can all pull the fused figure below
+     * it, because none of those inherits the failure — which is exactly what
+     * [com.squeeze.core.bodycomp.MethodFusion] is for.
+     */
+    fun leanestClaimable(sex: Sex): Double = plateauCeilingPercent(sex)
+
+    private fun floored(percent: Double, sex: Sex): Double =
+        percent.coerceIn(leanestClaimable(sex), MAX_PERCENT)
+
+    /**
+     * How far the two denominators may disagree before neither is trusted at full precision.
+     *
+     * Both are read off the same photograph of the same trunk, so on a clean silhouette they
+     * describe one body and land close together. A wide gap means one of them is measuring
+     * something that is not the body, and nothing inside the silhouette says which.
+     */
+    private const val DENOMINATOR_DISAGREEMENT_POINTS = 8.0
+
+    /** Interval carried when the two denominators contradict each other. */
+    private const val DISAGREEMENT_ERROR_PERCENT = 9.0
+
+    /**
      * Below this waist-to-shoulder ratio the outline stops carrying information.
      *
      * Measured, not assumed. Reading the ratios off a labelled reference chart gives 0.586
@@ -326,10 +368,20 @@ object SilhouetteBodyFat {
             }
 
         if (fromHip != null) {
+            // Two denominators that disagree mean one of them is measuring something that is
+            // not the body. Which one cannot be told from inside the silhouette, so neither
+            // is trusted at its usual precision — this is the only place the shoulder ratio
+            // is still of any use, and it is as a witness rather than as a measurement.
+            val disagrees = abs(fromShoulder - fromHip) > DENOMINATOR_DISAGREEMENT_POINTS
+
             return BodyFatEstimate(
-                percent = fromHip.coerceIn(MIN_PERCENT, MAX_PERCENT),
+                percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
-                standardErrorPercent = EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+                standardErrorPercent = when {
+                    fromHip < leanestClaimable(sex) -> PLATEAU_ERROR_PERCENT
+                    disagrees -> DISAGREEMENT_ERROR_PERCENT
+                    else -> EstimationMethod.PHOTO_SHAPE.standardErrorPercent
+                },
             )
         }
 
@@ -352,7 +404,7 @@ object SilhouetteBodyFat {
         // definition at all. The plateau ceiling with a nine-point interval says the same
         // thing the data supports: somewhere in the lean region, and this method cannot say
         // where.
-        val percent = if (onPlateau) plateauCeilingPercent(sex) else fromShoulder
+        val percent = if (onPlateau) plateauCeilingPercent(sex) else floored(fromShoulder, sex)
 
         val error = if (onPlateau) {
             PLATEAU_ERROR_PERCENT

@@ -89,19 +89,62 @@ class PlateauFloorTest {
     }
 
     @Test
-    fun `a hip-based reading is untouched by any of this`() {
-        // The flatness was measured on the waist-to-shoulder ratio and belongs to it. A
-        // genuinely narrow waist against a genuinely wide hip is a lean build, and clamping
-        // it would trade one wrong answer for another in the opposite direction.
+    fun `the hip path is floored too, because it fails the same way`() {
+        // Written an hour earlier as "a hip-based reading is untouched by any of this", on
+        // the reasoning that the flatness was measured on the shoulder ratio and belonged to
+        // it. That reasoning was too narrow. The plateau is why the shoulder path cannot
+        // resolve leanness; the floor is why no path may claim it — every failure mode adds
+        // pixels to a denominator, so every failure mode reads lean, and the hip's own
+        // failure is a waistband inside the band.
+        //
+        // Left as a hip reading of 0.78 that used to produce 5.92%.
         val estimate = SilhouetteBodyFat.estimate(
             ShapeIndices(waistToShoulder = 0.70, waistToHip = 0.78),
             Sex.MALE,
         )
 
         assertNotNull(estimate)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
+    }
+
+    @Test
+    fun `no photograph of any body produces a single-digit figure`() {
+        // The property the user asked for, stated directly: whatever the ratios, however
+        // contaminated, the outline alone never tells someone with no visible condition that
+        // they are six per cent.
+        val ratios = listOf(0.40, 0.55, 0.65, 0.70, 0.75, 0.80, 0.90, 1.00, 1.20)
+
+        for (shoulder in ratios) {
+            for (hip in ratios + listOf(null)) {
+                Sex.entries.forEach { sex ->
+                    val estimate = SilhouetteBodyFat.estimate(
+                        ShapeIndices(shoulder, hip),
+                        sex,
+                    ) ?: return@forEach
+
+                    assertTrue(
+                        estimate.percent >= SilhouetteBodyFat.leanestClaimable(sex),
+                        "shoulder=$shoulder hip=$hip $sex gave ${estimate.percent}",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `two denominators that contradict each other widen the interval`() {
+        // A clean silhouette gives two readings of one trunk, so they land close together. A
+        // wide gap means one of them is measuring something that is not the body, and the
+        // silhouette cannot say which — so neither is trusted at full precision. This is the
+        // only remaining use for the shoulder ratio: as a witness, not a measurement.
+        val agree = SilhouetteBodyFat.estimate(ShapeIndices(0.90, 0.90), Sex.MALE)
+        val contradict = SilhouetteBodyFat.estimate(ShapeIndices(0.68, 0.95), Sex.MALE)
+
+        assertNotNull(agree)
+        assertNotNull(contradict)
         assertTrue(
-            estimate.percent < SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE),
-            "got ${estimate.percent}",
+            contradict.standardErrorPercent > agree.standardErrorPercent,
+            "${contradict.standardErrorPercent} vs ${agree.standardErrorPercent}",
         )
     }
 }
