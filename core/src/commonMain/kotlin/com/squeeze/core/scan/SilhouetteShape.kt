@@ -227,6 +227,55 @@ object SilhouetteBodyFat {
     }
 
     /**
+     * The leanest figure the silhouette alone is allowed to claim, for either sex.
+     *
+     * **Every way this measurement fails makes the body look leaner.** That is not a
+     * generalisation from a small sample, it is a property of the mechanism: contamination
+     * adds pixels to a denominator and never removes them. Arms merging into the shoulder
+     * run, a waistband inside the hip band, laundry joined to the mask — each one widens the
+     * denominator, which shrinks the ratio, which reads as lean.
+     *
+     * Five wrong answers on one body bear it out. Four were absurdly low — 8.00, 6.22, 6.83,
+     * 4.93 — from four different causes, and each was reported with a confident band label
+     * on a body with no abdominal definition at all.
+     *
+     * So a low reading is precisely the reading this method has not earned. Below the plateau
+     * the ratio is flat, which means the outline cannot separate six per cent from twelve; it
+     * follows that a figure below the plateau is never something the outline established, only
+     * something a corrupted denominator produced.
+     *
+     * The floor does not say the subject is not lean. It says **the silhouette cannot be the
+     * thing that decides they are.** A tape measurement, a reference scan, or the user
+     * matching themselves against the appearance bands can all pull the fused figure below
+     * it, because none of those inherits the failure — which is exactly what
+     * [com.squeeze.core.bodycomp.MethodFusion] is for.
+     */
+    fun leanestClaimable(sex: Sex): Double = plateauCeilingPercent(sex)
+
+    private fun floored(percent: Double, sex: Sex): Double =
+        percent.coerceIn(leanestClaimable(sex), MAX_PERCENT)
+
+    /**
+     * There is deliberately no rule here that widens the interval when the two denominators
+     * disagree.
+     *
+     * One was written and removed the same day. The reasoning sounded right — both ratios
+     * read the same trunk in the same photograph, so a wide gap means one of them is
+     * measuring something that is not the body — but the threshold had to be invented, and
+     * eight points turned out to fire on ordinary input: a clean 0.90 shoulder against a 0.87
+     * hip reads 24.2 and 15.3, which is 8.9 apart.
+     *
+     * That gap is not evidence of contamination, it is the *expected* offset between the two.
+     * The shoulder ratio is deflated by arm pixels on essentially every photograph, so it
+     * reads systematically leaner than the hip. Treating the normal offset as a fault made
+     * a reading that had a hip *less* trusted than one that had none, which inverts the
+     * reason the hip is preferred at all.
+     *
+     * The gap probably does carry information about contamination. Nothing here knows how
+     * much, and this file has enough constants chosen by reasoning already.
+     */
+
+    /**
      * Below this waist-to-shoulder ratio the outline stops carrying information.
      *
      * Measured, not assumed. Reading the ratios off a labelled reference chart gives 0.586
@@ -327,17 +376,39 @@ object SilhouetteBodyFat {
 
         if (fromHip != null) {
             return BodyFatEstimate(
-                percent = fromHip.coerceIn(MIN_PERCENT, MAX_PERCENT),
+                percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
-                standardErrorPercent = EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+                // A floored reading is a bound rather than a measurement, and carries the
+                // interval that says so.
+                standardErrorPercent = if (fromHip < leanestClaimable(sex)) {
+                    PLATEAU_ERROR_PERCENT
+                } else {
+                    EstimationMethod.PHOTO_SHAPE.standardErrorPercent
+                },
             )
         }
 
         // No hip in the silhouette. The shoulder ratio is all that is left, and it keeps its
         // plateau behaviour — the flatness measured on the reference charts was measured on
         // this ratio, so it belongs here and nowhere else.
-        val percent = fromShoulder
         val onPlateau = indices.waistToShoulder < LEAN_PLATEAU_RATIO
+
+        // **On the plateau, report the plateau — not the line extended past its own data.**
+        //
+        // Below [LEAN_PLATEAU_RATIO] the mapping is an extrapolation of a fit through a
+        // region where the ratio was measured to be flat: 0.586 at eight per cent, 0.592 at
+        // twelve, 0.580 at fifteen. Flat means the ratio does not distinguish those bodies.
+        // Running the line on anyway turns "cannot tell" into a specific small number, and
+        // the smaller the ratio the more confident the falsehood.
+        //
+        // A real scan made that concrete. Arms merged into the shoulder run gave 0.686 —
+        // which is not a lean body, it is a contaminated denominator — and the extrapolation
+        // reported **4.93%**, labelled "below essential", for a man with no abdominal
+        // definition at all. The plateau ceiling with a nine-point interval says the same
+        // thing the data supports: somewhere in the lean region, and this method cannot say
+        // where.
+        val percent = if (onPlateau) plateauCeilingPercent(sex) else floored(fromShoulder, sex)
+
         val error = if (onPlateau) {
             PLATEAU_ERROR_PERCENT
         } else {

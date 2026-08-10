@@ -64,16 +64,22 @@ class HipDenominatorTest {
     }
 
     @Test
-    fun `a lean waist-to-hip still reads lean`() {
-        // The fix must not simply push everything upward. A genuinely narrow waist against a
-        // genuinely wide hip is a lean build and has to keep reading as one.
+    fun `a lean waist-to-hip reads as lean as this method may claim`() {
+        // This asserted `< 10.0` when it was written, and that was wrong for a reason worth
+        // recording rather than quietly deleting: it treated a single-digit figure from a
+        // silhouette as a success, when every single-digit figure this pipeline has ever
+        // produced came from a contaminated denominator rather than a lean body.
+        //
+        // The mapping still ranks this build as lean — it lands on the floor rather than
+        // above it. What it no longer does is put a number below the floor on the strength
+        // of an outline alone. See SilhouetteBodyFat.leanestClaimable.
         val estimate = SilhouetteBodyFat.estimate(
             ShapeIndices(waistToShoulder = 0.70, waistToHip = 0.78),
             Sex.MALE,
         )
 
         assertNotNull(estimate)
-        assertTrue(estimate.percent < 10.0, "got ${estimate.percent}")
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
     }
 
     @Test
