@@ -8,6 +8,7 @@ import com.squeeze.core.bodycomp.CalibrationPoint
 import com.squeeze.core.bodycomp.LeanMassPlausibility
 import com.squeeze.core.bodycomp.MethodFusion
 import com.squeeze.core.bodycomp.PersonalCalibration
+import com.squeeze.core.bodycomp.PlateauPrior
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.EstimationMethod
@@ -207,8 +208,20 @@ class BodyCompositionRepository @Inject constructor(
         // The veto still exists for what it was built for — a scale-recovery failure, which
         // produces a confident shape reading well above the plateau disagreeing with a
         // confidently wrong set of girths.
+        //
+        // Recognised from the interval the scan stored rather than by comparing the figure
+        // against a constant. Once a bounded reading resolves against the body's build it is
+        // no longer a fixed number — 11.6% for everyone became 18% for this man and 26% for a
+        // heavier one — so the value alone stopped being able to say what it was. The width
+        // always could: ±9 is the outline reporting that it did not resolve anything.
         val shapeIsPlateauReading = entity.shapeBodyFatPercent != null &&
-            entity.shapeBodyFatPercent <= SilhouetteBodyFat.plateauCeilingPercent(profile.sex)
+            PlateauPrior.isBounded(
+                percent = entity.shapeBodyFatPercent,
+                standardErrorPercent = entity.shapeStandardErrorPercent,
+                profile = profile,
+                weightKg = entity.weightKg,
+                age = age,
+            )
 
         val circumferencesContradicted = fromCircumferences != null &&
             entity.shapeBodyFatPercent != null &&
@@ -253,7 +266,20 @@ class BodyCompositionRepository @Inject constructor(
             candidates += BodyFatEstimate(
                 percent = shape,
                 method = EstimationMethod.PHOTO_SHAPE,
-                standardErrorPercent = EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+                // The interval the scan recorded, not the method's nominal one.
+                //
+                // This was a real leak. The scan produced an estimate carrying ±9 whenever
+                // the outline could not resolve the body, only the percentage was written to
+                // the row, and this line rebuilt it at the method's ordinary ±5 — so a
+                // reading that had explicitly said "I cannot tell" re-entered an
+                // inverse-variance fusion claiming nearly twice the precision it had, and
+                // outweighed methods that had measured something.
+                standardErrorPercent = entity.shapeStandardErrorPercent
+                    ?: if (shapeIsPlateauReading) {
+                        SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+                    } else {
+                        EstimationMethod.PHOTO_SHAPE.standardErrorPercent
+                    },
             )
         }
 

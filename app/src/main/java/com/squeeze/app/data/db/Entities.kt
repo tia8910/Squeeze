@@ -62,6 +62,20 @@ data class MeasurementEntity(
      * rather than a correction.
      */
     val abdominalBodyFatPercent: Double? = null,
+    /**
+     * How wide the shape figure's interval was when it was recorded.
+     *
+     * Stored because it is the only thing that distinguishes a measurement of adiposity from
+     * a bound, and it was being thrown away. The scan produced an estimate carrying ±9 when
+     * the outline could not resolve the body; only the percentage was written, and the
+     * repository rebuilt the estimate at the method's ordinary ±5 — so a reading that had
+     * said "I cannot tell" re-entered the fusion claiming full precision, and outweighed
+     * methods that had actually measured something.
+     *
+     * Null on rows written before this column existed. See PlateauPrior.isBounded for what
+     * those fall back to.
+     */
+    val shapeStandardErrorPercent: Double? = null,
 )
 
 /**

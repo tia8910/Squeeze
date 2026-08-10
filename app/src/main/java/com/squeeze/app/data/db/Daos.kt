@@ -21,6 +21,24 @@ interface MeasurementDao {
     @Query("SELECT * FROM measurements WHERE epochDay >= :sinceEpochDay ORDER BY epochDay ASC")
     suspend fun since(sinceEpochDay: Long): List<MeasurementEntity>
 
+    /**
+     * The most recent recorded bodyweight, if there is one.
+     *
+     * The scan needs it before the user has typed anything: what the outline reports on its
+     * plateau depends on the body's build, and the last weight is a far better answer to
+     * "what does this person weigh" than no answer at all. Overridden the moment a weight is
+     * entered on the result screen.
+     */
+    @Query(
+        """
+        SELECT weightKg FROM measurements
+        WHERE weightKg IS NOT NULL
+        ORDER BY epochDay DESC, id DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun latestWeightKg(): Double?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(measurement: MeasurementEntity): Long
 

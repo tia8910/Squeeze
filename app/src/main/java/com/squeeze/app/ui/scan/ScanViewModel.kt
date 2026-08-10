@@ -15,6 +15,8 @@ import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
+import com.squeeze.core.bodycomp.PlateauPrior
+import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
@@ -74,14 +76,27 @@ data class ScanUiState(
      *
      * Carried separately from the circumferences because it is the one number on the result
      * screen that did not come through them, and so the only one that can contradict them.
+     *
+     * The whole estimate rather than its percentage, because the interval is what says
+     * whether the outline measured this body or merely bounded it, and the result screen has
+     * to show the difference. It is the *unresolved* reading: [PlateauPrior] is applied at the
+     * point of display and of saving, where the user's weight is known.
      */
-    val shapeBodyFatPercent: Double? = null,
+    val shape: BodyFatEstimate? = null,
+    /**
+     * The most recent recorded bodyweight, before the user types one on this screen.
+     *
+     * Needed because what the outline reports on its plateau depends on the body's build. Also
+     * prefills the weight field, which is worth doing on its own: a scan with no weight is a
+     * scan the plausibility gate and the lean-mass trend cannot use.
+     */
+    val knownWeightKg: Double? = null,
     /**
      * Body fat read from the abdomen's side-on depth, when a side photograph was taken.
      *
-     * Separate from [shapeBodyFatPercent] because they measure perpendicular axes. The front
-     * view reads width, which is the axis abdominal fat moves along least; this reads depth,
-     * which is the one it moves along most.
+     * Separate from [shape] because they measure perpendicular axes. The front view reads
+     * width, which is the axis abdominal fat moves along least; this reads depth, which is
+     * the one it moves along most.
      */
     val abdominalBodyFatPercent: Double? = null,
     /**
@@ -108,7 +123,25 @@ data class ScanUiState(
      * used it.
      */
     val framing: ScanFraming = ScanFraming.FULL_BODY,
-)
+) {
+    /**
+     * What the app should print, given a weight the user may have typed since the scan ran.
+     *
+     * Recomputed rather than stored so that entering a weight updates the headline
+     * immediately. On the plateau the outline contributes only a bound, and the figure comes
+     * from the build — so the weight field is not an afterthought on this screen, it is an
+     * input to the number above it.
+     */
+    fun resolvedShape(weightKg: Double?): BodyFatEstimate? {
+        val profile = profile ?: return shape
+        return PlateauPrior.resolve(
+            estimate = shape,
+            profile = profile,
+            weightKg = weightKg ?: knownWeightKg,
+            age = profile.ageAt(LocalDate.now().year),
+        )
+    }
+}
 
 /**
  * Drives a body scan from one required photograph and up to two optional ones.
@@ -340,6 +373,11 @@ class ScanViewModel @Inject constructor(
             .indicesFrom(front.profile, front.anchors, pelvisSpan)
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
 
+        // Fetched here so the headline has a build to fall back on before the user types
+        // anything. Without it a plateau reading has nothing to resolve against and prints
+        // the method's own constant, which is where 11.6% came from.
+        val knownWeight = measurementDao.latestWeightKg()
+
         val lighting = frontBitmap?.let { AbdomenCrop.lighting(it, front.geometry) }
 
         // Abdominal definition used to narrow a plateau reading to a point inside it. It no
@@ -358,7 +396,6 @@ class ScanViewModel @Inject constructor(
         // back as exactly 8.00 per cent, because the texture score placed it at the lean end
         // and the lean end is a constant. A figure that is a constant is not a measurement,
         // and printing it to two decimal places made it look like the opposite.
-        val shape = shapeEstimate?.percent
 
         // The abdomen, measured on the axis it actually moves along. Only a side photograph
         // can supply it: from the front, fat that accumulates in depth is invisible, which is
@@ -392,7 +429,8 @@ class ScanViewModel @Inject constructor(
             // Ratios divide two measurements from the same photograph, so scale error
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
-            shapeBodyFatPercent = shape,
+            shape = shapeEstimate,
+            knownWeightKg = knownWeight,
             framing = front.framing,
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
@@ -414,7 +452,9 @@ class ScanViewModel @Inject constructor(
         visualBodyFatPercent: Double? = null,
         knownBodyFatPercent: Double? = null,
     ) {
-        val shape = _state.value.shapeBodyFatPercent
+        // Resolved against the weight the user just entered rather than the one on file, so
+        // the figure that is stored is the figure they were looking at when they pressed save.
+        val shape = _state.value.resolvedShape(weightKg)
         val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
 
@@ -456,7 +496,11 @@ class ScanViewModel @Inject constructor(
                     // The one input that did not come from the photograph, and so the one
                     // that can contradict it. See VisualAssessment.
                     visualBodyFatPercent = visualBodyFatPercent,
-                    shapeBodyFatPercent = shape,
+                    shapeBodyFatPercent = shape?.percent,
+                    // Written alongside the figure because it is what tells the repository
+                    // whether that figure measured this body or merely bounded it. Storing
+                    // the percentage alone let a ±9 reading re-enter the fusion at ±5.
+                    shapeStandardErrorPercent = shape?.standardErrorPercent,
                     abdominalBodyFatPercent = abdominal,
                     note = if (result.depthAssumed) "Photo scan (front only)" else "Photo scan",
                     photoId = photoId,

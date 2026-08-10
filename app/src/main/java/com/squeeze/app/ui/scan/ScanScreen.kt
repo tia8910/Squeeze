@@ -76,9 +76,11 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.VisualAssessment
+import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.ScanFraming
+import com.squeeze.core.scan.SilhouetteBodyFat
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -672,7 +674,20 @@ private fun ResultStep(
         // are simply no longer presented as something to argue with.
         val c = result.circumferences
 
-        state.shapeBodyFatPercent?.let { ShapeHeadline(it) }
+        // Declared above the headline because the headline depends on it. When the outline
+        // lands on its plateau it has no figure of its own to give — it contributes a bound —
+        // and what gets printed comes from the body's build, which needs a weight. Prefilled
+        // from the last recorded one so the number is right before anything is typed, and
+        // recomputed on every keystroke so correcting the weight corrects the answer.
+        var weight by remember(c) {
+            mutableStateOf(state.knownWeightKg?.let { "%.1f".format(it) }.orEmpty())
+        }
+        var knownPercent by remember(c) { mutableStateOf("") }
+        var visualPercent by remember(c) { mutableStateOf<Double?>(null) }
+
+        val shape = state.resolvedShape(weight.toCm())
+
+        shape?.let { ShapeHeadline(it, hasWeight = weight.toCm() != null) }
 
         // Said before the advice, because it changes what the advice is for. A trunk scan is
         // not a degraded full-body scan — it is the framing the shape figure actually wants,
@@ -715,10 +730,6 @@ private fun ResultStep(
         // the reason to distrust the figure directly above it.
         state.lightingAdvice?.let { InfoCard(it) }
 
-        var weight by remember(c) { mutableStateOf("") }
-        var knownPercent by remember(c) { mutableStateOf("") }
-        var visualPercent by remember(c) { mutableStateOf<Double?>(null) }
-
         MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
 
         KnownBodyFatCard(knownPercent) { knownPercent = it }
@@ -728,7 +739,7 @@ private fun ResultStep(
                 sex = profile.sex,
                 selected = visualPercent,
                 onSelect = { visualPercent = if (visualPercent == it) null else it },
-                measured = state.shapeBodyFatPercent,
+                measured = shape?.percent,
             )
         }
 
@@ -1103,7 +1114,15 @@ private fun KnownBodyFatCard(value: String, onValueChange: (String) -> Unit) {
  * on this screen whose errors are its own.
  */
 @Composable
-private fun ShapeHeadline(shapePercent: Double) {
+private fun ShapeHeadline(estimate: BodyFatEstimate, hasWeight: Boolean) {
+    // A reading carrying the plateau's interval is not a measurement of this body's fat — the
+    // outline could not separate lean from very lean, and said so by widening to ±9. The card
+    // has to say the same thing, because a number in display type reads as certain no matter
+    // what is printed under it.
+    val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+    val low = (estimate.percent - estimate.standardErrorPercent).coerceAtLeast(3.0)
+    val high = estimate.percent + estimate.standardErrorPercent
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1112,18 +1131,44 @@ private fun ShapeHeadline(shapePercent: Double) {
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = "From your shape",
+                text = if (bounded) "Best estimate" else "From your shape",
                 style = MaterialTheme.typography.labelLarge,
             )
             Text(
-                text = "%.1f%%".format(shapePercent),
+                text = "%.1f%%".format(estimate.percent),
                 style = MaterialTheme.typography.displaySmall,
             )
+            // Shown for every reading, not only the uncertain ones. Every figure in this app
+            // has an interval; hiding it is the core dishonesty of this app category, and a
+            // single number to one decimal place claims a precision no method here has.
             Text(
-                text = "Read from how wide your waist is relative to your shoulders and " +
-                    "hips. It never converts pixels to centimetres, so nothing about how " +
-                    "you were framed can reach it — which is why the scan keeps this figure " +
-                    "and not the one the circumferences give.",
+                text = "Most likely %.0f–%.0f%%".format(low, high),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = when {
+                    bounded && hasWeight ->
+                        "Your outline could not settle this one. What separates a lean body " +
+                            "from a very lean one is abdominal definition, and a silhouette " +
+                            "throws that away — it knows your edge and nothing inside it. So " +
+                            "this figure comes from your height, weight and age instead, " +
+                            "which are measured rather than inferred. A side photo, a tape " +
+                            "measurement at your navel, or matching yourself to the pictures " +
+                            "below will all beat it."
+
+                    bounded ->
+                        "Your outline could not settle this one, and without a weight there " +
+                            "is nothing left to settle it with — so this is the leanest " +
+                            "figure the shape reading is allowed to claim, not a reading of " +
+                            "you. Enter your weight above and it becomes an estimate of your " +
+                            "body."
+
+                    else ->
+                        "Read from how wide your waist is relative to your shoulders and " +
+                            "hips. It never converts pixels to centimetres, so nothing about " +
+                            "how you were framed can reach it — which is why the scan keeps " +
+                            "this figure and not the one the circumferences give."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
         }
