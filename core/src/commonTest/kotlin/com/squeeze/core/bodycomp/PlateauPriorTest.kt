@@ -37,8 +37,35 @@ class PlateauPriorTest {
         val resolved = PlateauPrior.resolve(scan(), man, weightKg = 68.0, age = 33)
 
         assertNotNull(resolved)
-        // 1.20 x 22.20 + 0.23 x 33 - 10.8 - 5.4
-        assertEquals(18.0, resolved.percent, 0.2, "got ${resolved.percent}")
+        // 1.20 x 22.20 + 0.23 x 33 - 10.8 - 5.4 = 18.0, less the 1.5 the equation is known
+        // to overread by on trained subjects.
+        assertEquals(16.5, resolved.percent, 0.2, "got ${resolved.percent}")
+    }
+
+    @Test
+    fun `the trained-population correction is applied once, and downward`() {
+        // Pinned as its own test so the offset cannot be quietly retuned to make some future
+        // screenshot land: changing it has to change a stated expectation here.
+        val raw = 1.20 * (68.0 / (1.75 * 1.75)) + 0.23 * 33 - 10.8 - 5.4
+        val implied = PlateauPrior.buildPercent(man, weightKg = 68.0, age = 33)
+
+        assertNotNull(implied)
+        assertEquals(raw - PlateauPrior.TRAINED_POPULATION_OFFSET, implied, 1e-9)
+        assertTrue(implied < raw, "the correction has to run downward")
+    }
+
+    @Test
+    fun `the correction can never push a reading below the floor`() {
+        // It is subtracted before the plausibility bound and before the floor, so both still
+        // have the last word. A correction that could produce a single-digit figure would
+        // undo the one thing this whole area of the codebase exists to guarantee.
+        val resolved = PlateauPrior.resolve(scan(), man, weightKg = 58.0, age = 20)
+
+        assertNotNull(resolved)
+        assertTrue(
+            resolved.percent >= SilhouetteBodyFat.leanestClaimable(Sex.MALE),
+            "got ${resolved.percent}",
+        )
     }
 
     @Test
@@ -129,9 +156,10 @@ class PlateauPriorTest {
     @Test
     fun `an impossible implied lean mass is bounded, not printed`() {
         // BMI is blind to stature in a way that bites at the extremes: 65 kg at 1.90 m gives
-        // a Deurenberg figure near 13%, which would leave 56.5 kg of fat-free mass — a
-        // fat-free mass index of 15.6, below anything measured in an ambulatory adult. The
-        // gate that caught 36.6% applies to this route too, and clamps it to 11.1.
+        // a Deurenberg figure near 13%, 11.5 after the trained correction, which would still
+        // leave under 57.6 kg of fat-free mass — a fat-free mass index of 15.9, below
+        // anything measured in an ambulatory adult. The gate that caught 36.6% applies to
+        // this route too, and clamps it to 11.14.
         val tall = Profile(heightCm = 190.0, birthYear = 1993, sex = Sex.MALE)
         val implied = PlateauPrior.buildPercent(tall, weightKg = 65.0, age = 33)
         val range = LeanMassPlausibility.plausibleRange(tall, 65.0)

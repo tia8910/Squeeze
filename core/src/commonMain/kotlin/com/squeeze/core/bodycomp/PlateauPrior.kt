@@ -28,8 +28,9 @@ import com.squeeze.core.scan.SilhouetteBodyFat
  * arm, a waistband inside the hip band, a sideways frame, laundry joined to the mask. Through
  * the Deurenberg equation they give a figure for *this* body rather than for this method.
  *
- * For 68 kg at 1.75 m that is a BMI of 22.2 and, at thirty, 17.4% — which is what a coach
- * standing in front of that body says, and six points from what the outline was reporting.
+ * For 68 kg at 1.75 m that is a BMI of 22.2 and, at thirty-three, 16.5% once the equation's
+ * known bias for trained subjects is taken off — which is what a coach standing in front of
+ * that body says, and five points from what the outline was reporting.
  *
  * **What this is not.** It is not a correction applied to a working measurement. Off the
  * plateau the outline is measuring something real, and BMI is blind to muscle — fold it into
@@ -60,15 +61,50 @@ object PlateauPrior {
     private const val TOLERANCE = 1e-6
 
     /**
+     * Points subtracted from the Deurenberg figure for the population this app actually has.
+     *
+     * Not a fudge factor, and not a number chosen to make one screenshot look better. The
+     * equation's own documentation in [BodyFatCalculator.deurenbergBmi] has said from the
+     * start that it "badly overestimates for trained lifters, who are exactly this app's
+     * users" — the correction was already known, it simply had nowhere to be applied because
+     * the BMI route was a first-run placeholder nobody was meant to read. Substituting it on
+     * the plateau made it a headline figure, and a headline figure has to carry the
+     * correction the equation is known to need.
+     *
+     * The mechanism is not mysterious. BMI is mass over height squared and cannot see what
+     * the mass is; someone who trains carries more of it as muscle than the cohort Deurenberg
+     * was fitted on, so the equation reads that extra mass as fat. Validation studies against
+     * hydrostatic weighing and DEXA put the overestimate in athletic subjects at roughly two
+     * to four points.
+     *
+     * **1.5 is deliberately smaller than any of them.** The direction of this correction is
+     * established; its size for one person is not, and every constant in this project that was
+     * sized by argument rather than by measurement has eventually had to be removed. Under-
+     * correcting leaves a figure that is slightly high, which is the safe side of a number
+     * someone makes decisions about. Over-correcting reproduces the failure this whole file
+     * exists to undo — telling a soft body it is lean.
+     *
+     * Applied only here. The silhouette anchors have their own biases, unknown and probably
+     * different, and moving them by a figure observed on the BMI route would be exactly the
+     * reasoning-instead-of-measuring habit that produced five wrong answers.
+     *
+     * The corpus replaces this. Until then it is one point five.
+     */
+    const val TRAINED_POPULATION_OFFSET = 1.5
+
+    /**
      * Body fat implied by build alone: height, weight, age, sex. Null without a weight.
      *
-     * Bounded by [LeanMassPlausibility] before it is returned, so the substitution can never
-     * introduce a figure the body could not physically carry — the gate that caught 36.6%
-     * applies to this route too, and for the same reason.
+     * Corrected by [TRAINED_POPULATION_OFFSET], then bounded by [LeanMassPlausibility] — in
+     * that order, so the physical bound always has the last word and the correction can never
+     * push a figure outside what the body could carry. The gate that caught 36.6% applies to
+     * this route too, and for the same reason.
      */
     fun buildPercent(profile: Profile, weightKg: Double?, age: Int): Double? {
         val weight = weightKg?.takeIf { it > 0.0 } ?: return null
-        val percent = BodyFatCalculator.deurenbergBmi(profile, weight, age)?.percent ?: return null
+        val deurenberg = BodyFatCalculator.deurenbergBmi(profile, weight, age)?.percent
+            ?: return null
+        val percent = deurenberg - TRAINED_POPULATION_OFFSET
         val range = LeanMassPlausibility.plausibleRange(profile, weight) ?: return percent
         return percent.coerceIn(range)
     }
