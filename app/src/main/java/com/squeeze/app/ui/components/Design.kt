@@ -25,7 +25,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -287,4 +296,174 @@ fun BrandRow(
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
+}
+
+/**
+ * A section title with the caption that belongs to it.
+ *
+ * Sections were bare `Text` calls at `titleMedium`, which is a heading in the same voice as
+ * everything under it — so a screen of six sections read as six equally important things and
+ * the reader had to parse each card to find the one they came for. A heading needs to sit
+ * *above* the content in the hierarchy, not beside it.
+ *
+ * The rule is a small blue eyebrow, a plain-weight title, and an optional line of grey saying
+ * what the section is for. The eyebrow is what does the work: it is the only place the accent
+ * appears outside data and actions, so it reads as structure rather than as something to tap.
+ */
+@Composable
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    eyebrow: String? = null,
+    caption: String? = null,
+) {
+    val dark = LocalIsDarkTheme.current
+
+    Column(
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        eyebrow?.let {
+            Text(
+                text = it.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                color = if (dark) Brand.DarkBlue else Brand.Blue,
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (dark) Brand.DarkInk else Brand.Navy,
+        )
+        caption?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (dark) Brand.DarkMuted else Brand.Muted,
+            )
+        }
+    }
+}
+
+/**
+ * The one figure a screen exists to show, at the size that says so.
+ *
+ * Every number in this app was rendered at roughly the same weight, which made a screen a
+ * list of equals and left the reader to work out which one was the answer. This is the
+ * opposite premise: one figure gets display type, its unit sits small and muted beside it so
+ * the digits keep the optical line, and the interval goes underneath rather than beside —
+ * because an interval is a qualification of the number, and a qualification set at the same
+ * size as its subject reads as a second number.
+ *
+ * @param band the population category, shown as a chip. Null when there is no published
+ *   reference, which is a real state and better than a chip reading "—"
+ */
+@Composable
+fun HeroMetric(
+    value: String,
+    unit: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    interval: String? = null,
+    band: String? = null,
+) {
+    val dark = LocalIsDarkTheme.current
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = if (dark) Brand.DarkMuted else Brand.Muted,
+        )
+
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = if (dark) Brand.DarkInk else Brand.Navy,
+            )
+            if (unit.isNotEmpty()) {
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (dark) Brand.DarkMuted else Brand.Muted,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 5.dp),
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            band?.let { BandChip(it) }
+            interval?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (dark) Brand.DarkMuted else Brand.Muted,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The population category a reading falls in.
+ *
+ * Deliberately one colour for every band. Colouring "Above average" amber would turn a
+ * population statement into a verdict on the person, which is the line ReferenceBands draws in
+ * its own header and which the UI has no business crossing.
+ */
+@Composable
+fun BandChip(label: String, modifier: Modifier = Modifier) {
+    val dark = LocalIsDarkTheme.current
+
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = if (dark) Brand.DarkBlue else Brand.BlueDeep,
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(iceFill())
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    )
+}
+
+/**
+ * Content that arrives rather than appearing.
+ *
+ * A short rise and fade, once, when a screen's data first resolves. It is not decoration: an
+ * app that computes for a moment and then swaps a spinner for a full screen of numbers reads
+ * as a page load, and the same content arriving reads as a result. The distance is small on
+ * purpose — anything longer becomes something to wait through on the fiftieth scan.
+ */
+@Composable
+fun Arriving(
+    visible: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val transition = updateTransition(targetState = visible, label = "arriving")
+
+    val alpha by transition.animateFloat(
+        transitionSpec = { tween(durationMillis = 260, easing = LinearOutSlowInEasing) },
+        label = "alpha",
+    ) { if (it) 1f else 0f }
+
+    val offset by transition.animateDp(
+        transitionSpec = { tween(durationMillis = 320, easing = LinearOutSlowInEasing) },
+        label = "offset",
+    ) { if (it) 0.dp else 10.dp }
+
+    Box(modifier.graphicsLayer { this.alpha = alpha; translationY = offset.toPx() }) {
+        content()
+    }
 }

@@ -16,7 +16,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -105,6 +105,19 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /**
+     * Adds the target bodyweight.
+     *
+     * NULL on existing rows, which is right: a goal set before this column existed was a body
+     * fat goal, and inventing a weight for it would put a target the user never chose into
+     * every progress verdict.
+     */
+    private val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN targetWeightKg REAL")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -119,6 +132,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to

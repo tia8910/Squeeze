@@ -55,10 +55,10 @@ import javax.inject.Inject
  * from the front photograph alone, or add a side view for measured depth and a back view
  * for a second width reading.
  */
-enum class ScanStep { FRONT, OPTIONAL_EXTRAS, SIDE, BACK, ANALYSING, RESULT }
+enum class ScanStep { WEIGHT, FRONT, OPTIONAL_EXTRAS, SIDE, BACK, ANALYSING, RESULT }
 
 data class ScanUiState(
-    val step: ScanStep = ScanStep.FRONT,
+    val step: ScanStep = ScanStep.WEIGHT,
     val result: ScanResult? = null,
     val failure: DetectionFailure? = null,
     val saved: Boolean = false,
@@ -91,6 +91,18 @@ data class ScanUiState(
      * scan the plausibility gate and the lean-mass trend cannot use.
      */
     val knownWeightKg: Double? = null,
+    /**
+     * The weight the user entered when the scan started.
+     *
+     * Asked for before the camera rather than after the photograph, because it is an input to
+     * the answer and not a footnote to it. When the outline lands on its plateau the reported
+     * figure comes from the body's build, so a scan taken without a weight cannot produce a
+     * figure about the person at all — it falls back to the leanest number the method is
+     * allowed to claim, which is the same for everybody. Collecting it first also means the
+     * scan is never one forgotten field away from being unusable by the plausibility gate
+     * and the lean-mass trend.
+     */
+    val enteredWeightKg: Double? = null,
     /**
      * Body fat read from the abdomen's side-on depth, when a side photograph was taken.
      *
@@ -185,6 +197,30 @@ class ScanViewModel @Inject constructor(
      * inference, at which point it no longer says which photograph is in flight.
      */
     private var capturing: ScanStep = ScanStep.FRONT
+
+    init {
+        // Loaded before anything is on screen so the weight step opens with the last figure
+        // already in the field. Most people's weight does not move between scans, so the
+        // common case becomes one tap rather than one typing task.
+        viewModelScope.launch {
+            val known = measurementDao.latestWeightKg()
+            _state.value = _state.value.copy(knownWeightKg = known, enteredWeightKg = known)
+        }
+    }
+
+    /**
+     * Records the weight and opens the camera.
+     *
+     * Null is allowed and moves on: a scan without a weight is worse but still worth taking,
+     * and a modal the user cannot get past would cost more scans than it saves figures.
+     */
+    fun confirmWeight(weightKg: Double?) {
+        if (_state.value.step != ScanStep.WEIGHT) return
+        _state.value = _state.value.copy(
+            step = ScanStep.FRONT,
+            enteredWeightKg = weightKg ?: _state.value.knownWeightKg,
+        )
+    }
 
     fun addSidePhoto() = moveToCapture(ScanStep.SIDE)
 
@@ -375,7 +411,7 @@ class ScanViewModel @Inject constructor(
         // Fetched here so the headline has a build to fall back on before the user types
         // anything. Without it a plateau reading has nothing to resolve against and prints
         // the method's own constant, which is where 11.6% came from.
-        val knownWeight = measurementDao.latestWeightKg()
+        val knownWeight = _state.value.enteredWeightKg ?: measurementDao.latestWeightKg()
 
         val lighting = frontBitmap?.let { AbdomenCrop.lighting(it, front.geometry) }
 
@@ -451,9 +487,15 @@ class ScanViewModel @Inject constructor(
         visualBodyFatPercent: Double? = null,
         knownBodyFatPercent: Double? = null,
     ) {
+        // Falls back to the weight given at the start of the scan. The result screen's field
+        // is prefilled from it, so the two agree in the ordinary case; this only matters when
+        // the field was cleared, and losing the weight there would silently drop the figure
+        // back to the leanest number the method is allowed to claim.
+        val weight = weightKg ?: _state.value.enteredWeightKg
+
         // Resolved against the weight the user just entered rather than the one on file, so
         // the figure that is stored is the figure they were looking at when they pressed save.
-        val shape = _state.value.resolvedShape(weightKg)
+        val shape = _state.value.resolvedShape(weight)
         val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
 
@@ -476,7 +518,7 @@ class ScanViewModel @Inject constructor(
                     } else {
                         MeasurementSource.PHOTO.name
                     },
-                    weightKg = weightKg,
+                    weightKg = weight,
                     neckCm = c.neckCm,
                     waistCm = c.waistCm,
                     hipCm = c.hipCm,
@@ -518,7 +560,14 @@ class ScanViewModel @Inject constructor(
         backBody = null
         frontAspectRatio = 1.0
         capturing = ScanStep.FRONT
-        _state.value = ScanUiState()
+        // The weight survives a retake. Nothing about it was wrong with the photograph, and
+        // asking again for a figure the user typed a minute ago is the kind of friction that
+        // makes people skip it the second time.
+        _state.value = ScanUiState(
+            step = ScanStep.FRONT,
+            knownWeightKg = _state.value.knownWeightKg,
+            enteredWeightKg = _state.value.enteredWeightKg,
+        )
     }
 
     override fun onCleared() {
