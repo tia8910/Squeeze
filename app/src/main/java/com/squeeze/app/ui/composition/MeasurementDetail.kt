@@ -46,6 +46,7 @@ import com.squeeze.app.ui.components.SecondaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
+import com.squeeze.app.data.toCircumferences
 import com.squeeze.core.bodycomp.BodyFindings
 import com.squeeze.core.bodycomp.RecordHeadline
 import com.squeeze.core.model.Profile
@@ -92,7 +93,7 @@ fun MeasurementDetailDialog(
     // here rather than in the view model because it is a pure function of the panel — nothing
     // to load, and nothing worth keeping once the dialog closes.
     val findings = remember(entry.id, panel, profile?.sex) {
-        profile?.let { BodyFindings.from(panel, it.sex) }.orEmpty()
+        profile?.let { BodyFindings.from(panel, it.sex, entry.toCircumferences()) }.orEmpty()
     }
 
     val reference = rememberReferencePhysique(bodyFatPercent, profile?.sex)

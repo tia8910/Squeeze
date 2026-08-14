@@ -1,6 +1,9 @@
 package com.squeeze.core.bodycomp
 
+import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
+import com.squeeze.core.program.MuscleGroup
+import com.squeeze.core.program.WeakPointAnalysis
 
 /** Whether a finding is something the body has going for it, or something to work on. */
 enum class FindingKind { STRENGTH, WEAKNESS }
@@ -63,7 +66,11 @@ object BodyFindings {
      * @return strengths first, then weak points, each in a fixed order; empty when the record
      *   holds too little to say anything, which is a legitimate outcome and not a failure
      */
-    fun from(panel: CompositionPanel?, sex: Sex): List<BodyFinding> {
+    fun from(
+        panel: CompositionPanel?,
+        sex: Sex,
+        circumferences: Circumferences? = null,
+    ): List<BodyFinding> {
         if (panel == null) return emptyList()
 
         val byName = (panel.composition + panel.shape).associateBy { it.name }
@@ -185,7 +192,46 @@ object BodyFindings {
             }
         }
 
+        // Body parts, after the whole-body figures.
+        //
+        // Everything above answers "how much fat is on this body". None of it answers "which
+        // part of it is behind", which is the question someone training actually has, and the
+        // one a coach answers first. WeakPointAnalysis already reads that off the same scan —
+        // arm against chest, thigh against waist, calf against thigh, chest against waist,
+        // arm against neck — and it was only ever shown on the Train tab, where a reader
+        // looking at their scan result never saw it.
+        //
+        // Proportional, never absolute, which is what makes it usable from a photograph whose
+        // centimetres may be off: a ratio divides two measurements taken from one image at one
+        // scale, so the scale error cancels. It says nothing at all when the girths it needs
+        // are missing, which is the honest answer for a torso-framed scan.
+        circumferences?.let { girths ->
+            WeakPointAnalysis.analyse(girths, sex)
+                .distinctBy { it.group }
+                .take(WeakPointAnalysis.MAX_PRIORITIES)
+                .forEach { point ->
+                    findings += weakness(
+                        "${label(point.group)} behind the rest of you",
+                        "${point.finding} ${point.prescription}",
+                    )
+                }
+        }
+
         return findings.sortedBy { it.kind == FindingKind.WEAKNESS }
+    }
+
+    /** The muscle group as a coach would say it, rather than as an enum constant. */
+    private fun label(group: MuscleGroup): String = when (group) {
+        MuscleGroup.CHEST -> "Chest"
+        MuscleGroup.BACK -> "Back"
+        MuscleGroup.QUADS -> "Quads"
+        MuscleGroup.HAMSTRINGS -> "Hamstrings"
+        MuscleGroup.GLUTES -> "Glutes"
+        MuscleGroup.SHOULDERS -> "Shoulders"
+        MuscleGroup.BICEPS -> "Biceps"
+        MuscleGroup.TRICEPS -> "Triceps"
+        MuscleGroup.CALVES -> "Calves"
+        MuscleGroup.ABS -> "Abs"
     }
 
     private fun strength(title: String, detail: String) =
