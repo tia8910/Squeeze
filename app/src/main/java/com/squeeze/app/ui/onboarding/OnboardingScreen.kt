@@ -1,6 +1,7 @@
 package com.squeeze.app.ui.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,8 @@ import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.model.ProfileValidation
+import com.squeeze.app.ui.settings.GoalOption
+import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Sex
 import java.time.LocalDate
 
@@ -60,7 +63,9 @@ fun OnboardingScreen(
         heightCm: Double,
         birthYear: Int,
         sex: Sex,
+        goal: Goal,
         targetBodyFatPercent: Double?,
+        targetWeightKg: Double?,
         targetEpochDay: Long?,
     ) -> Unit,
 ) {
@@ -73,7 +78,9 @@ fun OnboardingScreen(
     // it just cannot tell the user whether what they are doing is enough. Making this
     // mandatory would force a number out of someone who has not decided yet, and a target
     // invented to get past a form is worse than none.
+    var option by remember { mutableStateOf(GoalOption.DEFAULT) }
     var targetText by remember { mutableStateOf("") }
+    var targetWeightText by remember { mutableStateOf("") }
     var weeks by remember { mutableStateOf(12) }
 
     // Errors stay hidden until the user has tried to continue. Showing them as the screen
@@ -204,8 +211,12 @@ fun OnboardingScreen(
         Spacer(Modifier.height(18.dp))
 
         GoalPrompt(
+            option = option,
+            onOptionChange = { option = it },
             targetText = targetText,
             onTargetChange = { targetText = it },
+            targetWeightText = targetWeightText,
+            onTargetWeightChange = { targetWeightText = it },
             weeks = weeks,
             onWeeksChange = { weeks = it },
             muted = muted,
@@ -217,8 +228,17 @@ fun OnboardingScreen(
             text = "Start tracking",
             onClick = {
                 submitted = true
-                val target = targetText.trim().replace(',', '.').toDoubleOrNull()
-                    ?.takeIf { it in 3.0..60.0 }
+                // Only the fields the chosen goal asks for are read. Taking a target body
+                // fat from someone who picked "build muscle" would store a number they typed
+                // into a box that happened to be on screen, and then report progress
+                // against it.
+                val fat = targetText.trim().replace(',', '.').toDoubleOrNull()
+                    ?.takeIf { option.wantsBodyFat && it in 3.0..60.0 }
+                val targetWeight = targetWeightText.trim().replace(',', '.').toDoubleOrNull()
+                    ?.takeIf { option.wantsWeight && it in 30.0..300.0 }
+                val deadline = LocalDate.now().plusWeeks(weeks.toLong()).toEpochDay()
+                    .takeIf { fat != null || targetWeight != null }
+
                 ProfileValidation
                     .build(heightText, yearText, sex, currentYear)
                     ?.let {
@@ -226,8 +246,10 @@ fun OnboardingScreen(
                             it.heightCm,
                             it.birthYear,
                             it.sex,
-                            target,
-                            target?.let { _ -> LocalDate.now().plusWeeks(weeks.toLong()).toEpochDay() },
+                            option.goal,
+                            fat,
+                            targetWeight,
+                            deadline,
                         )
                     }
             },
@@ -265,13 +287,19 @@ private val ONBOARDING_HORIZONS = listOf(8, 12, 16, 24)
  */
 @Composable
 private fun GoalPrompt(
+    option: GoalOption,
+    onOptionChange: (GoalOption) -> Unit,
     targetText: String,
     onTargetChange: (String) -> Unit,
+    targetWeightText: String,
+    onTargetWeightChange: (String) -> Unit,
     weeks: Int,
     onWeeksChange: (Int) -> Unit,
     muted: androidx.compose.ui.graphics.Color,
 ) {
     val deadline = LocalDate.now().plusWeeks(weeks.toLong())
+    val anyTarget = (option.wantsBodyFat && targetText.isNotBlank()) ||
+        (option.wantsWeight && targetWeightText.isNotBlank())
 
     BrandCard(Modifier.fillMaxWidth()) {
         Text("Your goal — optional", style = MaterialTheme.typography.titleSmall)
@@ -284,28 +312,69 @@ private fun GoalPrompt(
             modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
         )
 
-        OutlinedTextField(
-            value = targetText,
-            onValueChange = { onTargetChange(it.take(4)) },
-            label = { Text("Target body fat (%)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Decimal,
-                imeAction = ImeAction.Done,
-            ),
-            modifier = Modifier.fillMaxWidth(),
+        // The same four goals the settings screen offers, from the same enum. This screen had
+        // its own field asking only for a body fat percentage, so the first thing the app ever
+        // asked a new user was to state a goal it could hold and three it could not — and
+        // someone whose actual aim was to add size either invented a percentage or skipped
+        // the question entirely.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        ) {
+            GoalOption.entries.forEach { candidate ->
+                FilterChip(
+                    selected = option == candidate,
+                    onClick = { onOptionChange(candidate) },
+                    label = { Text(candidate.label) },
+                )
+            }
+        }
+
+        Text(
+            text = option.blurb,
+            style = MaterialTheme.typography.bodySmall,
+            color = muted,
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
         )
 
-        if (targetText.isNotBlank()) {
+        if (option.wantsBodyFat) {
+            OutlinedTextField(
+                value = targetText,
+                onValueChange = { onTargetChange(it.take(4)) },
+                label = { Text("Target body fat (%)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = if (option.wantsWeight) ImeAction.Next else ImeAction.Done,
+                ),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+        }
+
+        if (option.wantsWeight) {
+            OutlinedTextField(
+                value = targetWeightText,
+                onValueChange = { onTargetWeightChange(it.take(5)) },
+                label = { Text("Target weight (kg)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done,
+                ),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+        }
+
+        if (anyTarget) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 12.dp),
             ) {
-                ONBOARDING_HORIZONS.forEach { option ->
+                ONBOARDING_HORIZONS.forEach { horizon ->
                     FilterChip(
-                        selected = weeks == option,
-                        onClick = { onWeeksChange(option) },
-                        label = { Text("${option}w") },
+                        selected = weeks == horizon,
+                        onClick = { onWeeksChange(horizon) },
+                        label = { Text("${horizon}w") },
                     )
                 }
             }

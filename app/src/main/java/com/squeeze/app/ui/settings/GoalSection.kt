@@ -45,7 +45,7 @@ private val HORIZONS = listOf(8, 12, 16, 24)
  * the percentage while weight rises — so it is the one goal that needs both fields, and the
  * old body-fat-only form could not express it at all.
  */
-private enum class GoalOption(
+enum class GoalOption(
     val goal: Goal,
     val label: String,
     val blurb: String,
@@ -84,6 +84,8 @@ private enum class GoalOption(
     ;
 
     companion object {
+        val DEFAULT = LOSE_FAT
+
         fun of(goal: Goal): GoalOption = entries.firstOrNull { it.goal == goal } ?: LOSE_FAT
     }
 }

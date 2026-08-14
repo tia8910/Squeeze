@@ -97,7 +97,9 @@ class SqueezeViewModel @Inject constructor(
         heightCm: Double?,
         birthYear: Int?,
         sex: Sex?,
+        goal: Goal? = null,
         targetBodyFatPercent: Double? = null,
+        targetWeightKg: Double? = null,
         targetEpochDay: Long? = null,
     ) {
         if (heightCm == null || birthYear == null || sex == null) return
@@ -113,12 +115,13 @@ class SqueezeViewModel @Inject constructor(
                     birthYear = birthYear,
                     sex = sex.name,
                     trainingAge = existing?.trainingAge ?: TrainingAge.NOVICE.name,
-                    goal = existing?.goal ?: Goal.HYPERTROPHY.name,
+                    goal = goal?.name ?: existing?.goal ?: Goal.HYPERTROPHY.name,
                     unitSystem = existing?.unitSystem ?: UnitSystem.METRIC.name,
                     // A goal supplied here wins; otherwise whatever is already stored
                     // survives, so editing height in Settings cannot silently clear it.
                     targetBodyFatPercent = targetBodyFatPercent
                         ?: existing?.targetBodyFatPercent,
+                    targetWeightKg = targetWeightKg ?: existing?.targetWeightKg,
                     targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
                 ),
             )
