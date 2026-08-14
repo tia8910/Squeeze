@@ -138,7 +138,6 @@ data class ScanUiState(
             estimate = shape,
             profile = profile,
             weightKg = weightKg ?: knownWeightKg,
-            age = profile.ageAt(LocalDate.now().year),
         )
     }
 }

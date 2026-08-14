@@ -143,7 +143,16 @@ class BodyCompositionRepository @Inject constructor(
         entity: MeasurementEntity,
         includeReference: Boolean = true,
     ): BodyFatEstimate? {
-        val age = profile.ageAt(LocalDate.now().year)
+        // The user's age *on the day of this measurement*, not today.
+        //
+        // This read `LocalDate.now()`, which meant every age-dependent equation here — Jackson
+        // -Pollock and the BMI fallback both carry an age term — silently re-answered a
+        // two-year-old scan at today's age. The row's figure crept upward by about half a
+        // point a year with nothing about the body having changed, and the trend engine, which
+        // sees these values and not the skinfolds behind them, read that creep as a real slow
+        // gain. The KDoc directly above already promised what this now delivers: a row dated
+        // three weeks ago says what that day's measurements said.
+        val age = profile.ageAt(LocalDate.ofEpochDay(entity.epochDay).year)
         val candidates = mutableListOf<BodyFatEstimate>()
 
         // A reference scan is not an equation applied to this entry, it is a measurement of
@@ -220,7 +229,6 @@ class BodyCompositionRepository @Inject constructor(
                 standardErrorPercent = entity.shapeStandardErrorPercent,
                 profile = profile,
                 weightKg = entity.weightKg,
-                age = age,
             )
 
         val circumferencesContradicted = fromCircumferences != null &&

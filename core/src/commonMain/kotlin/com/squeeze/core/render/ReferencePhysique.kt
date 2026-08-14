@@ -6,11 +6,15 @@ import kotlin.math.abs
 /**
  * Which reference photograph shows a body at this composition.
  *
- * The drawn figure ([BodyFigureBuilder]) is this person: every width in it came from their
- * record. What it cannot be is photographic, and a photograph is what makes someone say "yes,
- * that is roughly me" — which is the whole use for it. Two different jobs, so two different
- * pictures: the drawing shows *your measurements*, the reference photograph shows *what this
- * number looks like on a body*.
+ * A record used to carry a figure drawn from its own measurements. That is gone: with only
+ * four girths measured, the arms, calves and shoulders came from population averages, so two
+ * different people with the same waist were drawn the same body — and the caption underneath
+ * had to say so. It answered "what does a body look like", which nobody was asking.
+ *
+ * A photograph answers the question that was actually behind it. Someone looking at a
+ * composition figure wants to know whether it is *their* figure, and the only thing that
+ * settles that is seeing what the number looks like on a real body. This does not claim to
+ * show the user; it shows the level.
  *
  * The photographs are not of the user and never claim to be. They are the same idea as the
  * appearance bands in `VisualAssessment`, which already ask the user to place themselves

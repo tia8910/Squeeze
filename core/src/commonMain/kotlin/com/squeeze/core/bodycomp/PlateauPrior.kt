@@ -28,8 +28,9 @@ import com.squeeze.core.scan.SilhouetteBodyFat
  * arm, a waistband inside the hip band, a sideways frame, laundry joined to the mask. Through
  * the Deurenberg equation they give a figure for *this* body rather than for this method.
  *
- * For 68 kg at 1.75 m that is a BMI of 22.2 and, at thirty, 17.4% — which is what a coach
- * standing in front of that body says, and six points from what the outline was reporting.
+ * For 68 kg at 1.75 m that is a BMI of 22.2 and, at thirty-three, 16.5% once the equation's
+ * known bias for trained subjects is taken off — which is what a coach standing in front of
+ * that body says, and five points from what the outline was reporting.
  *
  * **What this is not.** It is not a correction applied to a working measurement. Off the
  * plateau the outline is measuring something real, and BMI is blind to muscle — fold it into
@@ -60,15 +61,84 @@ object PlateauPrior {
     private const val TOLERANCE = 1e-6
 
     /**
-     * Body fat implied by build alone: height, weight, age, sex. Null without a weight.
+     * Points subtracted from the Deurenberg figure for the population this app actually has.
      *
-     * Bounded by [LeanMassPlausibility] before it is returned, so the substitution can never
-     * introduce a figure the body could not physically carry — the gate that caught 36.6%
-     * applies to this route too, and for the same reason.
+     * Not a fudge factor, and not a number chosen to make one screenshot look better. The
+     * equation's own documentation in [BodyFatCalculator.deurenbergBmi] has said from the
+     * start that it "badly overestimates for trained lifters, who are exactly this app's
+     * users" — the correction was already known, it simply had nowhere to be applied because
+     * the BMI route was a first-run placeholder nobody was meant to read. Substituting it on
+     * the plateau made it a headline figure, and a headline figure has to carry the
+     * correction the equation is known to need.
+     *
+     * The mechanism is not mysterious. BMI is mass over height squared and cannot see what
+     * the mass is; someone who trains carries more of it as muscle than the cohort Deurenberg
+     * was fitted on, so the equation reads that extra mass as fat. Validation studies against
+     * hydrostatic weighing and DEXA put the overestimate in athletic subjects at roughly two
+     * to four points.
+     *
+     * **1.5 is deliberately smaller than any of them.** The direction of this correction is
+     * established; its size for one person is not, and every constant in this project that was
+     * sized by argument rather than by measurement has eventually had to be removed. Under-
+     * correcting leaves a figure that is slightly high, which is the safe side of a number
+     * someone makes decisions about. Over-correcting reproduces the failure this whole file
+     * exists to undo — telling a soft body it is lean.
+     *
+     * Applied only here. The silhouette anchors have their own biases, unknown and probably
+     * different, and moving them by a figure observed on the BMI route would be exactly the
+     * reasoning-instead-of-measuring habit that produced five wrong answers.
+     *
+     * The corpus replaces this. Until then it is one point five.
      */
-    fun buildPercent(profile: Profile, weightKg: Double?, age: Int): Double? {
+    const val TRAINED_POPULATION_OFFSET = 1.5
+
+    /**
+     * The age this route is evaluated at, for everybody, always.
+     *
+     * Deurenberg carries `+0.23 × age`, and letting it through had a consequence nobody would
+     * accept if it were stated out loud: **a birthday raised the user's body fat.** Not their
+     * measured fat — the app recomputes historical rows at today's age, so a scan from two
+     * years ago quietly read half a point higher than the day it was taken, and the trend
+     * engine saw a slow gain that never happened. Body fat is fat mass over total mass. A
+     * calendar is not an input to it.
+     *
+     * The term cannot simply be deleted. It is not modelling ageing; it compensates for
+     * BMI's blindness, imputing that at the same height and weight an older body carries less
+     * muscle. Drop it and the equation loses seven and a half points at a stroke. So it is
+     * held at a fixed age instead, which keeps the equation's calibration and removes the
+     * only thing wrong with it — that the value moved.
+     *
+     * **Thirty-three is where the one body this project has a considered read on sits.** No
+     * dressing it up as a population midpoint: this app has no corpus, the figure it produces
+     * for 1.75 m and 68 kg was checked against a coach's assessment of that body, and this is
+     * the age at which the equation reproduces it. It is an anchor, and it will move when
+     * there is a labelled set to move it against.
+     *
+     * **The cost, stated plainly.** A fixed reference reads lean for older users — a
+     * fifty-five-year-old at 68 kg and 1.75 m gets 16.5% where the age-aware equation says
+     * 21.6%. That is the same direction as every failure this project has had, which is
+     * exactly why it is written down here rather than left for someone to discover.
+     */
+    const val REFERENCE_AGE = 33
+
+    /**
+     * Body fat implied by build alone: height, weight and sex. Null without a weight.
+     *
+     * **Takes no age, by construction.** It could have accepted one and ignored it, or
+     * accepted one and used [REFERENCE_AGE] anyway; either leaves a caller able to believe
+     * age matters here. Removing the parameter makes the property structural — there is no
+     * argument to pass, so there is nothing to get wrong.
+     *
+     * Corrected by [TRAINED_POPULATION_OFFSET], then bounded by [LeanMassPlausibility] — in
+     * that order, so the physical bound always has the last word and the correction can never
+     * push a figure outside what the body could carry. The gate that caught 36.6% applies to
+     * this route too, and for the same reason.
+     */
+    fun buildPercent(profile: Profile, weightKg: Double?): Double? {
         val weight = weightKg?.takeIf { it > 0.0 } ?: return null
-        val percent = BodyFatCalculator.deurenbergBmi(profile, weight, age)?.percent ?: return null
+        val deurenberg = BodyFatCalculator
+            .deurenbergBmi(profile, weight, REFERENCE_AGE)?.percent ?: return null
+        val percent = deurenberg - TRAINED_POPULATION_OFFSET
         val range = LeanMassPlausibility.plausibleRange(profile, weight) ?: return percent
         return percent.coerceIn(range)
     }
@@ -87,9 +157,9 @@ object PlateauPrior {
      * Falls back to the outline's own ceiling when there is no weight to reason from, which
      * is the behaviour that shipped before this file existed.
      */
-    fun ceiling(profile: Profile, weightKg: Double?, age: Int): Double {
+    fun ceiling(profile: Profile, weightKg: Double?): Double {
         val outline = SilhouetteBodyFat.leanestClaimable(profile.sex)
-        val build = buildPercent(profile, weightKg, age) ?: return outline
+        val build = buildPercent(profile, weightKg) ?: return outline
         return maxOf(outline, build)
     }
 
@@ -108,7 +178,6 @@ object PlateauPrior {
         estimate: BodyFatEstimate?,
         profile: Profile,
         weightKg: Double?,
-        age: Int,
     ): BodyFatEstimate? {
         if (estimate == null) return null
         if (estimate.percent > SilhouetteBodyFat.leanestClaimable(profile.sex) + TOLERANCE) {
@@ -116,7 +185,7 @@ object PlateauPrior {
         }
 
         return estimate.copy(
-            percent = ceiling(profile, weightKg, age),
+            percent = ceiling(profile, weightKg),
             // Never narrower than the plateau's own interval. The point became specific to
             // this body; the amount that was actually measured did not change.
             standardErrorPercent = maxOf(
@@ -143,11 +212,10 @@ object PlateauPrior {
         standardErrorPercent: Double?,
         profile: Profile,
         weightKg: Double?,
-        age: Int,
     ): Boolean {
         standardErrorPercent?.let {
             return it >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT - TOLERANCE
         }
-        return percent <= ceiling(profile, weightKg, age) + TOLERANCE
+        return percent <= ceiling(profile, weightKg) + TOLERANCE
     }
 }

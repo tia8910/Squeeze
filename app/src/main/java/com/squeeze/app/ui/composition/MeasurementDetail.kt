@@ -41,16 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.squeeze.app.data.db.MeasurementEntity
-import com.squeeze.app.data.toCircumferences
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.SecondaryButton
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.core.bodycomp.CompositionPanel
+import com.squeeze.core.bodycomp.BodyFindings
 import com.squeeze.core.bodycomp.RecordHeadline
 import com.squeeze.core.model.Profile
-import com.squeeze.core.render.BodyFigureBuilder
-import com.squeeze.core.render.BodyView
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -88,25 +86,13 @@ fun MeasurementDetailDialog(
 
     val figures = remember(entry.id, panel) { RecordHeadline.from(panel, entry.weightKg) }
 
-    // The body this record describes, drawn three ways. Built here rather than in the view
-    // model because it is a pure function of the row and the profile — nothing to load, and
-    // nothing to keep once the dialog closes.
     val bodyFatPercent = panel?.composition?.firstOrNull { it.name == "Body fat" }?.value
 
-    val views = remember(entry.id, profile, bodyFatPercent) {
-        val subject = profile
-        if (subject == null) {
-            emptyList()
-        } else {
-            BodyView.entries.mapNotNull { view ->
-                BodyFigureBuilder.build(
-                    profile = subject,
-                    circumferences = entry.toCircumferences(),
-                    bodyFatPercent = bodyFatPercent,
-                    view = view,
-                )
-            }
-        }
+    // What this record is good and bad at, read off the figures already in the panel. Derived
+    // here rather than in the view model because it is a pure function of the panel — nothing
+    // to load, and nothing worth keeping once the dialog closes.
+    val findings = remember(entry.id, panel, profile?.sex) {
+        profile?.let { BodyFindings.from(panel, it.sex) }.orEmpty()
     }
 
     val reference = rememberReferencePhysique(bodyFatPercent, profile?.sex)
@@ -159,8 +145,7 @@ fun MeasurementDetailDialog(
                 // below would have told them that.
                 RecordSummary(
                     figures = figures,
-                    views = views,
-                    estimatedSites = views.firstOrNull()?.estimatedSites.orEmpty(),
+                    findings = findings,
                     reference = reference,
                 )
 
