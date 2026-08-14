@@ -132,14 +132,31 @@ class SqueezeViewModel @Inject constructor(
      * Both together, always. Storing one without the other would leave the planner with a
      * goal it cannot judge, which is exactly the state this feature exists to avoid.
      */
-    fun setGoal(targetBodyFatPercent: Double?, targetEpochDay: Long?) {
+    /**
+     * Stores the goal, its targets and its deadline.
+     *
+     * A deadline plus at least one target, or nothing at all. The rule used to be a deadline
+     * plus a body fat figure, which made body fat the only goal the app could hold — someone
+     * adding size had to invent a percentage to have any goal at all, and a recomposition
+     * could not be expressed, because holding weight while the percentage falls needs two
+     * numbers and there was only one field.
+     */
+    fun setGoal(
+        goal: Goal,
+        targetBodyFatPercent: Double?,
+        targetWeightKg: Double?,
+        targetEpochDay: Long?,
+    ) {
         viewModelScope.launch {
             val existing = profileDao.get() ?: return@launch
-            val both = targetBodyFatPercent != null && targetEpochDay != null
+            val complete = targetEpochDay != null &&
+                (targetBodyFatPercent != null || targetWeightKg != null)
             profileDao.upsert(
                 existing.copy(
-                    targetBodyFatPercent = if (both) targetBodyFatPercent else null,
-                    targetEpochDay = if (both) targetEpochDay else null,
+                    goal = goal.name,
+                    targetBodyFatPercent = if (complete) targetBodyFatPercent else null,
+                    targetWeightKg = if (complete) targetWeightKg else null,
+                    targetEpochDay = if (complete) targetEpochDay else null,
                 ),
             )
             refresh()
@@ -274,5 +291,6 @@ private fun com.squeeze.app.data.db.ProfileEntity.toDomain() = Profile(
     goal = Goal.valueOf(goal),
     unitSystem = UnitSystem.valueOf(unitSystem),
     targetBodyFatPercent = targetBodyFatPercent,
+    targetWeightKg = targetWeightKg,
     targetEpochDay = targetEpochDay,
 )

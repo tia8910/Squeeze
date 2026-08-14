@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -76,6 +77,7 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.VisualAssessment
+import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
@@ -120,6 +122,11 @@ fun ScanScreen(
     LaunchedEffect(state.saved) { if (state.saved) onFinished() }
 
     when (state.step) {
+        ScanStep.WEIGHT -> WeightStep(
+            knownWeightKg = state.knownWeightKg,
+            onConfirm = viewModel::confirmWeight,
+        )
+
         ScanStep.OPTIONAL_EXTRAS -> OptionalExtrasStep(
             hasSide = state.hasSide,
             hasBack = state.hasBack,
@@ -146,6 +153,65 @@ fun ScanScreen(
             onSave = viewModel::save,
             onRetake = viewModel::restart,
         )
+    }
+}
+
+/**
+ * The first thing a scan asks for, before the camera.
+ *
+ * A weight used to be an optional field on the result screen, collected after the photograph
+ * and easy to skip. That made it look like a footnote, and it is not one: when the outline
+ * cannot resolve the body — which is most photographs of most people, because the ratio the
+ * method reads is flat across the lean range — the reported figure comes from height, weight
+ * and sex. A scan taken without a weight cannot produce a figure about the person at all. It
+ * falls back to the leanest number the method is allowed to claim, which is the same for
+ * everybody who lands there.
+ *
+ * Prefilled with the last recorded weight, so the usual case is one tap. Skippable, because a
+ * scan without a weight is worse than one with it and much better than one not taken.
+ */
+@Composable
+private fun WeightStep(knownWeightKg: Double?, onConfirm: (Double?) -> Unit) {
+    var weight by remember(knownWeightKg) {
+        mutableStateOf(knownWeightKg?.let { "%.1f".format(it) }.orEmpty())
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Before we start", style = MaterialTheme.typography.headlineSmall)
+
+        Text(
+            text = "What do you weigh today?",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+
+        MeasurementField("Weight (kg)", weight, { weight = it }, missing = false)
+
+        InfoCard(
+            "A photograph shows your outline, and an outline cannot tell a lean body from a " +
+                "very lean one — what separates them is definition, which a silhouette " +
+                "throws away. Your weight is what turns the scan into a figure about you " +
+                "rather than the leanest figure the method is allowed to claim. It is also " +
+                "what the plausibility check and the lean-mass trend run on.",
+        )
+
+        PrimaryButton(
+            text = "Continue",
+            onClick = { onConfirm(weight.toCm()) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        TextButton(
+            onClick = { onConfirm(null) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Skip — scan without it")
+        }
     }
 }
 

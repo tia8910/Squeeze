@@ -20,6 +20,7 @@ import com.squeeze.app.BuildConfig
 import com.squeeze.app.ui.brand.SqueezeMark
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.theme.ThemeMode
+import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Sex
 
 @Composable
@@ -36,9 +37,11 @@ fun SettingsScreen(
     birthYear: Int?,
     sex: Sex?,
     onProfileChange: (Double?, Int?, Sex?) -> Unit,
+    goal: Goal,
     targetBodyFatPercent: Double?,
+    targetWeightKg: Double?,
     targetEpochDay: Long?,
-    onGoalChange: (Double?, Long?) -> Unit,
+    onGoalChange: (Goal, Double?, Double?, Long?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -56,7 +59,9 @@ fun SettingsScreen(
         )
 
         GoalSection(
+            goal = goal,
             targetBodyFatPercent = targetBodyFatPercent,
+            targetWeightKg = targetWeightKg,
             targetEpochDay = targetEpochDay,
             onGoalChange = onGoalChange,
         )

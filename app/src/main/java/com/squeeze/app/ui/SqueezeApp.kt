@@ -60,6 +60,7 @@ import com.squeeze.app.ui.onboarding.OnboardingScreen
 import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
 import com.squeeze.app.ui.theme.Brand
+import com.squeeze.core.model.Goal
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.training.TrainingScreen
 import java.time.LocalDate
@@ -245,7 +246,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         birthYear = state.profile?.birthYear,
                         sex = state.profile?.sex,
                         onProfileChange = viewModel::updateProfile,
+                        goal = state.profile?.goal ?: Goal.HYPERTROPHY,
                         targetBodyFatPercent = state.profile?.targetBodyFatPercent,
+                        targetWeightKg = state.profile?.targetWeightKg,
                         targetEpochDay = state.profile?.targetEpochDay,
                         onGoalChange = viewModel::setGoal,
                     )

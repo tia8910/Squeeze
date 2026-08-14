@@ -125,5 +125,7 @@ data class ProfileEntity(
     val unitSystem: String,
     /** Target body fat and its deadline; see [com.squeeze.core.model.Profile]. */
     val targetBodyFatPercent: Double? = null,
+    /** A bodyweight to arrive at. Null when the goal is not about weight. */
+    val targetWeightKg: Double? = null,
     val targetEpochDay: Long? = null,
 )

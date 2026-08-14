@@ -59,6 +59,16 @@ data class Profile(
      * only thing a current rate can honestly be compared against.
      */
     val targetBodyFatPercent: Double? = null,
+    /**
+     * A bodyweight to arrive at, in either direction.
+     *
+     * Separate from [targetBodyFatPercent] rather than derived from it, because they are
+     * different goals and a person can hold both. "Lose ten kilos" and "get to fifteen per
+     * cent" are not the same instruction: the first can be met by losing muscle, and the
+     * second can be met at any weight. Someone recomposing wants both stated, and the app can
+     * only tell them whether it is working if it knows what "it" was.
+     */
+    val targetWeightKg: Double? = null,
     val targetEpochDay: Long? = null,
 ) {
     init {
@@ -67,13 +77,21 @@ data class Profile(
 
     fun ageAt(year: Int): Int = year - birthYear
 
-    /** The dated goal, or null when the user has not set one. */
+    /**
+     * The dated goal, or null when the user has not set one.
+     *
+     * Needs a deadline and at least one target. Either target alone is a complete goal: a
+     * lifter adding size wants a weight and no body fat figure, someone cutting wants the
+     * reverse, and a recomp wants both — a weight that holds while the percentage falls, which
+     * is the one goal that cannot be expressed with a single number at all.
+     */
     fun targetOrNull(): com.squeeze.core.bodycomp.GoalTarget? {
-        val percent = targetBodyFatPercent ?: return null
         val day = targetEpochDay ?: return null
+        if (targetBodyFatPercent == null && targetWeightKg == null) return null
         return com.squeeze.core.bodycomp.GoalTarget(
             goal = goal,
-            targetBodyFatPercent = percent,
+            targetBodyFatPercent = targetBodyFatPercent,
+            targetWeightKg = targetWeightKg,
             targetEpochDay = day,
         )
     }
