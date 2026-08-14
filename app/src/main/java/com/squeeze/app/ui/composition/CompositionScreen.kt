@@ -37,9 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.ui.components.BrandCard
+import com.squeeze.app.ui.components.BandChip
 import com.squeeze.app.ui.components.BrandRow
 import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.app.ui.components.SecondaryButton
+import com.squeeze.app.ui.components.SectionHeader
 import com.squeeze.app.ui.components.Sparkline
 import com.squeeze.app.ui.components.StatRow
 import com.squeeze.app.ui.components.StatTile
@@ -401,26 +403,44 @@ private fun HistorySection(
         modifier = Modifier.padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "History",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
+        SectionHeader(
+            eyebrow = "Every entry, oldest kept",
+            title = "History",
+            caption = if (measurements.size == 1) {
+                "One measurement so far. A trend needs three before it will say anything."
+            } else {
+                "${measurements.size} measurements. Tap one to see what it was made of."
+            },
         )
 
         measurements.take(HISTORY_LIMIT).forEach { entry ->
             BrandRow(onClick = { selected = entry }) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = formatDate(entry.epochDay),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = entrySummary(entry),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
-                    )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = formatDate(entry.epochDay),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        // How the row was measured, lifted out of the summary line and given
+                        // a chip. It is the single most important thing about an entry after
+                        // its date — a tape reading and a front-only photo estimate are not
+                        // the same claim, and buried mid-sentence between a waist and a
+                        // weight it read as one more measurement rather than as their
+                        // provenance.
+                        BandChip(sourceLabel(entry))
+                    }
+                    entryFigures(entry)?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+                        )
+                    }
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -467,20 +487,23 @@ private fun lastEntryLabel(measurements: List<MeasurementEntity>): String =
         else -> "$days days"
     }
 
-private fun entrySummary(entry: MeasurementEntity): String {
+/** How this row was measured. Shown as a chip, because it qualifies everything beside it. */
+private fun sourceLabel(entry: MeasurementEntity): String = when (entry.source) {
+    "PHOTO" -> "Scan"
+    "PHOTO_FRONT_ONLY" -> "Front only"
+    "REFERENCE_SCAN" -> "Reference"
+    else -> "Tape"
+}
+
+/** The figures in this row, or null when it holds none worth a second line. */
+private fun entryFigures(entry: MeasurementEntity): String? {
     val parts = buildList {
         entry.referenceBodyFatPercent?.let { add("DEXA %.1f%%".format(it)) }
-        entry.waistCm?.let { add("waist %.1f".format(it)) }
         entry.weightKg?.let { add("%.1f kg".format(it)) }
+        entry.waistCm?.let { add("waist %.1f".format(it)) }
         entry.neckCm?.let { add("neck %.1f".format(it)) }
     }
-    val source = when (entry.source) {
-        "PHOTO" -> "Scan"
-        "PHOTO_FRONT_ONLY" -> "Scan (front)"
-        "REFERENCE_SCAN" -> "Reference"
-        else -> "Tape"
-    }
-    return if (parts.isEmpty()) source else "$source · " + parts.joinToString(" · ")
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
 private const val HISTORY_LIMIT = 14
