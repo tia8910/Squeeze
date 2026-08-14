@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
@@ -86,15 +88,31 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
     val muted = if (dark) Brand.DarkMuted else Brand.Muted
 
     BrandCard(Modifier.fillMaxWidth()) {
+        // The group name as an eyebrow rather than a label in the same grey as the body
+        // copy underneath it. These three groups answer different questions — what am I made
+        // of, how is it distributed, what does it cost to run — and a heading that does not
+        // outrank its contents leaves the reader to discover that by reading all of it.
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = muted,
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = if (dark) Brand.DarkBlue else Brand.Blue,
         )
 
         metrics.forEachIndexed { index, metric ->
-            Column(Modifier.padding(top = if (index == 0) 12.dp else 18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // A hairline between readings. Spacing alone left one long column in which a
+            // band caption belonging to the metric above sat closer to the metric below it,
+            // and the eye had to re-establish where each figure started.
+            if (index > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 16.dp),
+                    color = if (dark) Brand.DarkLine else Brand.Line,
+                )
+            }
+
+            Column(Modifier.padding(top = if (index == 0) 12.dp else 16.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = metric.name,
                         style = MaterialTheme.typography.bodyMedium,
@@ -104,7 +122,8 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
                     )
                     Text(
                         text = metric.formatted(),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
