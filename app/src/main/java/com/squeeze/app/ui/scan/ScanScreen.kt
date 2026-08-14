@@ -77,6 +77,10 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.core.audio.Cue
 import com.squeeze.core.bodycomp.VisualAssessment
+import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.app.ui.components.BrandCard
+import com.squeeze.app.ui.components.HeroMetric
 import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
@@ -1188,56 +1192,48 @@ private fun ShapeHeadline(estimate: BodyFatEstimate, hasWeight: Boolean) {
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
     val low = (estimate.percent - estimate.standardErrorPercent).coerceAtLeast(3.0)
     val high = estimate.percent + estimate.standardErrorPercent
+    val dark = LocalIsDarkTheme.current
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = if (bounded) "Best estimate" else "From your shape",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Text(
-                text = "%.1f%%".format(estimate.percent),
-                style = MaterialTheme.typography.displaySmall,
-            )
+    BrandCard(Modifier.fillMaxWidth()) {
+        HeroMetric(
+            value = "%.1f".format(estimate.percent),
+            unit = "%",
+            label = if (bounded) "Best estimate" else "From your shape",
             // Shown for every reading, not only the uncertain ones. Every figure in this app
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
-            Text(
-                text = "Most likely %.0f–%.0f%%".format(low, high),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = when {
-                    bounded && hasWeight ->
-                        "Your outline could not settle this one. What separates a lean body " +
-                            "from a very lean one is abdominal definition, and a silhouette " +
-                            "throws that away — it knows your edge and nothing inside it. So " +
-                            "this figure comes from your height, weight and age instead, " +
-                            "which are measured rather than inferred. A side photo, a tape " +
-                            "measurement at your navel, or matching yourself to the pictures " +
-                            "below will all beat it."
+            interval = "most likely %.0f–%.0f%%".format(low, high),
+            band = if (bounded) "Not resolved by the photo" else null,
+        )
 
-                    bounded ->
-                        "Your outline could not settle this one, and without a weight there " +
-                            "is nothing left to settle it with — so this is the leanest " +
-                            "figure the shape reading is allowed to claim, not a reading of " +
-                            "you. Enter your weight above and it becomes an estimate of your " +
-                            "body."
+        Text(
+            text = when {
+                bounded && hasWeight ->
+                    "Your outline could not settle this one. What separates a lean body " +
+                        "from a very lean one is abdominal definition, and a silhouette " +
+                        "throws that away — it knows your edge and nothing inside it. So " +
+                        "this figure comes from your height, weight and age instead, " +
+                        "which are measured rather than inferred. A side photo, a tape " +
+                        "measurement at your navel, or matching yourself to the pictures " +
+                        "below will all beat it."
 
-                    else ->
-                        "Read from how wide your waist is relative to your shoulders and " +
-                            "hips. It never converts pixels to centimetres, so nothing about " +
-                            "how you were framed can reach it — which is why the scan keeps " +
-                            "this figure and not the one the circumferences give."
-                },
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+                bounded ->
+                    "Your outline could not settle this one, and without a weight there " +
+                        "is nothing left to settle it with — so this is the leanest " +
+                        "figure the shape reading is allowed to claim, not a reading of " +
+                        "you. Enter your weight above and it becomes an estimate of your " +
+                        "body."
+
+                else ->
+                    "Read from how wide your waist is relative to your shoulders and " +
+                        "hips. It never converts pixels to centimetres, so nothing about " +
+                        "how you were framed can reach it — which is why the scan keeps " +
+                        "this figure and not the one the circumferences give."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (dark) Brand.DarkMuted else Brand.Muted,
+            modifier = Modifier.padding(top = 12.dp),
+        )
     }
 }
 
