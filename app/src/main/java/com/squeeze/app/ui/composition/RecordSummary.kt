@@ -7,10 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -31,20 +32,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.core.bodycomp.BodyFinding
+import com.squeeze.core.bodycomp.FindingKind
 import com.squeeze.core.bodycomp.HeadlineFigure
 import com.squeeze.core.model.Sex
-import com.squeeze.core.render.BodyFigure
 import com.squeeze.core.render.ReferencePhysique
 
 /**
- * The top of a record: what the session concluded, over a body drawn from it.
+ * The top of a record: what the session concluded, and what it means.
  *
- * The two halves belong together and are drawn as one block for that reason. A body-fat
- * percentage is an assertion about a body, and a column of centimetres is the one form in
- * which a two-centimetre change at the waist is invisible. Putting the figures directly above
- * a figure built from those same figures makes the comparison the default rather than an
- * effort — and makes a broken scan obvious, because a wrong waist draws a body the user knows
- * is not theirs.
+ * This used to be the figures over a body drawn from them, and the drawing is gone. It was
+ * built from four girths and a body fat percentage with everything else — arms, calves,
+ * shoulders — filled in from population averages, so two people with the same waist were
+ * drawn identically and the caption underneath had to admit it. It took the most valuable
+ * space on the screen to show the reader what a body looks like.
+ *
+ * In its place is the question the drawing was standing in for: is this good news? A column of
+ * centimetres does not say, and neither did a silhouette. Two short lists do.
  *
  * Everything here is also printed below in full, with its confidence and its interval. This
  * block is a summary and is deliberately silent about uncertainty; the cards underneath are
@@ -53,12 +57,11 @@ import com.squeeze.core.render.ReferencePhysique
 @Composable
 fun RecordSummary(
     figures: List<HeadlineFigure>,
-    views: List<BodyFigure>,
-    estimatedSites: List<String>,
+    findings: List<BodyFinding>,
     reference: ReferencePhysiqueMatch?,
     modifier: Modifier = Modifier,
 ) {
-    if (figures.isEmpty() && views.isEmpty()) return
+    if (figures.isEmpty() && findings.isEmpty() && reference == null) return
 
     val dark = LocalIsDarkTheme.current
     val muted = if (dark) Brand.DarkMuted else Brand.Muted
@@ -67,19 +70,14 @@ fun RecordSummary(
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))) {
             if (figures.isNotEmpty()) HeadlineStrip(figures)
 
-            // The photograph when the set has shipped, the drawing when it has not. Never
-            // both: they answer the same question and stacking them would leave the reader
-            // deciding which of two bodies is the answer.
-            when {
-                reference != null -> Image(
-                    painter = painterResource(reference.drawableId),
+            reference?.let {
+                Image(
+                    painter = painterResource(it.drawableId),
                     contentDescription = "A reference body at about " +
-                        "${reference.bandPercent} per cent body fat",
+                        "${it.bandPercent} per cent body fat",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                views.isNotEmpty() -> FigureRow(views)
             }
         }
 
@@ -91,13 +89,9 @@ fun RecordSummary(
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
             )
-        } else if (views.isNotEmpty()) {
-            Text(
-                text = caption(estimatedSites),
-                style = MaterialTheme.typography.bodySmall,
-                color = muted,
-            )
         }
+
+        if (findings.isNotEmpty()) FindingsBlock(findings)
     }
 }
 
@@ -109,8 +103,8 @@ data class ReferencePhysiqueMatch(val drawableId: Int, val bandPercent: Int)
  * build.
  *
  * Looked up by name so [com.squeeze.core.render.ReferencePhysique] can stay in the
- * platform-free module, and so that a build shipping no photographs degrades to the drawn
- * figure rather than failing to compile.
+ * platform-free module, and so that a build shipping no photographs simply omits the image
+ * rather than failing to compile.
  */
 @Composable
 fun rememberReferencePhysique(percent: Double?, sex: Sex?): ReferencePhysiqueMatch? {
@@ -125,22 +119,6 @@ fun rememberReferencePhysique(percent: Double?, sex: Sex?): ReferencePhysiqueMat
         )
         if (id == 0) null else ReferencePhysiqueMatch(id, band)
     }
-}
-
-/**
- * What the drawing is, and what in it was not measured.
- *
- * Stated every time rather than hidden behind a tap. A drawing is far more persuasive than a
- * table — someone who would question a chest circumference will accept a chest they can see —
- * so the figure has to say plainly which parts of it came from this record and which came
- * from a population average.
- */
-private fun caption(estimatedSites: List<String>): String {
-    val base = "Drawn from this record's own measurements. Proportion is real; the likeness " +
-        "is not — two people with these measurements are drawn the same."
-    if (estimatedSites.isEmpty()) return base
-    return "$base Not measured here, so taken from population averages: " +
-        estimatedSites.joinToString(", ") { it.lowercase() } + "."
 }
 
 /**
@@ -216,55 +194,78 @@ private fun CellDivider() {
 }
 
 /**
- * The views, side by side, all at one scale.
+ * Strengths, then weak points.
  *
- * Front and back share an outline, because a girth is a loop and nothing in a record says how
- * it divides between the two halves. They are both shown anyway: the profile is what changes
- * most visibly as the waist moves, and a row of three reads as a body where a single figure
- * reads as an icon.
+ * Two headed lists rather than one mixed list with coloured dots. A reader scanning a mixed
+ * list has to decode each row before knowing which pile it belongs to, and the whole value of
+ * this block is being readable in the two seconds before the reader starts on the cards below.
+ *
+ * Nothing is padded. A record that supports one strength and no weak points shows exactly
+ * that — an empty column would invite the reader to wonder what was being withheld, and a
+ * manufactured finding would be worse than either.
  */
 @Composable
-private fun FigureRow(views: List<BodyFigure>) {
+private fun FindingsBlock(findings: List<BodyFinding>) {
     val dark = LocalIsDarkTheme.current
 
-    Row(
+    val strengths = findings.filter { it.kind == FindingKind.STRENGTH }
+    val weaknesses = findings.filter { it.kind == FindingKind.WEAKNESS }
+
+    Column(
         Modifier
             .fillMaxWidth()
-            .background(if (dark) Brand.DarkSunken else Brand.Sunken),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (dark) Brand.DarkSunken else Brand.Sunken)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        views.forEach { view ->
-            Box(
-                Modifier
-                    .weight(1f)
-                    .aspectRatio(FIGURE_PANEL_ASPECT),
+        if (strengths.isNotEmpty()) FindingGroup("Strengths", strengths, Brand.Success)
+        if (weaknesses.isNotEmpty()) FindingGroup("Weak points", weaknesses, Brand.Warning)
+    }
+}
+
+@Composable
+private fun FindingGroup(heading: String, findings: List<BodyFinding>, accent: Color) {
+    val dark = LocalIsDarkTheme.current
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = heading.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+        )
+
+        findings.forEach { finding ->
+            // IntrinsicSize.Min so the row measures its tallest child first, which is what
+            // lets the bar below fill the finding's real height rather than a guessed one.
+            Row(
+                Modifier.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                BodyFigureView(
-                    figure = view,
-                    fill = if (dark) Brand.DarkBlue else Brand.BlueDeep,
-                    // Drawn onto the filled body, so it has to lift off it rather than
-                    // contrast with the panel behind.
-                    line = if (dark) Brand.DarkGround.copy(alpha = 0.55f)
-                    else Color.White.copy(alpha = 0.65f),
+                // A bar rather than a dot: it grows with the text, so a three-line finding
+                // still reads as one item and the eye can follow the column down the list.
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(accent.copy(alpha = 0.55f)),
                 )
-                Text(
-                    text = view.view.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (dark) Brand.DarkMuted else Brand.Muted,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = finding.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (dark) Brand.DarkInk else Brand.Navy,
+                    )
+                    Text(
+                        text = finding.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (dark) Brand.DarkMuted else Brand.Muted,
+                    )
+                }
             }
         }
     }
 }
-
-/**
- * The frame each view is drawn in.
- *
- * Tall and narrow, because a standing body is: a squarer panel would leave the figure small
- * in the middle of it, and the whole value of the drawing is being able to see the waist.
- */
-private const val FIGURE_PANEL_ASPECT = 0.56f
