@@ -438,6 +438,10 @@ private fun CaptureStep(
         ) {
             StepCard(step)
             failure?.let { FailureCard(it) }
+
+            // Above the camera controls, not below them. A reference the reader reaches after
+            // they have already framed a shot is a reference they will not act on.
+            PoseReference(step)
             if (profileMissing) {
                 InfoCard(
                     "Set your height in Settings first — the scan uses it to convert the " +
