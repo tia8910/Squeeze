@@ -13,4 +13,4 @@
 -->
 <resources
     xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/physique_*" />
+    tools:keep="@drawable/physique_*,@drawable/pose_*" />

@@ -1,6 +1,7 @@
 package com.squeeze.app.ui.scan
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,8 +14,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -69,10 +74,24 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PoseFigure(
-                sideOn = step == ScanStep.SIDE,
-                modifier = Modifier.weight(1f).aspectRatio(0.62f),
-            )
+            val photo = rememberPosePhoto(step)
+
+            if (photo != null) {
+                Image(
+                    painter = painterResource(photo),
+                    contentDescription = "Someone standing in the pose to copy",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .aspectRatio(0.62f)
+                        .clip(RoundedCornerShape(12.dp)),
+                )
+            } else {
+                PoseFigure(
+                    sideOn = step == ScanStep.SIDE,
+                    modifier = Modifier.weight(1f).aspectRatio(0.62f),
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1.55f),
@@ -106,6 +125,38 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = if (dark) Brand.DarkMuted else Brand.Muted,
         )
+    }
+}
+
+/**
+ * The pose photograph for this step, when one has shipped.
+ *
+ * Resolved by name at run time rather than referenced directly, so a build with no pose
+ * photographs falls back to the drawn figure instead of failing to compile — the same
+ * arrangement the physique references use, and for the same reason: the code should not have
+ * to change when the artwork arrives.
+ *
+ * A photograph beats the drawing once one exists. The objection to a photograph was that it
+ * shows *a* body, so a reader who looks nothing like the model has to work out which parts
+ * they are meant to copy — but that objection is about a real person's photograph. A generated
+ * figure is nobody in particular, which removes both that problem and the copyright one, and a
+ * reader copying a pose from something that looks like a person will copy it more accurately
+ * than from a blue silhouette.
+ *
+ * Expected names: `pose_front`, `pose_side`, `pose_back`.
+ */
+@Composable
+private fun rememberPosePhoto(step: ScanStep): Int? {
+    val context = LocalContext.current
+    return remember(step) {
+        val name = when (step) {
+            ScanStep.SIDE -> "pose_side"
+            ScanStep.BACK -> "pose_back"
+            else -> "pose_front"
+        }
+        context.resources
+            .getIdentifier(name, "drawable", context.packageName)
+            .takeIf { it != 0 }
     }
 }
 
