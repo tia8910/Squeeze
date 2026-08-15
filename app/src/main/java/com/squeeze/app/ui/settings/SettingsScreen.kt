@@ -20,6 +20,7 @@ import com.squeeze.app.BuildConfig
 import com.squeeze.app.ui.brand.SqueezeMark
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.theme.ThemeMode
+import com.squeeze.app.ui.components.SecondaryButton
 import com.squeeze.app.ui.components.SectionHeader
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Sex
@@ -43,6 +44,7 @@ fun SettingsScreen(
     targetWeightKg: Double?,
     targetEpochDay: Long?,
     onGoalChange: (Goal, Double?, Double?, Long?) -> Unit,
+    onLabelPhotos: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -108,6 +110,16 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        SectionHeader(
+            eyebrow = "Help the scan get better",
+            title = "Label your scans",
+            caption = "Answer three questions about a scan photo. Enough of them and the app " +
+                "can learn to read definition from a picture instead of inferring it from an " +
+                "outline. Nothing leaves this device.",
+        )
+
+        SecondaryButton(text = "Start labelling", onClick = onLabelPhotos)
 
         SectionHeader(
             eyebrow = "On this device",
