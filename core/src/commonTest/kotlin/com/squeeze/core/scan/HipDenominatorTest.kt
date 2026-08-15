@@ -61,7 +61,10 @@ class HipDenominatorTest {
         val estimate = SilhouetteBodyFat.estimate(indices, Sex.MALE)
 
         assertNotNull(estimate)
-        assertTrue(estimate.percent > 13.0, "got ${estimate.percent}")
+        assertTrue(
+            estimate.percent > 13.0 - SilhouetteBodyFat.OBSERVED_OFFSET_PERCENT,
+            "got ${estimate.percent}",
+        )
     }
 
     @Test
@@ -85,12 +88,21 @@ class HipDenominatorTest {
 
     @Test
     fun `the hip mapping is monotonic`() {
-        val percents = listOf(0.78, 0.85, 0.92, 1.00).map { hip ->
+        // Starts at 0.87 rather than 0.78. Below that the mapping lands under
+        // leanestClaimable once OBSERVED_OFFSET_PERCENT is taken off, and the floor holds
+        // every such reading at the same value — so two lean ratios come back equal, which
+        // is the floor working rather than the mapping failing. Monotonicity is a property
+        // of the informative range, and the offset moved where that range begins.
+        val percents = listOf(0.87, 0.92, 1.00, 1.05).map { hip ->
             SilhouetteBodyFat.estimate(ShapeIndices(0.80, hip), Sex.MALE)?.percent
         }.filterNotNull()
 
         assertEquals(4, percents.size)
         assertTrue(percents.zipWithNext().all { (a, b) -> b > a }, "$percents")
+        assertTrue(
+            percents.first() > SilhouetteBodyFat.leanestClaimable(Sex.MALE),
+            "the range being tested has to sit above the floor: $percents",
+        )
     }
 
     @Test
