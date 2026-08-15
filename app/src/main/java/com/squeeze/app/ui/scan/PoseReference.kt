@@ -1,6 +1,7 @@
 package com.squeeze.app.ui.scan
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,8 +14,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -69,10 +74,23 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PoseFigure(
-                sideOn = step == ScanStep.SIDE,
-                modifier = Modifier.weight(1f).aspectRatio(0.62f),
-            )
+            val photo = rememberPosePhoto(step)
+
+            if (photo != null) {
+                Image(
+                    painter = painterResource(photo),
+                    contentDescription = "Someone standing in the pose to copy",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+                )
+            } else {
+                PoseFigure(
+                    sideOn = step == ScanStep.SIDE,
+                    modifier = Modifier.weight(1f).aspectRatio(0.62f),
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1.55f),
@@ -106,6 +124,48 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = if (dark) Brand.DarkMuted else Brand.Muted,
         )
+    }
+}
+
+/**
+ * The pose photograph for this step, when one has shipped.
+ *
+ * Resolved by name at run time rather than referenced directly, so a build with no pose
+ * photographs falls back to the drawn figure instead of failing to compile — the same
+ * arrangement the physique references use, and for the same reason: the code should not have
+ * to change when the artwork arrives.
+ *
+ * A photograph beats the drawing once one exists. The objection to a photograph was that it
+ * shows *a* body, so a reader who looks nothing like the model has to work out which parts
+ * they are meant to copy — but that objection is about a real person's photograph. A generated
+ * figure is nobody in particular, which removes both that problem and the copyright one, and a
+ * reader copying a pose from something that looks like a person will copy it more accurately
+ * than from a blue silhouette.
+ *
+ * Expected names: `pose_front`, `pose_side`, `pose_back`.
+ */
+@Composable
+private fun rememberPosePhoto(step: ScanStep): Int? {
+    val context = LocalContext.current
+    return remember(step) {
+        // The per-view image if it shipped, otherwise a single sheet showing all three.
+        //
+        // Both are supported because cropping one supplied image into three is a chore that
+        // stands between having the artwork and shipping it, and a step that can be skipped
+        // is one worth removing. A sheet showing front, side and back at once is also not
+        // worse for the reader: the pose is the same in all three, and seeing the set makes
+        // the relationship between them obvious.
+        val perView = when (step) {
+            ScanStep.SIDE -> "pose_side"
+            ScanStep.BACK -> "pose_back"
+            else -> "pose_front"
+        }
+
+        listOf(perView, "pose_reference").firstNotNullOfOrNull { name ->
+            context.resources
+                .getIdentifier(name, "drawable", context.packageName)
+                .takeIf { it != 0 }
+        }
     }
 }
 
@@ -170,57 +230,75 @@ private fun DrawScope.drawFrontFigure(body: Color, w: Float, h: Float) {
     val centre = w / 2f
 
     // Head and neck.
-    drawCircle(body, radius = w * 0.088f, center = Offset(centre, h * 0.11f))
+    drawCircle(body, radius = w * 0.082f, center = Offset(centre, h * 0.10f))
     drawRoundRect(
         color = body,
-        topLeft = Offset(centre - w * 0.035f, h * 0.175f),
-        size = Size(w * 0.07f, h * 0.035f),
+        topLeft = Offset(centre - w * 0.030f, h * 0.160f),
+        size = Size(w * 0.060f, h * 0.030f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f),
     )
 
-    // Torso: shoulders wider than waist, hips between the two. A trapezoid rather than a
-    // rectangle, because the taper is the quantity the scan reads and a figure that does not
-    // show one teaches the wrong silhouette.
-    val shoulderHalf = w * 0.155f
-    val waistHalf = w * 0.105f
-    val hipHalf = w * 0.125f
+    // Torso, narrower than the shoulder line so the arms have somewhere to be. The first
+    // version drew the torso out to the full shoulder width and then rotated the arms about a
+    // pivot inside it, so the arms never cleared the body and the whole figure rendered as one
+    // blob — the opposite of the thing the picture exists to show.
+    val shoulderHalf = w * 0.125f
+    val waistHalf = w * 0.088f
+    val hipHalf = w * 0.105f
 
     drawPath(
         path = Path().apply {
-            moveTo(centre - shoulderHalf, h * 0.205f)
-            lineTo(centre + shoulderHalf, h * 0.205f)
-            lineTo(centre + waistHalf, h * 0.39f)
-            lineTo(centre + hipHalf, h * 0.50f)
-            lineTo(centre - hipHalf, h * 0.50f)
-            lineTo(centre - waistHalf, h * 0.39f)
+            moveTo(centre - shoulderHalf, h * 0.192f)
+            lineTo(centre + shoulderHalf, h * 0.192f)
+            lineTo(centre + waistHalf, h * 0.360f)
+            lineTo(centre + hipHalf, h * 0.470f)
+            lineTo(centre - hipHalf, h * 0.470f)
+            lineTo(centre - waistHalf, h * 0.360f)
             close()
         },
         color = body,
     )
 
-    // Arms, angled out. Each is a rounded bar rotated about its own shoulder, so the gap
-    // between arm and waist is the thing the reader copies.
+    // Arms, hanging with a slight outward angle rather than held out.
+    //
+    // Matched to the reference photograph: this is how someone stands when told to stand
+    // still, which is the point — a pose people adopt naturally is one they will reproduce,
+    // and an A-pose held at forty-five degrees is one they will approximate badly.
+    //
+    // The angle is small and the gap does the work. Rotating outward about the shoulder means
+    // the separation is narrowest at the armpit and widest at the waist, which is exactly
+    // where it is needed: the waist band is the measurement everything else divides by, and
+    // the shoulder band is the one both arms ruined on the scan that read 4.93%.
+    val armHalfWidth = w * 0.028f
+
     listOf(-1f, 1f).forEach { side ->
-        val shoulder = Offset(centre + side * shoulderHalf * 0.85f, h * 0.225f)
-        rotate(degrees = side * 22f, pivot = shoulder) {
+        val shoulder = Offset(centre + side * (shoulderHalf - w * 0.010f), h * 0.196f)
+
+        rotate(degrees = side * 9f, pivot = shoulder) {
             drawRoundRect(
                 color = body,
-                topLeft = Offset(shoulder.x - w * 0.035f, shoulder.y),
-                size = Size(w * 0.07f, h * 0.30f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.035f),
+                // Meeting the torso at the shoulder rather than starting clear of it, so
+                // the deltoid reads as attached. The rotation opens the gap on the way down,
+                // which puts the separation where it is needed and none where it is not.
+                topLeft = Offset(
+                    shoulder.x - armHalfWidth + side * armHalfWidth,
+                    shoulder.y,
+                ),
+                size = Size(armHalfWidth * 2f, h * 0.315f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(armHalfWidth),
             )
         }
     }
 
-    // Legs, slightly apart. Feet are not drawn: at this size they add nothing the reader
-    // needs and every attempt to attach them to a leg in this project has produced a shape
-    // that reads as a mistake.
+    // Legs, with a clear gap between them. Feet are not drawn: at this size they add nothing,
+    // and every attempt to attach a foot to a leg in this project has produced a shape that
+    // reads as a mistake.
     listOf(-1f, 1f).forEach { side ->
         drawRoundRect(
             color = body,
-            topLeft = Offset(centre + side * w * 0.115f - w * 0.055f, h * 0.485f),
-            size = Size(w * 0.11f, h * 0.46f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.05f),
+            topLeft = Offset(centre + side * w * 0.058f - w * 0.042f, h * 0.455f),
+            size = Size(w * 0.084f, h * 0.470f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.040f),
         )
     }
 }

@@ -119,3 +119,34 @@ interface ProfileDao {
     @Query("DELETE FROM profile")
     suspend fun deleteAll()
 }
+
+@Dao
+interface DefinitionLabelDao {
+
+    @Query("SELECT * FROM definition_labels ORDER BY photoHash ASC, region ASC")
+    suspend fun all(): List<DefinitionLabelEntity>
+
+    @Query("SELECT * FROM definition_labels WHERE photoHash = :photoHash")
+    suspend fun forPhoto(photoHash: String): List<DefinitionLabelEntity>
+
+    /** How many photographs have been judged at all, which is the corpus's real size. */
+    @Query("SELECT COUNT(DISTINCT photoHash) FROM definition_labels")
+    fun observePhotoCount(): Flow<Int>
+
+    /**
+     * Replaces rather than ignores on conflict.
+     *
+     * A second judgement about the same photograph and region is someone changing their mind,
+     * and the later one is the one to keep. Ignoring it would silently discard a correction,
+     * which is the worst outcome for a set whose whole value is that a person stands behind
+     * every row.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(labels: List<DefinitionLabelEntity>)
+
+    @Query("DELETE FROM definition_labels WHERE photoHash = :photoHash")
+    suspend fun clearPhoto(photoHash: String)
+
+    @Query("DELETE FROM definition_labels")
+    suspend fun deleteAll()
+}

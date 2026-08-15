@@ -2,6 +2,7 @@ package com.squeeze.app.di
 
 import android.content.Context
 import com.squeeze.app.data.crypto.DatabaseKeyManager
+import com.squeeze.app.data.db.DefinitionLabelDao
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MesocycleDao
 import com.squeeze.app.data.db.ProfileDao
@@ -40,6 +41,10 @@ object AppModule {
     @Provides fun provideWorkoutDao(db: SqueezeDatabase): WorkoutDao = db.workoutDao()
     @Provides fun provideMesocycleDao(db: SqueezeDatabase): MesocycleDao = db.mesocycleDao()
     @Provides fun provideProfileDao(db: SqueezeDatabase): ProfileDao = db.profileDao()
+
+    @Provides
+    fun provideDefinitionLabelDao(db: SqueezeDatabase): DefinitionLabelDao =
+        db.definitionLabelDao()
 
     @Provides
     @Singleton

@@ -15,8 +15,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         LoggedSetEntity::class,
         MesocycleEntity::class,
         ProfileEntity::class,
+        DefinitionLabelEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class SqueezeDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun mesocycleDao(): MesocycleDao
     abstract fun profileDao(): ProfileDao
+    abstract fun definitionLabelDao(): DefinitionLabelDao
 }
 
 /**
@@ -118,6 +120,35 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /**
+     * Adds the definition-label corpus.
+     *
+     * A new table rather than columns on `measurements`, because a label is about a
+     * photograph and not about a measurement session — the same photograph can be judged
+     * again later, and a scan can exist with no photograph to judge.
+     */
+    private val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS definition_labels (
+                    photoHash TEXT NOT NULL,
+                    region TEXT NOT NULL,
+                    capturedEpochDay INTEGER NOT NULL,
+                    visible INTEGER NOT NULL,
+                    unusable INTEGER NOT NULL,
+                    labelledEpochDay INTEGER NOT NULL,
+                    PRIMARY KEY (photoHash, region)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_definition_labels_photoHash " +
+                    "ON definition_labels (photoHash)",
+            )
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -133,6 +164,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to

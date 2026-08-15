@@ -54,6 +54,7 @@ import androidx.navigation.compose.rememberNavController
 import com.squeeze.app.ui.brand.SqueezeWordmark
 import com.squeeze.app.ui.celebration.CelebrationScreen
 import com.squeeze.app.ui.composition.CompositionScreen
+import com.squeeze.app.ui.label.LabelScreen
 import com.squeeze.app.ui.landing.LandingScreen
 import com.squeeze.app.ui.measurement.AddMeasurementScreen
 import com.squeeze.app.ui.onboarding.OnboardingScreen
@@ -82,6 +83,15 @@ private enum class Destination(
     TRAINING("training", "Train", Icons.Default.FitnessCenter),
     SETTINGS("settings", "You", Icons.Default.Person),
 }
+
+/**
+ * The labelling screen, deliberately not a tab.
+ *
+ * It is a tool for building the training set, not part of using the app to track a body, and
+ * a fourth tab would put it in front of every user for the sake of the few who will ever open
+ * it. Reached from Settings instead.
+ */
+private const val LABEL_ROUTE = "label"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,6 +242,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
                 composable(Destination.TRAINING.route) { TrainingScreen() }
 
+                composable(LABEL_ROUTE) { LabelScreen() }
+
                 composable(Destination.SETTINGS.route) {
                     val blockScreenshots by viewModel.blockScreenshots
                         .collectAsStateWithLifecycle()
@@ -259,6 +271,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         targetWeightKg = state.profile?.targetWeightKg,
                         targetEpochDay = state.profile?.targetEpochDay,
                         onGoalChange = viewModel::setGoal,
+                        onLabelPhotos = { navController.navigate(LABEL_ROUTE) },
                     )
                 }
 
