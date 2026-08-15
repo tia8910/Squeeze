@@ -138,7 +138,7 @@ class PlateauPriorTest {
         // trained man reads lean from a clean hip ratio and BMI, blind to muscle, would drag
         // him upward — the exact bias MethodFusion refuses to average into a measured method.
         val measured = SilhouetteBodyFat.estimate(
-            ShapeIndices(waistToShoulder = 0.90, waistToHip = 0.87),
+            ShapeIndices(waistToShoulder = 0.95, waistToHip = 0.95),
             Sex.MALE,
         )
         assertNotNull(measured)

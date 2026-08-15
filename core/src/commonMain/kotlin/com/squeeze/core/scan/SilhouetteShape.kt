@@ -328,6 +328,29 @@ object SilhouetteBodyFat {
      *   silhouette produces — which means the outline is not a body, not that the body is
      *   unusual
      */
+    /**
+     * Points taken off every silhouette reading, from comparison against independent reads.
+     *
+     * Two scans of the same body, checked against a coach's eye and against a vision model
+     * reading the photograph, both put this method about two points high: 18 where the eye
+     * said 15-16, and 17 where it said 14-16. Same direction both times.
+     *
+     * **Two observations is not a fit, and this is not one.** It is an offset the size of the
+     * disagreement that has actually been seen, applied because leaving a known bias in place
+     * so the constant can stay theoretically pure serves nobody using the app. It is named
+     * here rather than folded into the anchors so it can be deleted in one line when the
+     * labelled corpus makes the anchors fittable, which is what should replace it.
+     *
+     * It is also probably standing in for something else. This body's waist reads about five
+     * centimetres wide, and a waist that is too large inflates the estimate through every
+     * route at once — fix the band placement and this offset will over-correct. That is the
+     * argument for keeping it small, visible and easy to remove rather than for not having it.
+     *
+     * Subtracted before the floor, so no reading can be pushed below what the outline is
+     * allowed to claim.
+     */
+    const val OBSERVED_OFFSET_PERCENT = 2.0
+
     fun estimate(indices: ShapeIndices, sex: Sex): BodyFatEstimate? {
         val female = sex == Sex.FEMALE
 
@@ -340,7 +363,7 @@ object SilhouetteBodyFat {
 
         val fromShoulder = interpolate(
             indices.waistToShoulder, leanRatio, highRatio, leanPercent, highPercent,
-        )
+        ) - OBSERVED_OFFSET_PERCENT
 
         // **The hip is the denominator, whenever there is one.**
         //
@@ -371,7 +394,7 @@ object SilhouetteBodyFat {
                     if (female) FEMALE_HIGH_HIP_RATIO else MALE_HIGH_HIP_RATIO,
                     leanPercent,
                     highPercent,
-                )
+                ) - OBSERVED_OFFSET_PERCENT
             }
 
         if (fromHip != null) {
