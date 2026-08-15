@@ -83,7 +83,6 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .weight(1f)
-                        .aspectRatio(0.62f)
                         .clip(RoundedCornerShape(12.dp)),
                 )
             } else {
@@ -149,14 +148,24 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
 private fun rememberPosePhoto(step: ScanStep): Int? {
     val context = LocalContext.current
     return remember(step) {
-        val name = when (step) {
+        // The per-view image if it shipped, otherwise a single sheet showing all three.
+        //
+        // Both are supported because cropping one supplied image into three is a chore that
+        // stands between having the artwork and shipping it, and a step that can be skipped
+        // is one worth removing. A sheet showing front, side and back at once is also not
+        // worse for the reader: the pose is the same in all three, and seeing the set makes
+        // the relationship between them obvious.
+        val perView = when (step) {
             ScanStep.SIDE -> "pose_side"
             ScanStep.BACK -> "pose_back"
             else -> "pose_front"
         }
-        context.resources
-            .getIdentifier(name, "drawable", context.packageName)
-            .takeIf { it != 0 }
+
+        listOf(perView, "pose_reference").firstNotNullOfOrNull { name ->
+            context.resources
+                .getIdentifier(name, "drawable", context.packageName)
+                .takeIf { it != 0 }
+        }
     }
 }
 
