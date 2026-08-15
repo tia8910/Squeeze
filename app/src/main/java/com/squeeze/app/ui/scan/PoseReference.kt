@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,16 +25,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
@@ -78,15 +84,11 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
             color = if (dark) Brand.DarkBlue else Brand.Blue,
         )
 
-        val photo = rememberPosePhoto(step)
+        val photo = posePhotoId(step)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (photo != null) {
-                PosePanel(
-                    photo = photo,
-                    step = step,
-                    modifier = Modifier.weight(1f),
-                )
+                PosePanel(step = step, modifier = Modifier.wrapContentWidth())
             } else {
                 PoseFigure(
                     sideOn = step == ScanStep.SIDE,
@@ -128,7 +130,7 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
  * Expected names: `pose_front`, `pose_side`, `pose_back`.
  */
 @Composable
-private fun rememberPosePhoto(step: ScanStep): Int? {
+private fun posePhotoId(step: ScanStep): Int? {
     val context = LocalContext.current
     return remember(step) {
         // The per-view image if it shipped, otherwise a single sheet showing all three.
@@ -171,40 +173,48 @@ private fun rememberPosePhoto(step: ScanStep): Int? {
  * is what the instruction beside it describes.
  */
 @Composable
-private fun PosePanel(photo: Int, step: ScanStep, modifier: Modifier = Modifier) {
-    val painter = painterResource(photo)
-    val intrinsic = painter.intrinsicSize
+private fun PosePanel(step: ScanStep, modifier: Modifier = Modifier) {
+    val sheet = ImageBitmap.imageResource(posePhotoId(step) ?: return)
 
-    // Three columns, two rows. Falls back to the drawn figure's aspect when the painter cannot
-    // report a size, which is the case for a vector with no fixed dimensions.
-    val panelAspect = if (intrinsic.isSpecified && intrinsic.height > 0f) {
-        (intrinsic.width / COLUMNS) / (intrinsic.height / ROWS)
-    } else {
-        0.62f
-    }
-
+    val panelWidth = sheet.width / COLUMNS
+    val panelHeight = sheet.height / ROWS
     val column = when (step) {
         ScanStep.SIDE -> 1
         ScanStep.BACK -> 2
         else -> 0
     }
 
-    BoxWithConstraints(
+    Canvas(
         modifier = modifier
-            .aspectRatio(panelAspect)
+            .height(PANEL_HEIGHT)
+            .aspectRatio(panelWidth.toFloat() / panelHeight.toFloat())
             .clip(RoundedCornerShape(12.dp)),
     ) {
-        Image(
-            painter = painter,
-            contentDescription = "Someone standing in the pose to copy",
-            contentScale = ContentScale.FillWidth,
-            alignment = Alignment.TopStart,
-            modifier = Modifier
-                .requiredWidth(maxWidth * COLUMNS)
-                .offset(x = -maxWidth * column),
+        // Drawn with an explicit source rectangle rather than positioned by layout modifiers.
+        //
+        // The previous attempt laid the sheet out at three times the panel width and offset it
+        // by the column, which is the kind of thing that reads as correct and renders as the
+        // middle panel: an oversized child inside a clipping box depends on how that box aligns
+        // what does not fit, and it landed on a view the reader was not being asked for. There
+        // is no alignment here. srcOffset names the pixels, and the pixels are the answer.
+        drawImage(
+            image = sheet,
+            srcOffset = IntOffset(x = column * panelWidth, y = 0),
+            srcSize = IntSize(panelWidth, panelHeight),
+            dstSize = IntSize(size.width.toInt(), size.height.toInt()),
         )
     }
 }
+
+/**
+ * How tall the pose panel may get.
+ *
+ * Fixed rather than derived from the width, because the panel is a portrait crop of a standing
+ * body and a portrait crop given a share of the screen's width comes back taller than the
+ * screen. Twice now it has pushed the camera and upload controls below the fold — a reference
+ * that hides the control it exists to serve has cost more than it gave.
+ */
+private val PANEL_HEIGHT = 190.dp
 
 /** The pose sheet's grid. Three views across, two framings down. */
 private const val COLUMNS = 3
