@@ -433,6 +433,16 @@ private fun CaptureStep(
             CameraPermissionRequired(onRequest = onRequestCamera)
         }
 
+        // Collapsed by default once the camera is live, expanded when it is not.
+        //
+        // The guide and the viewfinder want the same screen. Expanded over a preview it hid
+        // the thing the user was trying to frame — they cannot copy a pose they cannot see
+        // themselves failing to hold. But it has to be the first thing on an upload-only
+        // screen, where there is no preview and nothing else explains what the photo needs.
+        // So the default follows which of those the user is in, and either way it is one tap
+        // to the other.
+        var guideExpanded by remember(hasCameraPermission) { mutableStateOf(!hasCameraPermission) }
+
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -440,9 +450,20 @@ private fun CaptureStep(
             StepCard(step)
             failure?.let { FailureCard(it) }
 
-            // Above the camera controls, not below them. A reference the reader reaches after
-            // they have already framed a shot is a reference they will not act on.
-            PoseReference(step)
+            if (guideExpanded) {
+                PoseReference(step)
+            }
+
+            // Always present, so the guide is never lost — and labelled with what it does
+            // rather than with a chevron, because a bare arrow over a camera preview reads as
+            // a control for the camera.
+            FilledTonalButton(
+                onClick = { guideExpanded = !guideExpanded },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (guideExpanded) "Hide how to stand" else "How to stand")
+            }
+
             if (profileMissing) {
                 InfoCard(
                     "Set your height in Settings first — the scan uses it to convert the " +
