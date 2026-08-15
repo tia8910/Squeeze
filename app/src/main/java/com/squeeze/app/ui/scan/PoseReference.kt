@@ -259,34 +259,35 @@ private fun DrawScope.drawFrontFigure(body: Color, w: Float, h: Float) {
         color = body,
     )
 
-    // Arms, each a straight bar placed wholly outside the torso with a visible gap, not a
-    // rotated shape overlapping it. The gap is the entire subject of this drawing: a reader
-    // copies the space between arm and waist, not the angle of the limb.
-    val armHalfWidth = w * 0.030f
-    val gap = w * 0.030f
+    // Arms, hanging with a slight outward angle rather than held out.
+    //
+    // Matched to the reference photograph: this is how someone stands when told to stand
+    // still, which is the point — a pose people adopt naturally is one they will reproduce,
+    // and an A-pose held at forty-five degrees is one they will approximate badly.
+    //
+    // The angle is small and the gap does the work. Rotating outward about the shoulder means
+    // the separation is narrowest at the armpit and widest at the waist, which is exactly
+    // where it is needed: the waist band is the measurement everything else divides by, and
+    // the shoulder band is the one both arms ruined on the scan that read 4.93%.
+    val armHalfWidth = w * 0.028f
 
     listOf(-1f, 1f).forEach { side ->
-        val inner = centre + side * (shoulderHalf + gap)
-        val outer = inner + side * armHalfWidth * 2f
+        val shoulder = Offset(centre + side * (shoulderHalf - w * 0.010f), h * 0.196f)
 
-        drawRoundRect(
-            color = body,
-            topLeft = Offset(minOf(inner, outer), h * 0.200f),
-            size = Size(armHalfWidth * 2f, h * 0.300f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(armHalfWidth),
-        )
-
-        // The shoulder cap, bridging torso to arm above the gap, so the arm reads as attached
-        // rather than as floating beside the body.
-        drawRoundRect(
-            color = body,
-            topLeft = Offset(
-                minOf(centre + side * shoulderHalf, outer),
-                h * 0.192f,
-            ),
-            size = Size(shoulderHalf + gap + armHalfWidth * 2f - shoulderHalf, h * 0.030f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.012f),
-        )
+        rotate(degrees = side * 9f, pivot = shoulder) {
+            drawRoundRect(
+                color = body,
+                // Meeting the torso at the shoulder rather than starting clear of it, so
+                // the deltoid reads as attached. The rotation opens the gap on the way down,
+                // which puts the separation where it is needed and none where it is not.
+                topLeft = Offset(
+                    shoulder.x - armHalfWidth + side * armHalfWidth,
+                    shoulder.y,
+                ),
+                size = Size(armHalfWidth * 2f, h * 0.315f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(armHalfWidth),
+            )
+        }
     }
 
     // Legs, with a clear gap between them. Feet are not drawn: at this size they add nothing,
