@@ -73,47 +73,35 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
             color = if (dark) Brand.DarkBlue else Brand.Blue,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val photo = rememberPosePhoto(step)
+        val photo = rememberPosePhoto(step)
 
-            if (photo != null) {
-                Image(
-                    painter = painterResource(photo),
-                    contentDescription = "Someone standing in the pose to copy",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp)),
-                )
-            } else {
+        // A photograph gets the full width and the rules go under it; the drawn figure sits
+        // beside them. The shapes are different and the layout has to follow: the supplied
+        // sheet is three panels wide, and in the narrow column the drawing lives in it would
+        // render each body about a centimetre tall — legible as a blue silhouette, useless as
+        // a photograph of a pose someone is meant to copy.
+        if (photo != null) {
+            Image(
+                painter = painterResource(photo),
+                contentDescription = "Someone standing in the pose to copy, front, side and back",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp)),
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { PoseRules() }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PoseFigure(
                     sideOn = step == ScanStep.SIDE,
                     modifier = Modifier.weight(1f).aspectRatio(0.62f),
                 )
-            }
 
-            Column(
-                modifier = Modifier.weight(1.55f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PoseRule(
-                    "Arms clear of your sides",
-                    "The one that matters most. An arm touching your waist is measured as " +
-                        "part of you, and the reading comes back far too lean.",
-                )
-                PoseRule(
-                    "Stand relaxed, not braced",
-                    "Bracing narrows the waist and flattens the stomach. Breathe out and let " +
-                        "it go.",
-                )
-                PoseRule(
-                    "Phone at chest height, level",
-                    "Shooting up or down foreshortens the trunk and moves every band.",
-                )
-                PoseRule(
-                    "Waistband below your hip bones",
-                    "Shorts sitting on the hip are measured instead of the hip.",
-                )
+                Column(
+                    modifier = Modifier.weight(1.55f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) { PoseRules() }
             }
         }
 
@@ -167,6 +155,32 @@ private fun rememberPosePhoto(step: ScanStep): Int? {
                 .takeIf { it != 0 }
         }
     }
+}
+
+/**
+ * The four rules, ranked by how much damage each one prevents rather than by order of
+ * operations. Extracted so the photograph layout and the drawing layout cannot drift into
+ * showing different advice.
+ */
+@Composable
+private fun PoseRules() {
+    PoseRule(
+        "Arms clear of your sides",
+        "The one that matters most. An arm touching your waist is measured as part of you, " +
+            "and the reading comes back far too lean.",
+    )
+    PoseRule(
+        "Stand relaxed, not braced",
+        "Bracing narrows the waist and flattens the stomach. Breathe out and let it go.",
+    )
+    PoseRule(
+        "Phone at chest height, level",
+        "Shooting up or down foreshortens the trunk and moves every band.",
+    )
+    PoseRule(
+        "Waistband below your hip bones",
+        "Shorts sitting on the hip are measured instead of the hip.",
+    )
 }
 
 @Composable
