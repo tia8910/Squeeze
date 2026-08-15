@@ -4,17 +4,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -22,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -75,34 +80,24 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
 
         val photo = rememberPosePhoto(step)
 
-        // A photograph gets the full width and the rules go under it; the drawn figure sits
-        // beside them. The shapes are different and the layout has to follow: the supplied
-        // sheet is three panels wide, and in the narrow column the drawing lives in it would
-        // render each body about a centimetre tall — legible as a blue silhouette, useless as
-        // a photograph of a pose someone is meant to copy.
-        if (photo != null) {
-            Image(
-                painter = painterResource(photo),
-                contentDescription = "Someone standing in the pose to copy, front, side and back",
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp)),
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { PoseRules() }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (photo != null) {
+                PosePanel(
+                    photo = photo,
+                    step = step,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
                 PoseFigure(
                     sideOn = step == ScanStep.SIDE,
                     modifier = Modifier.weight(1f).aspectRatio(0.62f),
                 )
-
-                Column(
-                    modifier = Modifier.weight(1.55f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) { PoseRules() }
             }
+
+            Column(
+                modifier = Modifier.weight(1.55f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) { PoseRules() }
         }
 
         Text(
@@ -156,6 +151,64 @@ private fun rememberPosePhoto(step: ScanStep): Int? {
         }
     }
 }
+
+/**
+ * One panel of the pose sheet, cropped to the view this step is asking for.
+ *
+ * The supplied artwork is a contact sheet: three views across, two rows down. Shown whole it
+ * did two things wrong — it displayed the side and back views to someone being asked for a
+ * front photograph, and at full width it was tall enough to push the camera button off the
+ * bottom of the screen. A reference that hides the control it is a reference for has cost more
+ * than it gave.
+ *
+ * Cropped in the layout rather than by cutting the file, because the file is the artwork and
+ * the app's needs will change again. The geometry comes from the painter's own intrinsic size,
+ * so there are no magic numbers here and a re-exported sheet at a different resolution keeps
+ * working: the image is laid out at three times the panel's width and aligned to the start,
+ * which places one column of one row exactly inside the clip.
+ *
+ * The top row is used. Both rows show the same pose; the top one is framed head to feet, which
+ * is what the instruction beside it describes.
+ */
+@Composable
+private fun PosePanel(photo: Int, step: ScanStep, modifier: Modifier = Modifier) {
+    val painter = painterResource(photo)
+    val intrinsic = painter.intrinsicSize
+
+    // Three columns, two rows. Falls back to the drawn figure's aspect when the painter cannot
+    // report a size, which is the case for a vector with no fixed dimensions.
+    val panelAspect = if (intrinsic.isSpecified && intrinsic.height > 0f) {
+        (intrinsic.width / COLUMNS) / (intrinsic.height / ROWS)
+    } else {
+        0.62f
+    }
+
+    val column = when (step) {
+        ScanStep.SIDE -> 1
+        ScanStep.BACK -> 2
+        else -> 0
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .aspectRatio(panelAspect)
+            .clip(RoundedCornerShape(12.dp)),
+    ) {
+        Image(
+            painter = painter,
+            contentDescription = "Someone standing in the pose to copy",
+            contentScale = ContentScale.FillWidth,
+            alignment = Alignment.TopStart,
+            modifier = Modifier
+                .requiredWidth(maxWidth * COLUMNS)
+                .offset(x = -maxWidth * column),
+        )
+    }
+}
+
+/** The pose sheet's grid. Three views across, two framings down. */
+private const val COLUMNS = 3
+private const val ROWS = 2
 
 /**
  * The four rules, ranked by how much damage each one prevents rather than by order of
