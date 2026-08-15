@@ -35,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
@@ -556,6 +557,18 @@ private fun CaptureStep(
                     FilledTonalButton(onClick = { useFrontCamera = !useFrontCamera }) {
                         Icon(Icons.Default.Cameraswitch, contentDescription = "Switch camera")
                     }
+                }
+            }
+
+            // The permission prompt lives behind this column, in the space the camera preview
+            // would occupy, and this column is tall enough to cover it — so on a device that
+            // has not granted the camera there was no way to reach "Allow camera" at all, and
+            // the screen offered only an upload. The ask belongs in the same stack as the
+            // actions it unlocks.
+            if (!hasCameraPermission) {
+                Button(onClick = onRequestCamera, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = null, Modifier.size(18.dp))
+                    Text("  Use the camera")
                 }
             }
 
