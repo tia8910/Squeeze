@@ -170,57 +170,74 @@ private fun DrawScope.drawFrontFigure(body: Color, w: Float, h: Float) {
     val centre = w / 2f
 
     // Head and neck.
-    drawCircle(body, radius = w * 0.088f, center = Offset(centre, h * 0.11f))
+    drawCircle(body, radius = w * 0.082f, center = Offset(centre, h * 0.10f))
     drawRoundRect(
         color = body,
-        topLeft = Offset(centre - w * 0.035f, h * 0.175f),
-        size = Size(w * 0.07f, h * 0.035f),
+        topLeft = Offset(centre - w * 0.030f, h * 0.160f),
+        size = Size(w * 0.060f, h * 0.030f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f),
     )
 
-    // Torso: shoulders wider than waist, hips between the two. A trapezoid rather than a
-    // rectangle, because the taper is the quantity the scan reads and a figure that does not
-    // show one teaches the wrong silhouette.
-    val shoulderHalf = w * 0.155f
-    val waistHalf = w * 0.105f
-    val hipHalf = w * 0.125f
+    // Torso, narrower than the shoulder line so the arms have somewhere to be. The first
+    // version drew the torso out to the full shoulder width and then rotated the arms about a
+    // pivot inside it, so the arms never cleared the body and the whole figure rendered as one
+    // blob — the opposite of the thing the picture exists to show.
+    val shoulderHalf = w * 0.125f
+    val waistHalf = w * 0.088f
+    val hipHalf = w * 0.105f
 
     drawPath(
         path = Path().apply {
-            moveTo(centre - shoulderHalf, h * 0.205f)
-            lineTo(centre + shoulderHalf, h * 0.205f)
-            lineTo(centre + waistHalf, h * 0.39f)
-            lineTo(centre + hipHalf, h * 0.50f)
-            lineTo(centre - hipHalf, h * 0.50f)
-            lineTo(centre - waistHalf, h * 0.39f)
+            moveTo(centre - shoulderHalf, h * 0.192f)
+            lineTo(centre + shoulderHalf, h * 0.192f)
+            lineTo(centre + waistHalf, h * 0.360f)
+            lineTo(centre + hipHalf, h * 0.470f)
+            lineTo(centre - hipHalf, h * 0.470f)
+            lineTo(centre - waistHalf, h * 0.360f)
             close()
         },
         color = body,
     )
 
-    // Arms, angled out. Each is a rounded bar rotated about its own shoulder, so the gap
-    // between arm and waist is the thing the reader copies.
+    // Arms, each a straight bar placed wholly outside the torso with a visible gap, not a
+    // rotated shape overlapping it. The gap is the entire subject of this drawing: a reader
+    // copies the space between arm and waist, not the angle of the limb.
+    val armHalfWidth = w * 0.030f
+    val gap = w * 0.030f
+
     listOf(-1f, 1f).forEach { side ->
-        val shoulder = Offset(centre + side * shoulderHalf * 0.85f, h * 0.225f)
-        rotate(degrees = side * 22f, pivot = shoulder) {
-            drawRoundRect(
-                color = body,
-                topLeft = Offset(shoulder.x - w * 0.035f, shoulder.y),
-                size = Size(w * 0.07f, h * 0.30f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.035f),
-            )
-        }
+        val inner = centre + side * (shoulderHalf + gap)
+        val outer = inner + side * armHalfWidth * 2f
+
+        drawRoundRect(
+            color = body,
+            topLeft = Offset(minOf(inner, outer), h * 0.200f),
+            size = Size(armHalfWidth * 2f, h * 0.300f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(armHalfWidth),
+        )
+
+        // The shoulder cap, bridging torso to arm above the gap, so the arm reads as attached
+        // rather than as floating beside the body.
+        drawRoundRect(
+            color = body,
+            topLeft = Offset(
+                minOf(centre + side * shoulderHalf, outer),
+                h * 0.192f,
+            ),
+            size = Size(shoulderHalf + gap + armHalfWidth * 2f - shoulderHalf, h * 0.030f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.012f),
+        )
     }
 
-    // Legs, slightly apart. Feet are not drawn: at this size they add nothing the reader
-    // needs and every attempt to attach them to a leg in this project has produced a shape
-    // that reads as a mistake.
+    // Legs, with a clear gap between them. Feet are not drawn: at this size they add nothing,
+    // and every attempt to attach a foot to a leg in this project has produced a shape that
+    // reads as a mistake.
     listOf(-1f, 1f).forEach { side ->
         drawRoundRect(
             color = body,
-            topLeft = Offset(centre + side * w * 0.115f - w * 0.055f, h * 0.485f),
-            size = Size(w * 0.11f, h * 0.46f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.05f),
+            topLeft = Offset(centre + side * w * 0.058f - w * 0.042f, h * 0.455f),
+            size = Size(w * 0.084f, h * 0.470f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.040f),
         )
     }
 }
