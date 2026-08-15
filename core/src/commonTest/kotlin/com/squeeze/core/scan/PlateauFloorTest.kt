@@ -73,7 +73,12 @@ class PlateauFloorTest {
 
         assertTrue(percents.zipWithNext().all { (a, b) -> b > a }, "$percents")
         assertTrue(percents.first() > SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE))
-        assertEquals(35.0, percents.last(), 0.5)
+        // The top anchor, less the observed offset every reading now carries.
+        assertEquals(
+            35.0 - SilhouetteBodyFat.OBSERVED_OFFSET_PERCENT,
+            percents.last(),
+            0.5,
+        )
     }
 
     @Test
