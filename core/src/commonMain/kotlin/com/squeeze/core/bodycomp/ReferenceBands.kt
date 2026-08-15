@@ -103,14 +103,18 @@ object ReferenceBands {
             value < belowAverage -> ReferenceBand(
                 BandPosition.LOW,
                 "Below average",
-                "Less lean mass than typical for your height. Resistance training moves this " +
-                    "more reliably than anything else.",
+                "Less lean mass than typical for your height. A population comparison, not a " +
+                    "judgement of your training: resistance work moves this more reliably " +
+                    "than anything else, and it moves slowly.",
             )
 
             value < average -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Average",
-                "Around the untrained adult norm.",
+                "Around the adult average for your sex. This says how much lean mass you " +
+                    "carry, not how hard you train — someone lean enough to look muscular " +
+                    "often sits here, because visible muscle comes from low body fat as much " +
+                    "as from mass.",
             )
 
             value < aboveAverage -> ReferenceBand(
