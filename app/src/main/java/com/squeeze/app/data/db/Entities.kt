@@ -129,3 +129,34 @@ data class ProfileEntity(
     val targetWeightKg: Double? = null,
     val targetEpochDay: Long? = null,
 )
+
+/**
+ * One human judgement about one region of one scan photograph.
+ *
+ * Keyed by the hash of the image bytes rather than by the photo's storage id, and that is what
+ * makes the corpus portable. A storage id means something only to the device that minted it; a
+ * hash of the pixels means the same thing everywhere, so a labels file exported from this
+ * phone can be checked against the same photographs on the machine that trains the model, and
+ * a mislabelled file cannot quietly attach itself to the wrong judgement.
+ *
+ * The photograph itself never leaves the device. See com.squeeze.core.corpus.LabelFile.
+ *
+ * @param region the [com.squeeze.core.corpus.DefinitionRegion] name
+ * @param visible whether separation is visible with the subject relaxed
+ * @param unusable set when the photograph cannot answer the question at all. Stored rather
+ *   than discarded, because how many photographs are unusable is itself worth measuring.
+ */
+@Entity(
+    tableName = "definition_labels",
+    primaryKeys = ["photoHash", "region"],
+    indices = [Index("photoHash")],
+)
+data class DefinitionLabelEntity(
+    val photoHash: String,
+    val region: String,
+    val capturedEpochDay: Long,
+    val visible: Boolean,
+    val unusable: Boolean,
+    /** When the judgement was made, so a revision can be told from an original. */
+    val labelledEpochDay: Long,
+)

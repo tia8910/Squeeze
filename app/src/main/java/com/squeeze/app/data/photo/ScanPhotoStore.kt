@@ -7,6 +7,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.security.MessageDigest
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
@@ -90,6 +91,41 @@ class ScanPhotoStore @Inject constructor(
 
             val plain = cipher.doFinal(input.readBytes())
             BitmapFactory.decodeByteArray(plain, 0, plain.size)
+        }
+    }.getOrNull()
+
+    /**
+     * SHA-256 of a stored photograph's decrypted bytes, as lowercase hex.
+     *
+     * Of the plaintext, not of the file. Each write uses a fresh IV under a per-device
+     * Keystore key, so the same photograph produces different ciphertext on two devices and
+     * even on two saves — a hash of the file would change when nothing about the image did,
+     * and every corpus label pointing at it would become a dangling reference.
+     *
+     * Hashed from the raw decrypted JPEG rather than from a decoded bitmap, because decoding
+     * is lossy in a way that varies with the platform: the same file decoded on two Android
+     * versions can differ by a pixel, and the identity of a photograph must not depend on
+     * which phone is asking.
+     *
+     * @return null when the photograph is missing or cannot be decrypted
+     */
+    fun pixelHash(id: String): String? = runCatching {
+        val file = File(directory, id)
+        if (!file.exists()) return null
+
+        file.inputStream().use { input ->
+            val ivLength = input.read()
+            if (ivLength <= 0) return null
+
+            val iv = ByteArray(ivLength)
+            if (input.read(iv) != ivLength) return null
+
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_BITS, iv))
+
+            MessageDigest.getInstance("SHA-256")
+                .digest(cipher.doFinal(input.readBytes()))
+                .joinToString("") { byte -> "%02x".format(byte) }
         }
     }.getOrNull()
 
