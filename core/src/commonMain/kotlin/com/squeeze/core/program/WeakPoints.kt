@@ -235,6 +235,54 @@ object WeakPointAnalysis {
     fun priorityGroups(weakPoints: List<WeakPoint>): Set<MuscleGroup> =
         weakPoints.take(MAX_PRIORITIES).map { it.group }.toSet()
 
+/**
+     * Body parts measurably ahead of the rest, by the same ratios read the other way.
+     *
+     * The analysis only ever looked for what was lagging, and a screen built from it could
+     * only ever tell someone what was wrong with them. The ratios are symmetrical — an arm at
+     * 40% of chest is as far above the balanced figure as one at 32% is below it — so the
+     * information was always there and simply had nothing reading it.
+     *
+     * This matters beyond tone. Knowing which part is ahead is how someone decides what to
+     * hold while cutting, and it is the honest counterweight to a list of shortfalls
+     * assembled from the same measurements: a body with three lagging parts and two leading
+     * ones is not the body the shortfall list alone describes.
+     *
+     * @return the leading groups, largest surplus first
+     */
+    fun strongPoints(c: Circumferences, sex: Sex): List<MuscleGroup> {
+        val chest = c.chestCm
+        val waist = c.waistCm
+        val arm = c.armCm
+        val thigh = c.thighCm
+        val calf = c.calfCm
+        val femaleAdjust = if (sex == Sex.FEMALE) 0.92 else 1.0
+
+        return buildList {
+            if (arm != null && chest != null && chest > 0) {
+                surplus(arm / chest, ARM_TO_CHEST * femaleAdjust)?.let {
+                    add(MuscleGroup.BICEPS to it)
+                }
+            }
+            if (thigh != null && waist != null && waist > 0) {
+                surplus(thigh / waist, THIGH_TO_WAIST)?.let { add(MuscleGroup.QUADS to it) }
+            }
+            if (calf != null && thigh != null && thigh > 0) {
+                surplus(calf / thigh, CALF_TO_THIGH)?.let { add(MuscleGroup.CALVES to it) }
+            }
+            if (chest != null && waist != null && waist > 0) {
+                surplus(chest / waist, CHEST_TO_WAIST)?.let { add(MuscleGroup.BACK to it) }
+            }
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    /** How far above [expected] a ratio sits, as a fraction, or null when it is ordinary. */
+    private fun surplus(actual: Double, expected: Double): Double? {
+        if (expected <= 0.0) return null
+        val relative = (actual - expected) / expected
+        return relative.takeIf { it > THRESHOLD }?.coerceAtMost(1.0)
+    }
+
     /** How far below [expected] a ratio sits, as a fraction, or null when it is fine. */
     private fun shortfall(actual: Double, expected: Double): Double? {
         if (expected <= 0.0) return null
