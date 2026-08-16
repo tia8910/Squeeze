@@ -106,6 +106,24 @@ object BodyFindings {
                         "${point.finding} ${point.prescription}",
                     )
                 }
+
+            // Said out loud when the limbs were not measured, rather than silently omitted.
+            //
+            // Arm, thigh and calf girths come only from a scan with the whole body in frame.
+            // Without them the analysis can compare the torso against itself and nothing
+            // else, so a trunk-framed scan produces a screen with no arms, no legs and no
+            // explanation — which reads as the app having judged those parts fine. The
+            // absence of a finding and a finding of no problem look identical, and only one
+            // of them is true.
+            if (girths.armCm == null || girths.thighCm == null || girths.calfCm == null) {
+                findings += weakness(
+                    "Your arms and legs were not measured",
+                    "Which muscles are behind is read from arm, thigh and calf girth against " +
+                        "your chest and waist, and this scan did not capture them. Stand far " +
+                        "enough back that your whole body is in frame, head to feet, and the " +
+                        "next scan can say which parts to train.",
+                )
+            }
         }
 
         // Waist-to-height leads because it is the most direct thing here: a ratio of two
