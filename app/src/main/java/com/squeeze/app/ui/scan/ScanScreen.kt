@@ -336,17 +336,40 @@ private fun CaptureStep(
 
                 if (hint == null) {
                     goodStreak++
-                    // Two consecutive good frames, not one. A single frame catches the
-                    // moment an arm happens to swing clear and fires while the user is
-                    // still walking into place.
+                    // Consecutive good frames, not one. A single frame catches the moment an
+                    // arm happens to swing clear and fires while the user is still walking
+                    // into place.
                     if (goodStreak >= AUTO_DETECT_CONFIRMATIONS && countdown == 0) {
                         goodStreak = 0
+                        busy = false
+
+                        // The countdown re-checks the framing every second and abandons the
+                        // shot if it breaks.
+                        //
+                        // It used to commit: once the count started, the shutter fired
+                        // whatever happened next. That is the wrong half of the interval to
+                        // stop watching. The user is three metres away and has just been told
+                        // a photograph is coming — dropping an arm, turning to check the
+                        // screen, shifting weight onto one leg are all things that happen in
+                        // those three seconds, and every one of them is the framing error the
+                        // detector had just confirmed was absent. An automatic capture that
+                        // fires anyway is worse than a manual one, because nobody was
+                        // watching when it went wrong.
+                        var abandoned = false
                         countdown = AUTO_DETECT_COUNTDOWN_SECONDS
+
                         while (countdown > 0) {
                             delay(1000)
+                            if (framingHint != null) {
+                                abandoned = true
+                                break
+                            }
                             countdown--
                         }
-                        shoot()
+
+                        countdown = 0
+                        if (!abandoned) shoot()
+                        return@launch
                     }
                 } else {
                     goodStreak = 0
@@ -931,8 +954,16 @@ private val ZOOM_STEPS = listOf(1f, 2f)
 /** How often a preview frame is put through the detector while auto-capture is armed. */
 private const val AUTO_DETECT_INTERVAL_MS = 700L
 
-/** Consecutive good frames required before the countdown starts. */
-private const val AUTO_DETECT_CONFIRMATIONS = 2
+/**
+ * Consecutive good frames required before the countdown starts.
+ *
+ * Three at [AUTO_DETECT_INTERVAL_MS] is a little over two seconds of holding the pose. Raised
+ * from two once the countdown learned to abandon a shot: with nothing re-checking the framing
+ * afterwards, a low arming threshold was the only thing standing between a half-settled user
+ * and a photograph, so it had to be a compromise between firing early and never firing at all.
+ * Now that the count can be called off, arming can afford to be slower than it was.
+ */
+private const val AUTO_DETECT_CONFIRMATIONS = 3
 
 /** Long enough to drop the arm that was holding the phone, short enough not to drift. */
 private const val AUTO_DETECT_COUNTDOWN_SECONDS = 3

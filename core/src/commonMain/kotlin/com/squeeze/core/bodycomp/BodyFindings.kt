@@ -76,6 +76,38 @@ object BodyFindings {
         val byName = (panel.composition + panel.shape).associateBy { it.name }
         val findings = mutableListOf<BodyFinding>()
 
+        // Body parts first, because they are what the reader can act on.
+        //
+        // Everything below this answers "how much fat is on this body". None of it answers
+        // "which part of me is behind", which is the question someone training actually has
+        // and the one a coach answers first. Ordered under the whole-body figures, the parts
+        // were the last thing on a screen most people stop reading before the end.
+        //
+        // Proportional, never absolute, which is what makes it usable from a photograph whose
+        // centimetres may be off: a ratio divides two measurements taken from one image at
+        // one scale, so the scale error cancels. It says nothing at all when the girths it
+        // needs are missing, which is the honest answer for a torso-framed scan rather than a
+        // gap to fill with generalities.
+        circumferences?.let { girths ->
+            WeakPointAnalysis.strongPoints(girths, sex).take(MAX_PART_FINDINGS).forEach { group ->
+                findings += strength(
+                    "${label(group)} ahead of the rest of you",
+                    "Measurably above the balanced proportion for your frame. Worth knowing " +
+                        "when you cut: this is the part with the most to lose.",
+                )
+            }
+
+            WeakPointAnalysis.analyse(girths, sex)
+                .distinctBy { it.group }
+                .take(MAX_PART_FINDINGS)
+                .forEach { point ->
+                    findings += weakness(
+                        "${label(point.group)} behind the rest of you",
+                        "${point.finding} ${point.prescription}",
+                    )
+                }
+        }
+
         // Waist-to-height leads because it is the most direct thing here: a ratio of two
         // measured lengths, no equation between them, and the one figure that holds across
         // sexes, ages and ethnicities.
@@ -192,33 +224,20 @@ object BodyFindings {
             }
         }
 
-        // Body parts, after the whole-body figures.
-        //
-        // Everything above answers "how much fat is on this body". None of it answers "which
-        // part of it is behind", which is the question someone training actually has, and the
-        // one a coach answers first. WeakPointAnalysis already reads that off the same scan —
-        // arm against chest, thigh against waist, calf against thigh, chest against waist,
-        // arm against neck — and it was only ever shown on the Train tab, where a reader
-        // looking at their scan result never saw it.
-        //
-        // Proportional, never absolute, which is what makes it usable from a photograph whose
-        // centimetres may be off: a ratio divides two measurements taken from one image at one
-        // scale, so the scale error cancels. It says nothing at all when the girths it needs
-        // are missing, which is the honest answer for a torso-framed scan.
-        circumferences?.let { girths ->
-            WeakPointAnalysis.analyse(girths, sex)
-                .distinctBy { it.group }
-                .take(WeakPointAnalysis.MAX_PRIORITIES)
-                .forEach { point ->
-                    findings += weakness(
-                        "${label(point.group)} behind the rest of you",
-                        "${point.finding} ${point.prescription}",
-                    )
-                }
-        }
-
+        // Strengths before weak points, and within each the order they were added — body
+        // parts first, then the whole-body figures. sortedBy is stable, so grouping by kind
+        // does not disturb the ordering the block above chose.
         return findings.sortedBy { it.kind == FindingKind.WEAKNESS }
     }
+
+    /**
+     * The most body parts named in either column.
+     *
+     * A list of every proportion that missed is not a plan. Three is what a training block
+     * can absorb, which is the same number WeakPointAnalysis prioritises for volume, and a
+     * reader given eight lagging parts will act on none of them.
+     */
+    private const val MAX_PART_FINDINGS = 3
 
     /** The muscle group as a coach would say it, rather than as an enum constant. */
     private fun label(group: MuscleGroup): String = when (group) {
