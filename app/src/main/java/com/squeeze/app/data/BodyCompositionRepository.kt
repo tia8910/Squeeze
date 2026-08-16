@@ -305,6 +305,36 @@ class BodyCompositionRepository @Inject constructor(
         // This is the only check here that never touches the silhouette, so it survives every
         // failure the silhouette has: a clipped arm, a waist read at the rib notch, a hip
         // band landing on a shadow. See LeanMassPlausibility.
+        // A photo scan reports what the photograph said, or it reports nothing.
+        //
+        // Every method here except the BMI fallback needs a measurement. When a photograph
+        // yields none — the frame holds a head and a chest, the waist and hips are outside
+        // it, the outline cannot be read — the fusion was left with the fallback alone and
+        // printed it as the scan's result. That figure is derived from height, weight and
+        // sex; it would be identical for any photograph taken at the same bodyweight, and it
+        // is the same number whether the subject is lean or not.
+        //
+        // Presenting it as a scan is a claim to have read a photograph that was never read.
+        // The user cannot tell the difference — the record looks the same, the confidence
+        // tag says "Estimated" either way — and the figure moves when they change nothing
+        // but the framing, which is exactly how this app loses the trust it spent a week
+        // earning. Better to say a scan failed than to answer with something that did not
+        // come from it.
+        //
+        // Tape and skinfold entries are untouched: for those the BMI fallback is what it was
+        // always documented to be, a first-run placeholder before anything has been measured.
+        val photoDerived = candidates.any {
+            it.method == EstimationMethod.PHOTO_SHAPE ||
+                it.method == EstimationMethod.PHOTO_SILHOUETTE ||
+                it.method == EstimationMethod.PHOTO_FRONT_ONLY ||
+                it.method == EstimationMethod.PHOTO_ABDOMINAL_PROFILE ||
+                it.method == EstimationMethod.VISUAL_ASSESSMENT ||
+                it.method == EstimationMethod.REFERENCE_SCAN
+        }
+        val fromPhoto = entity.source == MeasurementSource.PHOTO.name ||
+            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name
+        if (fromPhoto && !photoDerived) return null
+
         val plausible = LeanMassPlausibility.filter(candidates, profile, entity.weightKg)
 
         return MethodFusion.combine(plausible)?.combined
