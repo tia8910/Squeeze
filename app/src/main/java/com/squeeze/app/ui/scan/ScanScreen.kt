@@ -35,6 +35,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Timer
@@ -45,6 +47,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -447,27 +450,44 @@ private fun CaptureStep(
             modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StepCard(step)
-            failure?.let { FailureCard(it) }
-
+            // Nothing but the viewfinder while the camera is live and the guide is closed.
+            //
+            // Not even the step card. Somebody standing three metres away on a ten-second
+            // timer is looking at one thing — whether they are in frame — and every panel
+            // over the preview is a panel across the part of themselves they are checking.
+            // The instructions have already been read by then; leaving them up trades the
+            // only moment they matter for repeating something at the moment it does not.
+            //
+            // Failures and a missing height stay, because those are not instructions. They
+            // are the reasons a capture will not work, and hiding them would leave someone
+            // photographing themselves repeatedly for nothing.
             if (guideExpanded) {
+                StepCard(step)
                 PoseReference(step)
             }
 
-            // Always present, so the guide is never lost — and labelled with what it does
-            // rather than with a chevron, because a bare arrow over a camera preview reads as
-            // a control for the camera.
-            FilledTonalButton(
-                onClick = { guideExpanded = !guideExpanded },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (guideExpanded) "Hide how to stand" else "How to stand")
-            }
+            failure?.let { FailureCard(it) }
 
             if (profileMissing) {
                 InfoCard(
                     "Set your height in Settings first — the scan uses it to convert the " +
                         "photo into real measurements.",
+                )
+            }
+        }
+
+        // The way back to the guide: an icon, in the corner, out of the frame's centre.
+        // Small enough not to be a panel, present enough that the guide is never lost.
+        if (hasCameraPermission) {
+            FilledTonalIconButton(
+                onClick = { guideExpanded = !guideExpanded },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+            ) {
+                Icon(
+                    imageVector = if (guideExpanded) Icons.Default.Close else Icons.Default.HelpOutline,
+                    contentDescription = if (guideExpanded) "Hide the guide" else "How to stand",
                 )
             }
         }
