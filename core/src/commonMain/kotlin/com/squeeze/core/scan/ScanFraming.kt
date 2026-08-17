@@ -37,10 +37,47 @@ enum class ScanFraming {
      * from it.
      */
     TORSO,
+
+    /**
+     * Shoulders and waist in shot; the hips are not.
+     *
+     * The shape figure only, and read off the shoulder denominator — which is the weaker of
+     * the two, for the reason [SilhouetteBodyFat] spends a paragraph on: at the shoulder line
+     * the arms are attached, so the run there spans deltoid to deltoid and is not a torso
+     * width. That path already existed and already carries its own wider interval; what is
+     * new is that a photograph can now reach it.
+     *
+     * The alternative was refusing the photograph, and refusing was the behaviour that
+     * prompted this: a picture with the whole upper body plainly in it came back "your
+     * shoulders and hips were not both in the picture, so there is no waist to measure",
+     * which is not true. The waist is in the picture. Only the hip is not, and the hip is a
+     * denominator rather than the measurement.
+     *
+     * **No centimetres, and no hip.** The stature is not in shot, and neither is the pelvis —
+     * see [UpperBodyFraming] for why the hip must be dropped rather than clamped back into
+     * frame.
+     */
+    UPPER_BODY,
     ;
 
     /** Whether a scan at this framing can produce measurements in centimetres. */
     val yieldsCentimetres: Boolean get() = this == FULL_BODY
+
+    /**
+     * Whether the pelvis is in the picture.
+     *
+     * The gate on everything read from the hips — the hip width the shape ratio prefers, and
+     * the hip line the posture findings report. At [UPPER_BODY] the hip landmarks exist but
+     * were inferred, and inferred landmarks are usable for placing a band and for nothing
+     * else.
+     *
+     * Asked rather than inferred from the enum at each call site, because getting it wrong is
+     * silent both ways. The hip band would clamp back to the bottom row of a cropped
+     * photograph and return the width of the abdomen at the crop — waist over waist is 1.0,
+     * and 1.0 through the hip anchors is about thirty-five per cent. The hip *line* would
+     * come back perfectly level, because a pose prior is level by construction.
+     */
+    val hipsInShot: Boolean get() = this != UPPER_BODY
 }
 
 /**
@@ -152,4 +189,86 @@ object TorsoFraming {
             )
         }.getOrNull()
     }
+}
+
+/**
+ * The last framing the scan will accept: shoulders and waist in shot, hips out of it.
+ *
+ * **Why this exists.** A pose model does not stop at the edge of the picture. MediaPipe's
+ * landmarks are normalised coordinates and it happily reports a hip at y = 1.15 — below the
+ * bottom row — when the hip is out of frame but the body's geometry implies where it went.
+ * [TorsoFraming] reads that as a cropped hip and refuses, which is right for what it is
+ * guarding: at that framing the hip is a *measurement*, and measuring a joint that is not in
+ * the picture is exactly the failure this pipeline keeps having.
+ *
+ * But the hip is not the only thing the shape figure can be read from. [SilhouetteBodyFat]
+ * has always had a shoulder denominator, has always carried a wider interval for it, and
+ * needs nothing below the ribs. So the honest position on a photograph framed from the head
+ * to the navel is not "there is no waist to measure" — there plainly is one — it is "there is
+ * a waist, no pelvis, and therefore the weaker of the two readings".
+ *
+ * **What is not relaxed.** The extrapolated hip is used to place the bands and for nothing
+ * else. It never becomes a width: [ScanFraming.hipsInShot] is false here, and dropping
+ * the hip is the point rather than an omission. Left in, the hip band would clamp back to
+ * the bottom rows of the photograph — the crop, not the pelvis — and those rows are abdomen,
+ * a width near the waist's own. A waist-to-hip near 1.0 reads about thirty-five per cent, so
+ * the failure would not look like a failure. It would look like a fat man.
+ */
+object UpperBodyFraming {
+
+    /**
+     * How far from the frame edge the shoulders must sit.
+     *
+     * The same margin [TorsoFraming] applies, and applied to the shoulders for the same
+     * reason: the landmark is the joint centre and the deltoid is outside it, so a shoulder
+     * on the edge means the widest part of the shoulder is not in the picture — and the
+     * shoulder is the denominator of everything this framing can report.
+     */
+    const val EDGE_MARGIN = TorsoFraming.EDGE_MARGIN
+
+    /**
+     * @return true when the shoulders are properly in shot and the waist band the shape
+     *   reading is taken from falls inside the picture
+     */
+    fun supports(geometry: FrontPoseGeometry): Boolean {
+        val shoulderYs = listOf(geometry.shoulderLeft.y, geometry.shoulderRight.y)
+        val shoulderXs = listOf(geometry.shoulderLeft.x, geometry.shoulderRight.x)
+        if (shoulderYs.any { it < EDGE_MARGIN || it > 1.0 - EDGE_MARGIN }) return false
+        if (shoulderXs.any { it < EDGE_MARGIN || it > 1.0 - EDGE_MARGIN }) return false
+
+        val shoulder = (geometry.shoulderLeft.y + geometry.shoulderRight.y) / 2.0
+        val hip = (geometry.hipLeft.y + geometry.hipRight.y) / 2.0
+        val trunk = hip - shoulder
+        if (trunk < TorsoFraming.MIN_TRUNK_HEIGHT_FRACTION) return false
+
+        // **The one condition, and it is the literal question.** Is the waist in the
+        // photograph. The band comes from the same constants the measurement reads it from,
+        // so this cannot drift out of agreement with what is later measured — move the band
+        // and this moves with it.
+        //
+        // It doubles as the bound on how far the hip may be extrapolated, which is why there
+        // is no separate constant for that. The waist band ends at
+        // [SilhouetteBodyFat.WAIST_BAND_END] of the trunk, so requiring it inside the picture
+        // requires the visible part of the trunk to be at least that fraction of the whole —
+        // which caps the hip at about a quarter of a trunk outside the frame, and tighter on
+        // a shorter trunk. Past that the photograph is a chest shot, and a chest shot has no
+        // waist in it whatever the landmarks claim.
+        val waistBottom = shoulder + trunk * SilhouetteBodyFat.WAIST_BAND_END
+        return waistBottom <= 1.0 - EDGE_MARGIN
+    }
+
+    /**
+     * Anchors for an upper-body photograph.
+     *
+     * [TorsoFraming.anchorsFor] unchanged, and deliberately so — the arithmetic that turns
+     * landmarks into rows does not care whether the hip row lands inside the picture, and
+     * [PoseAnchors] only requires the rows be in anatomical order. A second copy of it here
+     * would be two things to keep in step for no difference in behaviour.
+     *
+     * The hip row it returns may sit below the last row of the mask. Every search clamps to
+     * the silhouette's own extent, so a band that starts outside the picture simply finds
+     * nothing, which is the correct answer.
+     */
+    fun anchorsFor(geometry: FrontPoseGeometry, rowCount: Int): PoseAnchors? =
+        TorsoFraming.anchorsFor(geometry, rowCount)
 }

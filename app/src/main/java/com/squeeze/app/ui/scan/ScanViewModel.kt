@@ -258,7 +258,7 @@ class ScanViewModel @Inject constructor(
                 DetectionFailure.NoPersonDetected -> "Step into frame."
                 DetectionFailure.BodyNotFullyVisible,
                 DetectionFailure.BodyCropped,
-                -> "Get your shoulders and hips both in shot."
+                -> "Get your shoulders and your waist in shot."
 
                 DetectionFailure.PoseImplausible -> "Stand upright, arms clear of your sides."
                 DetectionFailure.SegmentationFailed ->
@@ -405,7 +405,16 @@ class ScanViewModel @Inject constructor(
             ?.takeIf { it > 0.0 }
 
         val shapeEstimate = SilhouetteBodyFat
-            .indicesFrom(front.profile, front.anchors, pelvisSpan)
+            .indicesFrom(
+                front.profile,
+                front.anchors,
+                pelvisSpan,
+                // False only at UPPER_BODY, where the pelvis is outside the picture and the
+                // hip band would otherwise clamp onto the crop line. See the parameter's
+                // own documentation — it is the one place this framing could go silently
+                // wrong rather than loudly.
+                hipInFrame = front.framing.hipsInShot,
+            )
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
 
         // Fetched here so the headline has a build to fall back on before the user types
@@ -470,7 +479,11 @@ class ScanViewModel @Inject constructor(
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
-            posture = front.geometry?.let(PostureAnalysis::analyse).orEmpty(),
+            // Shoulder level always; hip level only when the hips were in the picture. An
+            // inferred hip line is level because the prior is level, not because the body is.
+            posture = front.geometry
+                ?.let { PostureAnalysis.analyse(it, front.framing.hipsInShot) }
+                .orEmpty(),
         )
     }
 

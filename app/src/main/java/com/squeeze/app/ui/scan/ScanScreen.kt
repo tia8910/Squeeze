@@ -677,11 +677,11 @@ private fun StepCard(step: ScanStep) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = "Shoulders and hips both in shot, arms held clear of your sides, " +
-                    "plain background, even light, close-fitting clothing. Loose fabric is " +
-                    "measured as body. Head to feet is optional — it adds tape measurements " +
-                    "in centimetres, and framing closer on your trunk reads your shape " +
-                    "better.",
+                text = "Shoulders and waist in shot at the least, arms held clear of your " +
+                    "sides, plain background, even light, close-fitting clothing. Loose " +
+                    "fabric is measured as body. Getting your hips in too gives the more " +
+                    "accurate reading; head to feet on top of that adds tape measurements " +
+                    "in centimetres.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -738,7 +738,7 @@ private fun FailureCard(failure: DetectionFailure) {
 
                     DetectionFailure.BodyNotFullyVisible ->
                         "Too little of you is in shot to measure. Frame at least from your " +
-                            "shoulders to below your hips."
+                            "shoulders down past your navel."
 
                     DetectionFailure.PoseImplausible ->
                         "Stand upright and square to the camera, arms slightly away from your sides."
@@ -748,10 +748,11 @@ private fun FailureCard(failure: DetectionFailure) {
                             "background and more even lighting will help."
 
                     DetectionFailure.BodyCropped ->
-                        "Your shoulders and hips were not both in the picture, so there is " +
-                            "no waist to measure. Your head and feet do not have to be in " +
-                            "shot — frame from your shoulders to below your hips and the " +
-                            "scan will read your shape from that."
+                        "Your shoulders and your waist were not both in the picture, so " +
+                            "there is nothing to measure your waist against. Your head, " +
+                            "your feet and your hips do not have to be in shot — frame " +
+                            "from your shoulders down past your navel and the scan will " +
+                            "read your shape from that."
 
                     DetectionFailure.PhotoUnreadable ->
                         "That photo could not be opened. Try picking it again, or choose a " +
@@ -850,6 +851,20 @@ private fun ResultStep(
                     "framing puts far more detail on your midsection. Tape measurements " +
                     "in centimetres need your full height in the picture, so this scan " +
                     "does not produce them.",
+            )
+        }
+
+        // Said plainly rather than left for the interval to imply. This reading came off the
+        // weaker of the two denominators, and the honest phrasing of that is not "less
+        // accurate" but "measured against your shoulders, and your arms are attached to
+        // those" — which also tells the user what to change.
+        if (state.framing == ScanFraming.UPPER_BODY) {
+            InfoCard(
+                "Measured from your upper body. Your hips were not in shot, so your waist " +
+                    "was read against your shoulders instead of your hips — that works, " +
+                    "but your arms attach at the shoulder line and whatever the outline " +
+                    "caught of them widens that measurement. The range above is wider for " +
+                    "exactly that reason. Getting your hips into the next photo narrows it.",
             )
         }
 

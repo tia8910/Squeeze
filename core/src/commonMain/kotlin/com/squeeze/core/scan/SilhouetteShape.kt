@@ -133,6 +133,22 @@ object SilhouetteBodyFat {
          * used as a measurement.
          */
         pelvisSpan: Double? = null,
+        /**
+         * Whether the pelvis is inside the photograph at all.
+         *
+         * False at [ScanFraming.UPPER_BODY], and it has to be asked rather than discovered.
+         * Every search in this file clamps its band to the silhouette's extent, which is
+         * exactly the wrong behaviour when the band is outside the picture: the hip band
+         * would collapse onto the last rows of a cropped photograph and return the width of
+         * the abdomen at the crop line. That is a real measurement of a real body part — it
+         * is simply not the hip, and it sits near the waist's own width. Waist over waist is
+         * 1.0, and 1.0 through the hip anchors is about thirty-five per cent, reported with
+         * the narrow interval a measured hip earns.
+         *
+         * So the hip is dropped, the shoulder denominator carries the reading, and the
+         * interval widens to the eight points a shoulder denominator has always carried.
+         */
+        hipInFrame: Boolean = true,
     ): ShapeIndices? {
         val stature = (profile.bottomRow - profile.topRow).toDouble()
         if (stature <= 0.0) return null
@@ -193,9 +209,13 @@ object SilhouetteBodyFat {
         // hip, inflating the denominator and reading **6.83%** for a body with a soft
         // midsection. A tight band and a median fix the sampling; the check below fixes the
         // rest.
-        val hipWidth = AnatomicalLevelFinder
-            .medianBetween(profile, bands.hip.fromRow, bands.hip.toRowInclusive)
-            ?.takeIf { it > 0.0 }
+        val hipWidth = if (!hipInFrame) {
+            null
+        } else {
+            AnatomicalLevelFinder
+                .medianBetween(profile, bands.hip.fromRow, bands.hip.toRowInclusive)
+                ?.takeIf { it > 0.0 }
+        }
 
         return ShapeIndices(
             waistToShoulder = waist / shoulder,

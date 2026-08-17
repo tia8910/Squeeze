@@ -173,6 +173,22 @@ class TorsoFrontalityTest {
     }
 
     @Test
+    fun `an ordinary adult is not told they are twisted`() {
+        // The regression the upper bound used to be. Both numbers here are landmark spans,
+        // not body breadths: the model's shoulder points sit near the acromion, so the
+        // numerator is biacromial breadth at about 0.23 of stature, while its hip points are
+        // joint centres around 0.10 apart — not the 0.16 that bi-iliac breadth runs at. A
+        // square, unremarkable adult therefore lands near 2.3, and a bound at 2.2 refused
+        // them while telling them to stand square.
+        assertNull(FrontalityCheck.evaluateTorso(geometry(0.115, 0.05)))
+    }
+
+    @Test
+    fun `a genuinely twisted trunk is still refused after the widening`() {
+        assertNotNull(FrontalityCheck.evaluateTorso(geometry(0.16, 0.045)))
+    }
+
+    @Test
     fun `degenerate spans say nothing rather than guessing`() {
         assertNull(FrontalityCheck.evaluateTorso(geometry(0.0, 0.10)))
     }

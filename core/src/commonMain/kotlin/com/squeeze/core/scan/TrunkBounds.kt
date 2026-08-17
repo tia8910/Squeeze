@@ -264,9 +264,44 @@ object FrontalityCheck {
     private const val MIN_SHOULDER_TO_HEIGHT = 0.17
     private const val MAX_SHOULDER_TO_HEIGHT = 0.32
 
-    /** Shoulder span divided by hip span, at the extremes of the adult range. */
+    /**
+     * Shoulder span divided by hip span, at the extremes of the adult range.
+     *
+     * **These are landmark spans, not body breadths, and the upper bound was set as though
+     * they were the same thing.** The pose model's shoulder points sit near the acromion, so
+     * the numerator is roughly biacromial breadth — about 0.23 of stature. Its hip points are
+     * *joint centres*, buried inside the pelvis and around 0.10 of stature apart, not the
+     * 0.16 that bi-iliac breadth runs at. The ratio a square, ordinary adult produces is
+     * therefore near 2.3, and 2.2 refused them: the check fired on exactly the photographs it
+     * was meant to pass, and told the user to stand square while they were standing square.
+     *
+     * The same arithmetic is why the lower bound stays where it is. A ratio under 1 means the
+     * shoulders came back narrower than a span that should be less than half of them, which
+     * no framing of an untwisted adult produces.
+     *
+     * [TrunkBounds.HIP_MARGIN] carries the same fact, arrived at the same way: a margin sized
+     * for the shoulder clipped a real hip because the landmarks there are nowhere near the
+     * skin.
+     */
     private const val MIN_SHOULDER_TO_HIP = 0.95
-    private const val MAX_SHOULDER_TO_HIP = 2.2
+    private const val MAX_SHOULDER_TO_HIP = 2.6
+
+    /**
+     * The same bounds when the hips are outside the picture, and much looser.
+     *
+     * Not a decision to care less about a twisted stance. It is that at
+     * [ScanFraming.UPPER_BODY] the hip landmarks are extrapolated — the model is reporting
+     * where the hips *would* be, from the shoulder line and the visible trunk — so a hip span
+     * that disagrees with the shoulders is describing the pose prior rather than the person.
+     * Refusing a photograph on that evidence rejects good pictures for a reason the check
+     * cannot actually see, which is worse than not checking.
+     *
+     * Kept at all because a gross value is still worth catching: a shoulder span three times
+     * an inferred hip span is not a turned body, it is a misdetection, and measuring a
+     * misdetection is how this app has produced every wrong number it has produced.
+     */
+    private const val MIN_INFERRED_SHOULDER_TO_HIP = 0.70
+    private const val MAX_INFERRED_SHOULDER_TO_HIP = 3.2
 
     /**
      * @param bodyHeightFraction how much of the frame the subject spans vertically
@@ -314,13 +349,41 @@ object FrontalityCheck {
      * Split out rather than reached by passing a zero height, which would silently skip both
      * tests and leave a twisted trunk unremarked.
      */
-    fun evaluateTorso(geometry: FrontPoseGeometry): String? {
+    fun evaluateTorso(geometry: FrontPoseGeometry): String? =
+        evaluateAgainstHips(geometry, MIN_SHOULDER_TO_HIP, MAX_SHOULDER_TO_HIP)
+
+    /**
+     * The same test again, on the only evidence an upper-body photograph carries.
+     *
+     * At [ScanFraming.UPPER_BODY] there is no stature and no observed pelvis, so both of the
+     * signals this object was built on are gone — one because the crown and feet are out of
+     * shot, the other because the hips are. What remains is an inferred hip span, and it is
+     * checked only for values no real detection produces. See
+     * [MIN_INFERRED_SHOULDER_TO_HIP].
+     *
+     * That is a real loss of protection and it is written here rather than hidden: a body
+     * turned thirty degrees in an upper-body photograph will be measured, and measured a
+     * little lean, because rotation foreshortens the shoulder denominator less than it
+     * foreshortens the waist. The shoulder-only interval is eight points wide, which is
+     * where that uncertainty is already accounted for.
+     */
+    fun evaluateUpperBody(geometry: FrontPoseGeometry): String? = evaluateAgainstHips(
+        geometry,
+        MIN_INFERRED_SHOULDER_TO_HIP,
+        MAX_INFERRED_SHOULDER_TO_HIP,
+    )
+
+    private fun evaluateAgainstHips(
+        geometry: FrontPoseGeometry,
+        min: Double,
+        max: Double,
+    ): String? {
         val shoulderSpan = abs(geometry.shoulderRight.x - geometry.shoulderLeft.x)
         val hipSpan = abs(geometry.hipRight.x - geometry.hipLeft.x)
         if (shoulderSpan <= 0.0 || hipSpan <= 0.0) return null
 
         val shoulderToHip = shoulderSpan / hipSpan
-        if (shoulderToHip < MIN_SHOULDER_TO_HIP || shoulderToHip > MAX_SHOULDER_TO_HIP) {
+        if (shoulderToHip < min || shoulderToHip > max) {
             return "Your upper and lower body look twisted relative to each other. Stand " +
                 "square, feet level, and keep your hips facing the camera."
         }

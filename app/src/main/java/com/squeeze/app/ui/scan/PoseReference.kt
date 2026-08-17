@@ -103,9 +103,9 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Shoulders and hips both in shot, plain background, even light, " +
-                "close-fitting clothing or none. Head to feet is optional — it adds " +
-                "centimetres, and framing closer on your trunk reads your shape better.",
+            text = "Shoulders and waist in shot at the least, plain background, even " +
+                "light, close-fitting clothing or none. Your hips in shot as well gives " +
+                "the more accurate reading; head to feet on top of that adds centimetres.",
             style = MaterialTheme.typography.bodySmall,
             color = if (dark) Brand.DarkMuted else Brand.Muted,
         )
