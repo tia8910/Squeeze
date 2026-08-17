@@ -90,6 +90,7 @@ import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.ScanFraming
+import com.squeeze.core.scan.ShapeIndices
 import com.squeeze.core.scan.SilhouetteBodyFat
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
@@ -839,7 +840,9 @@ private fun ResultStep(
 
         val shape = state.resolvedShape(weight.toCm())
 
-        shape?.let { ShapeHeadline(it, hasWeight = weight.toCm() != null) }
+        shape?.let {
+            ShapeHeadline(it, hasWeight = weight.toCm() != null, indices = state.shapeIndices)
+        }
 
         // Said before the advice, because it changes what the advice is for. A trunk scan is
         // not a degraded full-body scan — it is the framing the shape figure actually wants,
@@ -1288,7 +1291,11 @@ private fun KnownBodyFatCard(value: String, onValueChange: (String) -> Unit) {
  * on this screen whose errors are its own.
  */
 @Composable
-private fun ShapeHeadline(estimate: BodyFatEstimate, hasWeight: Boolean) {
+private fun ShapeHeadline(
+    estimate: BodyFatEstimate,
+    hasWeight: Boolean,
+    indices: ShapeIndices? = null,
+) {
     // A reading carrying the plateau's interval is not a measurement of this body's fat — the
     // outline could not separate lean from very lean, and said so by widening to ±9. The card
     // has to say the same thing, because a number in display type reads as certain no matter
@@ -1338,6 +1345,45 @@ private fun ShapeHeadline(estimate: BodyFatEstimate, hasWeight: Boolean) {
             color = if (dark) Brand.DarkMuted else Brand.Muted,
             modifier = Modifier.padding(top = 12.dp),
         )
+
+        // What the outline actually measured, shown only when it could not settle the answer.
+        //
+        // "Not resolved by the photo" is unfalsifiable on its own, and two opposite situations
+        // produce it: a genuinely lean body the method has no power to place, and a
+        // denominator with an arm in it. The first calls for a side photo or a tape; the
+        // second calls for standing differently. Without the ratio there is no way to tell
+        // them apart, including for whoever is fixing the app.
+        if (bounded && indices != null) {
+            Text(
+                text = buildString {
+                    val hip = indices.waistToHip
+                    if (hip != null) {
+                        append("Measured: waist %.2f× your hips".format(hip))
+                        append(
+                            if (indices.hipCorroborated) {
+                                ", checked against your hip joints and clear of your arms."
+                            } else {
+                                ". Your hips could not be checked against your skeleton " +
+                                    "here, so the reading is held at the leanest figure " +
+                                    "the outline is allowed to claim."
+                            },
+                        )
+                    } else {
+                        append(
+                            "Measured: waist %.2f× your shoulders, with no hip to check it "
+                                .format(indices.waistToShoulder),
+                        )
+                        append(
+                            "against. Your arms attach at the shoulder line, so whatever " +
+                                "the outline caught of them is inside that number.",
+                        )
+                    }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (dark) Brand.DarkMuted else Brand.Muted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
 }
 
