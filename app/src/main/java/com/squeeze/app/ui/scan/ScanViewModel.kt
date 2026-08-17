@@ -15,6 +15,7 @@ import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
+import com.squeeze.core.bodycomp.LeanMassPlausibility
 import com.squeeze.core.bodycomp.PlateauPrior
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
@@ -36,6 +37,7 @@ import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
 import com.squeeze.app.scan.AbdomenCrop
 import com.squeeze.core.scan.ArmClearance
+import com.squeeze.core.scan.ShapeIndices
 import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -83,6 +85,17 @@ data class ScanUiState(
      * point of display and of saving, where the user's weight is known.
      */
     val shape: BodyFatEstimate? = null,
+    /**
+     * The two ratios [shape] was read from, so the screen can say what the outline actually
+     * measured.
+     *
+     * Here because "not resolved by the photo" is unfalsifiable on its own. Two very
+     * different things produce it — a genuinely lean body the method has no power to place,
+     * and a denominator with an arm in it — and they call for opposite responses from the
+     * person holding the phone. Printing the ratio and which denominator carried it turns one
+     * screenshot into a diagnosis instead of a report that something went wrong.
+     */
+    val shapeIndices: ShapeIndices? = null,
     /**
      * The most recent recorded bodyweight, before the user types one on this screen.
      *
@@ -146,11 +159,19 @@ data class ScanUiState(
      */
     fun resolvedShape(weightKg: Double?): BodyFatEstimate? {
         val profile = profile ?: return shape
-        return PlateauPrior.resolve(
-            estimate = shape,
-            profile = profile,
-            weightKg = weightKg ?: knownWeightKg,
-        )
+        val weight = weightKg ?: knownWeightKg
+
+        return PlateauPrior
+            .resolve(estimate = shape, profile = profile, weightKg = weight)
+            // The same gate the stored record goes through, applied to the figure on screen.
+            //
+            // It used to be unnecessary here: nothing the outline produced could reach this
+            // point below SilhouetteBodyFat's own floor, so a reading was bounded before it
+            // arrived. A corroborated hip reading is not floored any more — deliberately, so
+            // that a genuinely lean body is measured rather than overwritten — and the thing
+            // that made the floor safe to remove is that height and weight still say what
+            // lean mass a body can be carrying. Which they only do if they are asked.
+            ?.let { LeanMassPlausibility.clampToRange(it, profile, weight) }
     }
 }
 
@@ -404,17 +425,18 @@ class ScanViewModel @Inject constructor(
             ?.let { kotlin.math.abs(it.hipLeft.x - it.hipRight.x) }
             ?.takeIf { it > 0.0 }
 
-        val shapeEstimate = SilhouetteBodyFat
-            .indicesFrom(
-                front.profile,
-                front.anchors,
-                pelvisSpan,
-                // False only at UPPER_BODY, where the pelvis is outside the picture and the
-                // hip band would otherwise clamp onto the crop line. See the parameter's
-                // own documentation — it is the one place this framing could go silently
-                // wrong rather than loudly.
-                hipInFrame = front.framing.hipsInShot,
-            )
+        val shapeIndices = SilhouetteBodyFat.indicesFrom(
+            front.profile,
+            front.anchors,
+            pelvisSpan,
+            // False only at UPPER_BODY, where the pelvis is outside the picture and the
+            // hip band would otherwise clamp onto the crop line. See the parameter's own
+            // documentation — it is the one place this framing could go silently wrong
+            // rather than loudly.
+            hipInFrame = front.framing.hipsInShot,
+        )
+
+        val shapeEstimate = shapeIndices
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
 
         // Fetched here so the headline has a build to fall back on before the user types
@@ -474,6 +496,7 @@ class ScanViewModel @Inject constructor(
             // cancels — they are trustworthy even when the centimetres are not.
             proportions = BodyProportions.analyse(result.circumferences, profile.heightCm),
             shape = shapeEstimate,
+            shapeIndices = shapeIndices,
             knownWeightKg = knownWeight,
             framing = front.framing,
             abdominalBodyFatPercent = abdominal,

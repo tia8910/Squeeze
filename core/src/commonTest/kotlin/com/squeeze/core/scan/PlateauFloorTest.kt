@@ -94,13 +94,19 @@ class PlateauFloorTest {
     }
 
     @Test
-    fun `the hip path is floored too, because it fails the same way`() {
-        // Written an hour earlier as "a hip-based reading is untouched by any of this", on
-        // the reasoning that the flatness was measured on the shoulder ratio and belonged to
-        // it. That reasoning was too narrow. The plateau is why the shoulder path cannot
-        // resolve leanness; the floor is why no path may claim it — every failure mode adds
-        // pixels to a denominator, so every failure mode reads lean, and the hip's own
-        // failure is a waistband inside the band.
+    fun `an unchecked hip is floored too, because it fails the same way`() {
+        // This has been rewritten twice and the current scope is the narrowest of the three,
+        // which is the point. It began as "a hip-based reading is untouched by any of this",
+        // on the reasoning that the flatness was measured on the shoulder ratio and belonged
+        // to it; that was widened to cover every path, because every failure mode adds pixels
+        // to a denominator and so every failure mode reads lean, the hip's own being a
+        // waistband inside the band.
+        //
+        // Widening it that far had a cost: a checked hip on a genuinely lean body was floored
+        // as well, and PlateauPrior then replaced the floored reading with a height-and-weight
+        // figure seven points higher. So the rule is now about evidence rather than about
+        // which ratio: a hip the scan could not check keeps the floor, exactly as here, and
+        // one it could does not. See CorroboratedHipTest for the other side.
         //
         // Left as a hip reading of 0.78 that used to produce 5.92%.
         val estimate = SilhouetteBodyFat.estimate(
@@ -113,10 +119,13 @@ class PlateauFloorTest {
     }
 
     @Test
-    fun `no photograph of any body produces a single-digit figure`() {
-        // The property the user asked for, stated directly: whatever the ratios, however
-        // contaminated, the outline alone never tells someone with no visible condition that
-        // they are six per cent.
+    fun `an unverified outline never produces a single-digit figure`() {
+        // The property the user asked for, in the scope it is actually true: whatever the
+        // ratios, however contaminated, an outline that could not check its own hip never
+        // tells someone with no visible condition that they are six per cent.
+        //
+        // ShapeIndices defaults hipCorroborated to false, so every case swept here is one
+        // where the scan had no pelvis span to check against or an arm in a band.
         val ratios = listOf(0.40, 0.55, 0.65, 0.70, 0.75, 0.80, 0.90, 1.00, 1.20)
 
         for (shoulder in ratios) {

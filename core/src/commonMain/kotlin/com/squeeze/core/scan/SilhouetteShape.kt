@@ -39,6 +39,24 @@ import com.squeeze.core.model.Sex
 data class ShapeIndices(
     val waistToShoulder: Double,
     val waistToHip: Double?,
+    /**
+     * Whether [waistToHip] came off a hip the scan was able to check, on rows no arm touched.
+     *
+     * The flag that decides whether a lean reading is allowed to stand. **The floor exists
+     * because contamination only ever reads lean** — but contamination is not invisible, and
+     * this is the pipeline saying it looked for it and did not find it:
+     *
+     *  - the mask width at the hip was checked against the distance between the hip joints,
+     *    so a waistband or a pair of loose shorts could not have been measured as the pelvis
+     *    (see [SilhouetteBodyFat.hipIsSkin], added after a scan read 6.83% off exactly that)
+     *  - neither the waist band nor the hip band was substantially cut back by the trunk
+     *    bound, so no arm was resting against the body where either was measured
+     *
+     * With both true there is no mechanism left that produces a spuriously lean hip ratio,
+     * and a lean reading is a measurement rather than a failure wearing its clothes. False
+     * whenever either check was unavailable — absence of evidence, not evidence of absence.
+     */
+    val hipCorroborated: Boolean = false,
 )
 
 /**
@@ -217,11 +235,35 @@ object SilhouetteBodyFat {
                 ?.takeIf { it > 0.0 }
         }
 
+        val hip = hipWidth?.takeIf { hipIsSkin(it, pelvisSpan) }
+
         return ShapeIndices(
             waistToShoulder = waist / shoulder,
-            waistToHip = hipWidth?.takeIf { hipIsSkin(it, pelvisSpan) }?.let { waist / it },
+            waistToHip = hip?.let { waist / it },
+            // Both halves of the check must have actually run. A null pelvis span means
+            // hipIsSkin waved the hip through without looking at it, which is the right
+            // default for a ratio that is only being tempered — and the wrong basis for
+            // lifting a floor.
+            hipCorroborated = hip != null &&
+                pelvisSpan != null &&
+                pelvisSpan > 0.0 &&
+                bandIsClean(profile, bands.waist) &&
+                bandIsClean(profile, bands.hip),
         )
     }
+
+    /**
+     * Whether the trunk bound had to cut this band back, i.e. whether an arm was in it.
+     *
+     * The searches already skip clipped rows one at a time, so a lightly clipped band still
+     * yields an honest median. What this rules out is a band where so little survived that
+     * the rows which did were not chosen for anatomical reasons — the state
+     * [ArmClearance.verdict] tells the user to fix, and the same threshold, because the two
+     * are answering the same question about the same photograph.
+     */
+    private fun bandIsClean(profile: WidthProfile, band: MeasurementBand): Boolean =
+        profile.clippedFractionBetween(band.fromRow, band.toRowInclusive) <=
+            ArmClearance.TOLERATED_CLIPPED_FRACTION
 
     /**
      * Whether a hip width measured off the mask is the body, or the clothes on it.
@@ -418,12 +460,49 @@ object SilhouetteBodyFat {
             }
 
         if (fromHip != null) {
+            // **The floor was measured on the other ratio, and it does not transfer.**
+            //
+            // [LEAN_PLATEAU_RATIO] and the ceiling derived from it come from one observation:
+            // waist-to-*shoulder* runs 0.586 at eight per cent, 0.592 at twelve and 0.580 at
+            // fifteen. Flat. That is a fact about the shoulder denominator, and there is a
+            // reason it is one — the arms attach at the shoulder line, so however much of
+            // them the band caught is added to the denominator and subtracted from the
+            // reading. Nothing equivalent was ever measured on waist-to-hip, and nothing
+            // anatomical predicts it: the hip sits below the arms, is pelvic breadth rather
+            // than muscle, and is read by the same torso-run rule as the waist.
+            //
+            // Applying the shoulder's floor here anyway had a cost that showed up the first
+            // time a genuinely lean body was photographed properly. The outline read it
+            // correctly at single digits, the floor refused the reading, the interval widened
+            // to nine points, and [com.squeeze.core.bodycomp.PlateauPrior] then replaced it
+            // with a height-and-weight figure seven points higher — on a clear, front-on,
+            // trunk-framed photograph of a man with visible abdominal separation. The app
+            // measured him right and then threw the measurement away.
+            //
+            // So the floor now applies where its evidence applies. A hip reading the scan was
+            // able to check — pelvis span present and in range, no arm in either band — is a
+            // measurement and stands on its own. One it could not check keeps the floor,
+            // because then contamination is exactly as possible as it always was. See
+            // [ShapeIndices.hipCorroborated].
+            //
+            // [com.squeeze.core.bodycomp.LeanMassPlausibility] is still downstream of this
+            // and still bounds the result against height and weight, so "lean" cannot become
+            // "impossible" without something else catching it.
+            val floorApplies = !indices.hipCorroborated
+            val bounded = floorApplies && fromHip < leanestClaimable(sex)
+
             return BodyFatEstimate(
-                percent = floored(fromHip, sex),
+                percent = if (floorApplies) {
+                    floored(fromHip, sex)
+                } else {
+                    fromHip.coerceIn(MIN_PERCENT, MAX_PERCENT)
+                },
                 method = EstimationMethod.PHOTO_SHAPE,
                 // A floored reading is a bound rather than a measurement, and carries the
-                // interval that says so.
-                standardErrorPercent = if (fromHip < leanestClaimable(sex)) {
+                // interval that says so. A corroborated one is not floored, so it never
+                // carries it — which is also what stops PlateauPrior substituting for it,
+                // since that is the signature it recognises a bound by.
+                standardErrorPercent = if (bounded) {
                     PLATEAU_ERROR_PERCENT
                 } else {
                     EstimationMethod.PHOTO_SHAPE.standardErrorPercent
@@ -452,7 +531,16 @@ object SilhouetteBodyFat {
         // where.
         val percent = if (onPlateau) plateauCeilingPercent(sex) else floored(fromShoulder, sex)
 
-        val error = if (onPlateau) {
+        // A reading the floor moved is a bound, whichever side of LEAN_PLATEAU_RATIO it came
+        // from, and it has to carry the interval that says so. It did not: between 0.76 and
+        // about 0.80 the ratio is off the plateau, so the line was run, but the two-point
+        // observed offset takes the result under the floor — and the value got clamped while
+        // the interval stayed at the ordinary shoulder-only width. Nothing downstream could
+        // then tell that figure from a measurement, which matters now that PlateauPrior reads
+        // the interval rather than the value to decide what it may replace.
+        val hitFloor = fromShoulder < leanestClaimable(sex)
+
+        val error = if (onPlateau || hitFloor) {
             PLATEAU_ERROR_PERCENT
         } else {
             // Widened even off the plateau, because the denominator is contaminated by
