@@ -19,6 +19,7 @@ import com.squeeze.core.scan.ScaleCrossCheck
 import com.squeeze.core.scan.ScaleDecision
 import com.squeeze.core.scan.TorsoFraming
 import com.squeeze.core.scan.TrunkBounds
+import com.squeeze.core.scan.UpperBodyFraming
 import com.squeeze.core.scan.Uprightness
 import com.squeeze.core.scan.WidthProfile
 import java.io.Closeable
@@ -76,12 +77,15 @@ sealed interface DetectionFailure {
     data object SegmentationFailed : DetectionFailure
 
     /**
-     * Head or feet are outside the frame.
+     * Not even the upper body is in the frame.
      *
-     * Distinct from [BodyNotFullyVisible], which is about the subject being too small.
-     * This is the more dangerous case: a cropped body still fills the frame, so the scale
-     * step happily maps the user's full height onto whatever fraction of them is showing
-     * and inflates every circumference. It has to be caught before measurement, not after.
+     * The last of three framings rather than the first thing checked. A cropped photograph
+     * is dangerous — it still fills the frame, so the scale step happily maps the user's full
+     * height onto whatever fraction of them is showing and inflates every circumference —
+     * but the answer to that is to stop converting to centimetres, which
+     * [ScanFraming.TORSO] and [ScanFraming.UPPER_BODY] both do. This failure now means what
+     * it says: the shoulders or the waist are not in the picture, so there is no width and
+     * no denominator, and nothing can be read from it at any confidence.
      */
     data object BodyCropped : DetectionFailure
 
@@ -347,7 +351,27 @@ class BodyDetector @Inject constructor(
             )
         }
 
-        // Neither framing. The trunk is cut off too, so there is nothing to measure at all.
+        // The hips are not in shot. That used to end the scan here, and it told the user
+        // "there is no waist to measure" about a photograph with their waist plainly in it.
+        //
+        // What is missing is the hip, and the hip is a denominator rather than the
+        // measurement. The shoulder denominator has been in SilhouetteBodyFat from the start,
+        // carrying its own wider interval for the reason it documents — the arms attach at
+        // the shoulder line, so that run is not a torso width. Weaker, and weaker is what
+        // this framing gets. It is not nothing, which is what it got before.
+        if (geometry != null && UpperBodyFraming.supports(geometry)) {
+            val anchors = UpperBodyFraming.anchorsFor(geometry, maskHeight)
+                ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
+
+            FrontalityCheck.evaluateUpperBody(geometry)
+                ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
+
+            return DetectionResult.Success(
+                DetectedBody(profile, anchors, geometry, scale = null, ScanFraming.UPPER_BODY),
+            )
+        }
+
+        // No framing at all. The waist is out of shot too, so there is nothing to measure.
         return DetectionResult.Failure(DetectionFailure.BodyCropped)
     }
 

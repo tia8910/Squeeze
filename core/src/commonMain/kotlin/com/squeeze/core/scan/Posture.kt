@@ -54,7 +54,19 @@ object PostureAnalysis {
     /** Below this, a tilt is indistinguishable from how someone happened to stand. */
     private const val NOTABLE_DEGREES = 3.0
 
-    fun analyse(geometry: FrontPoseGeometry): List<PostureFinding> = buildList {
+    /**
+     * @param hipsObserved false when the hips are outside the photograph and their landmarks
+     *   were inferred rather than seen. Everything downstream of the hip line is then dropped
+     *   rather than reported at lower confidence: a pose model asked where the hips are in a
+     *   picture that does not contain them returns its prior, and a prior is level by
+     *   construction. Printing "hips sit level" from it would be the app inventing a finding
+     *   about a part of the body it never looked at — the same fault as reporting a
+     *   height-and-weight figure as a scan result.
+     */
+    fun analyse(
+        geometry: FrontPoseGeometry,
+        hipsObserved: Boolean = true,
+    ): List<PostureFinding> = buildList {
         val shoulderTilt = tiltDegrees(geometry.shoulderLeft, geometry.shoulderRight)
         add(
             PostureFinding(
@@ -69,6 +81,8 @@ object PostureAnalysis {
                 notable = abs(shoulderTilt) >= NOTABLE_DEGREES,
             ),
         )
+
+        if (!hipsObserved) return@buildList
 
         val hipTilt = tiltDegrees(geometry.hipLeft, geometry.hipRight)
         add(
