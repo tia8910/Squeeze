@@ -1355,29 +1355,21 @@ private fun ShapeHeadline(
         // them apart, including for whoever is fixing the app.
         if (bounded && indices != null) {
             Text(
+                // Numbers only. An earlier version of this line also said whether the hip had
+                // been checked against the hip joints, and that claim was worse than useless:
+                // it read "checked" on a photograph where the hip band was measuring a pair of
+                // trousers, because the check it names is the one that let those through.
                 text = buildString {
                     val hip = indices.waistToHip
-                    if (hip != null) {
-                        append("Measured: waist %.2f× your hips".format(hip))
-                        append(
-                            if (indices.hipCorroborated) {
-                                ", checked against your hip joints and clear of your arms."
-                            } else {
-                                ". Your hips could not be checked against your skeleton " +
-                                    "here, so the reading is held at the leanest figure " +
-                                    "the outline is allowed to claim."
-                            },
-                        )
-                    } else {
-                        append(
-                            "Measured: waist %.2f× your shoulders, with no hip to check it "
-                                .format(indices.waistToShoulder),
-                        )
-                        append(
-                            "against. Your arms attach at the shoulder line, so whatever " +
-                                "the outline caught of them is inside that number.",
-                        )
-                    }
+                    append("Your outline measured: ")
+                    append("waist %.2f× your shoulders".format(indices.waistToShoulder))
+                    if (hip != null) append(", waist %.2f× your hips".format(hip))
+                    append(
+                        ". Anything the outline picked up beside you — trousers at the hip, " +
+                            "an arm against your side, your thighs together — makes a " +
+                            "denominator wider and the reading leaner, which is why a lean " +
+                            "figure from this method is held rather than reported.",
+                    )
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = if (dark) Brand.DarkMuted else Brand.Muted,

@@ -151,13 +151,8 @@ object PlateauPrior {
      * outline's contribution on the plateau is a *bound* — "no leaner than this, and I cannot
      * say how much fatter" — and a bound combined with an estimate is whichever is more
      * restrictive. Taking the maximum also preserves the property
-     * [SilhouetteBodyFat.leanestClaimable] exists to guarantee, because it can only ever move
-     * a reading upward: **no bounded reading produces a single-digit figure.**
-     *
-     * That guarantee is deliberately narrower than it once was. It used to be stated of every
-     * photograph of every body, which was only true because the hip branch was being floored
-     * by a limit measured on the shoulder ratio — and the cost of that was overwriting
-     * correct readings of lean bodies. A checked hip does not pass through here at all.
+     * [SilhouetteBodyFat.leanestClaimable] exists to guarantee, that no photograph of any body
+     * produces a single-digit figure, because it can only ever move a reading upward.
      *
      * Falls back to the outline's own ceiling when there is no weight to reason from, which
      * is the behaviour that shipped before this file existed.
@@ -172,21 +167,14 @@ object PlateauPrior {
      * Resolves a fresh silhouette estimate against what the body's build implies.
      *
      * Only readings the outline has already bounded are touched, and **which readings those
-     * are is decided by the interval, not by the value**. That distinction used to make no
-     * difference and now makes all of it.
+     * are is decided by the interval rather than by the value**.
      *
-     * The old test was positional: [SilhouetteBodyFat] floored every path at
-     * [SilhouetteBodyFat.leanestClaimable], so a figure sitting on that value had to be one
-     * the outline could not resolve. That premise no longer holds. A hip reading the scan was
-     * able to check — pelvis span in range, no arm in either band — is not floored any more,
-     * because the flatness the floor comes from was measured on the shoulder ratio and never
-     * on the hip. Such a reading can legitimately arrive here in single digits.
-     *
-     * Left on the positional test, this function replaced exactly those readings: a clear
-     * front-on photograph of a lean man measured correctly at single digits, and was
-     * overwritten with a height-and-weight figure seven points higher. The interval is the
-     * honest signal and always was — a bound carries [SilhouetteBodyFat.PLATEAU_ERROR_PERCENT]
-     * and a measurement does not.
+     * Both tests give the same answer today, because [SilhouetteBodyFat] floors every path at
+     * [SilhouetteBodyFat.leanestClaimable] and widens the interval whenever it does. The
+     * interval is the better of the two to depend on: it is the estimator *stating* that it
+     * bounded something, where the value merely happens to coincide with the bound. When an
+     * exemption to the floor was briefly added, the positional test silently kept replacing
+     * the readings it exempted — a coupling that was invisible until it shipped.
      *
      * @return the estimate unchanged when the outline resolved something, the build-implied
      *   figure when it did not, and null for null
