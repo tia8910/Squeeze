@@ -165,12 +165,11 @@ data class ScanUiState(
             .resolve(estimate = shape, profile = profile, weightKg = weight)
             // The same gate the stored record goes through, applied to the figure on screen.
             //
-            // It used to be unnecessary here: nothing the outline produced could reach this
-            // point below SilhouetteBodyFat's own floor, so a reading was bounded before it
-            // arrived. A corroborated hip reading is not floored any more — deliberately, so
-            // that a genuinely lean body is measured rather than overwritten — and the thing
-            // that made the floor safe to remove is that height and weight still say what
-            // lean mass a body can be carrying. Which they only do if they are asked.
+            // Belt and braces rather than load-bearing: the estimator's own floor already
+            // stops a silhouette reading arriving here in single digits. It is kept because
+            // the screen and the record disagreeing about the same scan is its own kind of
+            // bug, and because the one time the floor was exempted this was the only thing
+            // between a broken hip measurement and a 3.00% headline.
             ?.let { LeanMassPlausibility.clampToRange(it, profile, weight) }
     }
 }

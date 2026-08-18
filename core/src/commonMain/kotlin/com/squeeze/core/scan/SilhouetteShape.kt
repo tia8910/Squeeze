@@ -42,19 +42,26 @@ data class ShapeIndices(
     /**
      * Whether [waistToHip] came off a hip the scan was able to check, on rows no arm touched.
      *
-     * The flag that decides whether a lean reading is allowed to stand. **The floor exists
-     * because contamination only ever reads lean** — but contamination is not invisible, and
-     * this is the pipeline saying it looked for it and did not find it:
+     * **Reported, and deliberately not acted on.** For one release this flag lifted the floor,
+     * on the argument that the two checks behind it — the mask width at the hip verified
+     * against the distance between the hip joints, and neither trunk band cut back by the
+     * bound — left no mechanism that could produce a spuriously lean hip ratio.
      *
-     *  - the mask width at the hip was checked against the distance between the hip joints,
-     *    so a waistband or a pair of loose shorts could not have been measured as the pelvis
-     *    (see [SilhouetteBodyFat.hipIsSkin], added after a scan read 6.83% off exactly that)
-     *  - neither the waist band nor the hip band was substantially cut back by the trunk
-     *    bound, so no arm was resting against the body where either was measured
+     * Two photographs took a day to disprove it. A man in loose cargo trousers worn high read
+     * waist-to-hip 0.788 and came back at **4.76%**, on a body with a soft midsection; a
+     * bodybuilder in a wide-stance front double biceps read 0.69 — the mask at the hip band
+     * spanning both spread thighs — and came back at **3.00%**, the absolute minimum the
+     * method can print. Both passed every check listed above.
      *
-     * With both true there is no mechanism left that produces a spuriously lean hip ratio,
-     * and a lean reading is a measurement rather than a failure wearing its clothes. False
-     * whenever either check was unavailable — absence of evidence, not evidence of absence.
+     * The lesson is about the argument rather than the constants. "No mechanism I can think
+     * of" is not evidence, and the failure it was reasoning about is the one thing this file
+     * has been shown over and over: **every way a hip is mismeasured makes it wider, and a
+     * wider hip reads lean.** Trousers, spread thighs, a towel, a shadow — the list is not
+     * closable by inspection, which is exactly why there is a floor rather than a set of
+     * exclusions.
+     *
+     * Kept because it is worth recording which readings were checked when the labelled corpus
+     * arrives — that is the thing that can settle this, and reasoning is not.
      */
     val hipCorroborated: Boolean = false,
 )
@@ -460,49 +467,39 @@ object SilhouetteBodyFat {
             }
 
         if (fromHip != null) {
-            // **The floor was measured on the other ratio, and it does not transfer.**
+            // **The floor applies here, and the attempt to exempt this branch is the reason
+            // the comment is this long.**
             //
-            // [LEAN_PLATEAU_RATIO] and the ceiling derived from it come from one observation:
-            // waist-to-*shoulder* runs 0.586 at eight per cent, 0.592 at twelve and 0.580 at
-            // fifteen. Flat. That is a fact about the shoulder denominator, and there is a
-            // reason it is one — the arms attach at the shoulder line, so however much of
-            // them the band caught is added to the denominator and subtracted from the
-            // reading. Nothing equivalent was ever measured on waist-to-hip, and nothing
-            // anatomical predicts it: the hip sits below the arms, is pelvic breadth rather
-            // than muscle, and is read by the same torso-run rule as the waist.
+            // The argument for exempting it was good on paper. [LEAN_PLATEAU_RATIO] and the
+            // ceiling derived from it come from one observation — waist-to-*shoulder* runs
+            // 0.586 at eight per cent, 0.592 at twelve, 0.580 at fifteen, flat — and that is
+            // a fact about the shoulder denominator, where the arms attach. Nothing
+            // equivalent was ever measured on waist-to-hip. So for one release a hip reading
+            // that passed two checks was allowed below the floor.
             //
-            // Applying the shoulder's floor here anyway had a cost that showed up the first
-            // time a genuinely lean body was photographed properly. The outline read it
-            // correctly at single digits, the floor refused the reading, the interval widened
-            // to nine points, and [com.squeeze.core.bodycomp.PlateauPrior] then replaced it
-            // with a height-and-weight figure seven points higher — on a clear, front-on,
-            // trunk-framed photograph of a man with visible abdominal separation. The app
-            // measured him right and then threw the measurement away.
+            // It shipped and produced **4.76%** for a man with a soft midsection in loose
+            // cargo trousers, and **3.00%** — the method's absolute minimum — for a
+            // bodybuilder in a wide-stance front double biceps whose hip band spanned two
+            // spread thighs. Both had passed the checks.
             //
-            // So the floor now applies where its evidence applies. A hip reading the scan was
-            // able to check — pelvis span present and in range, no arm in either band — is a
-            // measurement and stands on its own. One it could not check keeps the floor,
-            // because then contamination is exactly as possible as it always was. See
-            // [ShapeIndices.hipCorroborated].
+            // What the argument missed is that the floor was never a claim about *which
+            // ratio is flat*. It is a claim about **which direction this method fails in**:
+            // every way a width is mismeasured makes it wider, a wider denominator makes the
+            // ratio smaller, and a smaller ratio reads lean. Trousers, spread thighs, a
+            // towel, laundry, a shadow — the list is not closable by inspection, and an
+            // exemption granted for the failures someone thought of is an exemption for all
+            // the ones they did not.
             //
-            // [com.squeeze.core.bodycomp.LeanMassPlausibility] is still downstream of this
-            // and still bounds the result against height and weight, so "lean" cannot become
-            // "impossible" without something else catching it.
-            val floorApplies = !indices.hipCorroborated
-            val bounded = floorApplies && fromHip < leanestClaimable(sex)
-
+            // The plateau is why the shoulder path cannot resolve leanness. The floor is why
+            // no path may claim it. Those are two different statements and only the first one
+            // is about the shoulder.
             return BodyFatEstimate(
-                percent = if (floorApplies) {
-                    floored(fromHip, sex)
-                } else {
-                    fromHip.coerceIn(MIN_PERCENT, MAX_PERCENT)
-                },
+                percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
                 // A floored reading is a bound rather than a measurement, and carries the
-                // interval that says so. A corroborated one is not floored, so it never
-                // carries it — which is also what stops PlateauPrior substituting for it,
-                // since that is the signature it recognises a bound by.
-                standardErrorPercent = if (bounded) {
+                // interval that says so — which is also the signature PlateauPrior recognises
+                // a bound by.
+                standardErrorPercent = if (fromHip < leanestClaimable(sex)) {
                     PLATEAU_ERROR_PERCENT
                 } else {
                     EstimationMethod.PHOTO_SHAPE.standardErrorPercent
