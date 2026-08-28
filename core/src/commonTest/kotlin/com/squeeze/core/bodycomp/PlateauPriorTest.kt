@@ -1,6 +1,5 @@
 package com.squeeze.core.bodycomp
 
-import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
@@ -13,13 +12,34 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * What the app says about a body its outline could not resolve.
+ * Why a photo scan no longer answers from height and weight, and what is left here.
  *
- * The scan that motivated this reported 4.93%, then — once every path was floored — 11.6%, for
- * a 1.75 m, 68 kg man with no abdominal definition, soft through the midsection, real mass on
- * the arms and shoulders. A coach looking at that body says eighteen to twenty-one. Eleven-six
- * was no longer harmful and still six points wrong, because it was not a figure about him at
- * all: it is the same number the method returns for every body that lands on its plateau.
+ * This file used to substitute a Deurenberg figure for any reading the outline had bounded.
+ * The case for it was real: on the plateau the outline carries no information, so the 11.6%
+ * it reports is a property of the method rather than of the person, and printing a constant
+ * as a measurement is the failure this project keeps rediscovering. Height, weight, age and
+ * sex are measured to a precision no silhouette approaches, and through Deurenberg they gave
+ * 16.5% for the 68 kg body that had been reading 11.6 — which matched a coach's assessment,
+ * which is why it looked like progress.
+ *
+ * **The substitute was a constant too.** Deurenberg's inputs do not include the photograph, so
+ * for one person at one weight it returns one number. Three photographs of the same man at
+ * 70 kg and 1.75 m all came back at 17.3%:
+ *
+ * | photograph | true level | reported |
+ * |---|---|---|
+ * | soft midsection, loose cargo trousers | ~19% | 17.3% |
+ * | mirror selfie, some structure | ~15% | 17.3% |
+ * | visible abdominal separation, vascular forearms | ~12% | 17.3% |
+ *
+ * Not approximately — identically, because every input was identical. And the value was
+ * written to the row under [EstimationMethod.PHOTO_SHAPE], so [MethodFusion]'s rule that the
+ * BMI fallback never outvotes a measurement could not see it: a height-and-weight number was
+ * laundered through a photo method's name and shown as "Best estimate".
+ *
+ * What remains is [PlateauPrior.isBounded], which lets the rest of the app recognise a bound
+ * and refuse to let one act like a measurement. The tests below pin that, and pin that nothing
+ * here puts a figure on a body the photograph failed to read.
  */
 class PlateauPriorTest {
 
@@ -33,165 +53,43 @@ class PlateauPriorTest {
     )
 
     @Test
-    fun `the scan that reported eleven-six now reports what the body implies`() {
-        val resolved = PlateauPrior.resolve(scan(), man, weightKg = 68.0)
+    fun `a bounded reading is recognisable as one, by its interval`() {
+        // The whole remaining job. A bound may not veto another method's measurement and must
+        // re-enter a fusion at the width it was recorded with, and both of those need it to
+        // be identifiable from what the row stores.
+        val bounded = scan()
+        assertNotNull(bounded)
 
-        assertNotNull(resolved)
-        // 1.20 x 22.20 + 0.23 x 33 - 10.8 - 5.4 = 18.0, less the 1.5 the equation is known
-        // to overread by on trained subjects.
-        assertEquals(16.5, resolved.percent, 0.2, "got ${resolved.percent}")
-    }
-
-    @Test
-    fun `the trained-population correction is applied once, and downward`() {
-        // Pinned as its own test so the offset cannot be quietly retuned to make some future
-        // screenshot land: changing it has to change a stated expectation here.
-        val raw = 1.20 * (68.0 / (1.75 * 1.75)) +
-            0.23 * PlateauPrior.REFERENCE_AGE - 10.8 - 5.4
-        val implied = PlateauPrior.buildPercent(man, weightKg = 68.0)
-
-        assertNotNull(implied)
-        assertEquals(raw - PlateauPrior.TRAINED_POPULATION_OFFSET, implied, 1e-9)
-        assertTrue(implied < raw, "the correction has to run downward")
-    }
-
-    @Test
-    fun `the correction can never push a reading below the floor`() {
-        // It is subtracted before the plausibility bound and before the floor, so both still
-        // have the last word. A correction that could produce a single-digit figure would
-        // undo the one thing this whole area of the codebase exists to guarantee.
-        //
-        // 55 kg at 1.75 m is the case where it would: the equation gives 12.9, the correction
-        // takes it to 11.4 — under the floor — the plausibility bound pulls it further to
-        // 10.9, and the floor puts it back at 11.6.
-        val resolved = PlateauPrior.resolve(scan(), man, weightKg = 55.0)
-
-        assertNotNull(resolved)
-        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), resolved.percent, 1e-9)
-    }
-
-    @Test
-    fun `it is not a constant — a heavier man at the same height reads higher`() {
-        // The complaint the plateau ceiling could never answer: two different bodies, one
-        // number. Every input below is measured to a precision no silhouette approaches.
-        val light = PlateauPrior.resolve(scan(), man, weightKg = 62.0)
-        val heavy = PlateauPrior.resolve(scan(), man, weightKg = 88.0)
-
-        assertNotNull(light)
-        assertNotNull(heavy)
-        assertTrue(heavy.percent > light.percent + 5.0, "${light.percent} vs ${heavy.percent}")
-    }
-
-    @Test
-    fun `age cannot move it, because a birthday is not a measurement of fat`() {
-        // This test used to assert the opposite — that a fifty-year-old reads higher than a
-        // twenty-year-old at the same weight — on the strength of Deurenberg's own +0.23 per
-        // year. The term is real and it is not modelling ageing: it compensates for BMI's
-        // blindness by imputing less muscle to an older body at the same height and weight.
-        //
-        // Letting it through had a consequence that does not survive being said out loud. The
-        // repository recomputed every historical row at *today's* age, so a two-year-old scan
-        // silently read half a point higher than the day it was taken, and the trend engine —
-        // which sees these figures and not the measurements behind them — read that calendar
-        // creep as a slow real gain. Body fat is fat mass over total mass. A birthday is not
-        // an input to it.
-        //
-        // The term is held at PlateauPrior.REFERENCE_AGE rather than deleted, which would
-        // drop the equation by seven and a half points. Nothing about age reaches the figure
-        // now, and it cannot: buildPercent takes no age to pass.
-        val born1976 = man.copy(birthYear = 1976)
-        val born2006 = man.copy(birthYear = 2006)
-
-        val older = PlateauPrior.resolve(scan(), born1976, weightKg = 68.0)
-        val younger = PlateauPrior.resolve(scan(), born2006, weightKg = 68.0)
-
-        assertNotNull(older)
-        assertNotNull(younger)
-        assertEquals(younger.percent, older.percent, 1e-9)
-    }
-
-    @Test
-    fun `it never moves a reading downward`() {
-        // The floor property PlateauFloorTest guarantees has to survive this file. A body
-        // whose build implies less than the outline's own bound keeps the bound: the two
-        // agree the subject is lean, and the outline's statement is the more restrictive.
-        val slight = PlateauPrior.resolve(scan(), man, weightKg = 52.0)
-
-        assertNotNull(slight)
         assertTrue(
-            slight.percent >= SilhouetteBodyFat.leanestClaimable(Sex.MALE),
-            "got ${slight.percent}",
+            PlateauPrior.isBounded(bounded.percent, bounded.standardErrorPercent, man, 68.0),
         )
+        assertEquals(SilhouetteBodyFat.PLATEAU_ERROR_PERCENT, bounded.standardErrorPercent, 1e-9)
     }
 
     @Test
-    fun `with no weight recorded it says exactly what it said before`() {
-        val resolved = PlateauPrior.resolve(scan(), man, weightKg = null)
-
-        assertNotNull(resolved)
-        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), resolved.percent, 1e-9)
-    }
-
-    @Test
-    fun `a reading the outline resolved is left alone`() {
-        // The guard that keeps this from being a BMI correction applied to everything. A
-        // trained man reads lean from a clean hip ratio and BMI, blind to muscle, would drag
-        // him upward — the exact bias MethodFusion refuses to average into a measured method.
+    fun `a reading the outline resolved is not mistaken for a bound`() {
+        // The guard that keeps the bound machinery away from working measurements. A clean hip
+        // ratio well above the floor is a measurement and carries the method's own interval.
         val measured = SilhouetteBodyFat.estimate(
             ShapeIndices(waistToShoulder = 0.95, waistToHip = 0.95),
             Sex.MALE,
         )
         assertNotNull(measured)
 
-        val resolved = PlateauPrior.resolve(measured, man, weightKg = 95.0)
-
-        assertNotNull(resolved)
-        assertEquals(measured.percent, resolved.percent, 1e-9)
-        assertEquals(measured.standardErrorPercent, resolved.standardErrorPercent, 1e-9)
+        assertFalse(
+            PlateauPrior.isBounded(measured.percent, measured.standardErrorPercent, man, 95.0),
+        )
+        assertEquals(
+            EstimationMethod.PHOTO_SHAPE.standardErrorPercent,
+            measured.standardErrorPercent,
+            1e-9,
+        )
     }
 
     @Test
-    fun `the substituted figure keeps the plateau's interval`() {
-        val resolved = PlateauPrior.resolve(scan(), man, weightKg = 68.0)
-
-        assertNotNull(resolved)
-        assertEquals(SilhouetteBodyFat.PLATEAU_ERROR_PERCENT, resolved.standardErrorPercent, 1e-9)
-        // And it is still the outline's method, because the outline is what produced the
-        // bound this replaced. Relabelling it DEURENBERG_BMI would drop it from every fusion
-        // containing a measured method, which is the opposite of what a bound should do.
-        assertEquals(EstimationMethod.PHOTO_SHAPE, resolved.method)
-    }
-
-    @Test
-    fun `women resolve on the female form of the equation`() {
-        val resolved = PlateauPrior.resolve(scan(Sex.FEMALE), woman, weightKg = 62.0)
-        val asMan = PlateauPrior.resolve(scan(), man.copy(heightCm = 165.0), 62.0)
-
-        assertNotNull(resolved)
-        assertNotNull(asMan)
-        // The sex term is 10.8 points. Same height, same weight, same age.
-        assertTrue(resolved.percent > asMan.percent + 9.0, "${asMan.percent} vs ${resolved.percent}")
-    }
-
-    @Test
-    fun `an impossible implied lean mass is bounded, not printed`() {
-        // BMI is blind to stature in a way that bites at the extremes: 65 kg at 1.90 m gives
-        // a Deurenberg figure near 13%, 11.5 after the trained correction, which would still
-        // leave under 57.6 kg of fat-free mass — a fat-free mass index of 15.9, below
-        // anything measured in an ambulatory adult. The gate that caught 36.6% applies to
-        // this route too, and clamps it to 11.14.
-        val tall = Profile(heightCm = 190.0, birthYear = 1993, sex = Sex.MALE)
-        val implied = PlateauPrior.buildPercent(tall, weightKg = 65.0)
-        val range = LeanMassPlausibility.plausibleRange(tall, 65.0)
-
-        assertNotNull(implied)
-        assertNotNull(range)
-        assertTrue(implied in range, "got $implied for $range")
-        assertEquals(range.endInclusive, implied, 1e-9)
-    }
-
-    @Test
-    fun `a stored bound is recognised by its interval`() {
+    fun `the interval decides, not the value`() {
+        // Same percentage, different widths, opposite answers. The value merely coincides with
+        // the bound; the width is the estimator saying it bounded something.
         assertTrue(
             PlateauPrior.isBounded(18.0, SilhouetteBodyFat.PLATEAU_ERROR_PERCENT, man, 68.0),
         )
@@ -207,8 +105,9 @@ class PlateauPriorTest {
 
     @Test
     fun `a row recorded before intervals were stored still resolves correctly`() {
-        // Legacy rows have no interval. They fall back to the value comparison, which is
-        // sound because resolve maps every unresolved reading onto exactly the bound.
+        // Legacy rows have no interval, so they fall back to comparing against the bound the
+        // old code would have written. That comparison is sound for exactly those rows and no
+        // others, which is the only reason buildPercent and ceiling still exist.
         val bound = PlateauPrior.ceiling(man, 68.0)
 
         assertTrue(PlateauPrior.isBounded(bound, null, man, 68.0))
@@ -216,42 +115,89 @@ class PlateauPriorTest {
     }
 
     @Test
-    fun `no resolved reading is ever a single-digit figure`() {
-        // PlateauFloorTest's property, re-asserted through this layer, over the weights and
-        // birth years a real user can have. The birth years are still swept even though the
-        // figure no longer depends on them — if anything ever reintroduces an age term, this
-        // is where it gets caught rather than in a user's trend eighteen months later.
-        val weights = listOf(45.0, 55.0, 68.0, 80.0, 95.0, 120.0)
-        val birthYears = listOf(1950, 1975, 1996, 2008)
-        val ratios = listOf(0.40, 0.55, 0.65, 0.70, 0.75, 0.80, 0.90, 1.00, 1.20)
+    fun `the build figure is no longer anything a scan can report`() {
+        // The regression that matters. Deurenberg at 70 kg and 1.75 m is 17.3, and the three
+        // photographs in this file's header all landed on it. Whatever the outline gives back
+        // now, it is the outline's own figure — so it cannot equal a number derived from
+        // inputs the photograph never touched.
+        val implied = PlateauPrior.buildPercent(man, weightKg = 70.0)
+        assertNotNull(implied)
+        assertEquals(17.3, implied, 0.1, "the substitute was $implied")
 
-        for (weight in weights) {
-            for (birthYear in birthYears) {
-                for (ratio in ratios) {
-                    Sex.entries.forEach { sex ->
-                        val profile = (if (sex == Sex.MALE) man else woman)
-                            .copy(birthYear = birthYear)
-                        val raw = SilhouetteBodyFat.estimate(ShapeIndices(ratio, null), sex)
-                            ?: return@forEach
-                        val resolved = PlateauPrior.resolve(raw, profile, weight)
-
-                        assertNotNull(resolved)
-                        assertTrue(
-                            resolved.percent >= SilhouetteBodyFat.leanestClaimable(sex),
-                            "$sex $weight kg born $birthYear ratio $ratio " +
-                                "gave ${resolved.percent}",
-                        )
-                    }
-                }
-            }
-        }
+        val fromOutline = scan()
+        assertNotNull(fromOutline)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), fromOutline.percent, 1e-9)
+        assertTrue(
+            fromOutline.percent < implied - 4.0,
+            "the outline's bound must not have become the build figure: ${fromOutline.percent}",
+        )
     }
 
     @Test
-    fun `a null estimate stays null`() {
-        assertEquals(
-            null,
-            PlateauPrior.resolve(null as BodyFatEstimate?, man, 68.0),
-        )
+    fun `the outline answers the photograph and the build route cannot`() {
+        // The reason the route was removed, as a property rather than as anecdote. Three
+        // different photographs of one body at one weight: the outline gives three different
+        // readings because the picture is its only input, and the build figure gives one
+        // because the picture is not an input to it at all.
+        val outline = listOf(0.686, 0.80, 0.95)
+            .mapNotNull { SilhouetteBodyFat.estimate(ShapeIndices(it, null), Sex.MALE)?.percent }
+            .distinct()
+
+        assertEquals(3, outline.size, "the outline has to respond to the picture: $outline")
+        assertNotNull(PlateauPrior.buildPercent(man, 70.0))
     }
+
+    @Test
+    fun `the trained-population correction is applied once, and downward`() {
+        // Pinned because buildPercent still serves isBounded on legacy rows, so its arithmetic
+        // still has to be the arithmetic those rows were written with.
+        val raw = 1.20 * (68.0 / (1.75 * 1.75)) +
+            0.23 * PlateauPrior.REFERENCE_AGE - 10.8 - 5.4
+        val implied = PlateauPrior.buildPercent(man, weightKg = 68.0)
+
+        assertNotNull(implied)
+        assertEquals(raw - PlateauPrior.TRAINED_POPULATION_OFFSET, implied, 1e-9)
+        assertTrue(implied < raw, "the correction has to run downward")
+    }
+
+    @Test
+    fun `age cannot move it, because a birthday is not a measurement of fat`() {
+        // Kept from when this route was displayed. The repository recomputed historical rows
+        // at today's age, so a two-year-old scan silently read half a point higher than the
+        // day it was taken and the trend engine read that calendar creep as a real gain.
+        // buildPercent takes no age to pass, and this is what keeps it that way.
+        val older = PlateauPrior.buildPercent(man.copy(birthYear = 1976), 68.0)
+        val younger = PlateauPrior.buildPercent(man.copy(birthYear = 2006), 68.0)
+
+        assertNotNull(older)
+        assertNotNull(younger)
+        assertEquals(younger, older, 1e-9)
+    }
+
+    @Test
+    fun `an impossible implied lean mass is bounded, not printed`() {
+        // BMI is blind to stature at the extremes: 65 kg at 1.90 m gives a Deurenberg figure
+        // near 13%, 11.5 after the correction, which would leave a fat-free mass index of
+        // 15.9 — below anything measured in an ambulatory adult.
+        val tall = Profile(heightCm = 190.0, birthYear = 1993, sex = Sex.MALE)
+        val implied = PlateauPrior.buildPercent(tall, weightKg = 65.0)
+        val range = LeanMassPlausibility.plausibleRange(tall, 65.0)
+
+        assertNotNull(implied)
+        assertNotNull(range)
+        assertTrue(implied in range, "got $implied for $range")
+        assertEquals(range.endInclusive, implied, 1e-9)
+    }
+
+    @Test
+    fun `women resolve on the female form of the equation`() {
+        val her = PlateauPrior.buildPercent(woman, 62.0)
+        val him = PlateauPrior.buildPercent(man.copy(heightCm = 165.0), 62.0)
+
+        assertNotNull(her)
+        assertNotNull(him)
+        // The sex term is 10.8 points. Same height, same weight, same age.
+        assertTrue(her > him + 9.0, "$him vs $her")
+    }
+
 }

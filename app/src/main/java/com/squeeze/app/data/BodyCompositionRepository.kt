@@ -241,9 +241,35 @@ class BodyCompositionRepository @Inject constructor(
             fromCircumferences?.let { candidates += it }
         }
 
-        entity.weightKg
-            ?.let { BodyFatCalculator.deurenbergBmi(profile, it, age) }
-            ?.let { candidates += it }
+        // Whether this row claims to have read a photograph. Used twice below: to keep the
+        // BMI fallback out of the answer, and to refuse the record outright when nothing
+        // photo-derived survived.
+        val fromPhoto = entity.source == MeasurementSource.PHOTO.name ||
+            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name
+
+        // The BMI fallback, and **only where a photograph is not the question**.
+        //
+        // [MethodFusion] already refuses to fuse it with any measured method, on the grounds
+        // that it is blind to muscle and would drag a trained user toward a known bias. That
+        // rule holds. What it could not do is stop the figure being the *answer* when it was
+        // the only survivor, and on a photo scan that is exactly when it appeared: a scan
+        // whose outline landed on the plateau contributed a bound, the bound is not a
+        // measurement, and the user was shown a number computed from height and weight under
+        // the heading of a photo scan.
+        //
+        // Three photographs of one man at 70 kg proved it could not be right more than once:
+        // soft, mid, and with visible abdominal separation, all 17.3%, because every input to
+        // the equation was identical across the three. A scan answers from the scan, or it
+        // says it could not.
+        //
+        // Tape and skinfold entries keep it, because there it is what it was always
+        // documented to be — a first-run placeholder before anything has been measured, on a
+        // record that never claimed to have read a photograph.
+        if (!fromPhoto) {
+            entity.weightKg
+                ?.let { BodyFatCalculator.deurenbergBmi(profile, it, age) }
+                ?.let { candidates += it }
+        }
 
         // The one candidate that does not run on circumferences. Every other method here
         // shares the scan's scale error, so fusing them alone narrows the interval around a
@@ -331,8 +357,6 @@ class BodyCompositionRepository @Inject constructor(
                 it.method == EstimationMethod.VISUAL_ASSESSMENT ||
                 it.method == EstimationMethod.REFERENCE_SCAN
         }
-        val fromPhoto = entity.source == MeasurementSource.PHOTO.name ||
-            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name
         if (fromPhoto && !photoDerived) return null
 
         val plausible = LeanMassPlausibility.filter(candidates, profile, entity.weightKg)

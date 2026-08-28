@@ -70,18 +70,22 @@ class CorroboratedHipTest {
 
     @Test
     fun `and neither reaches the user as a single-digit figure`() {
-        // End to end, at the weight and height both records were taken at. PlateauPrior
-        // recognises the floored reading by its interval and substitutes what the build
-        // implies — which is not the right answer for either body, but is not a claim that
-        // a man with a soft midsection is below essential fat.
+        // The floor is what carries this now. PlateauPrior used to recognise the floored
+        // reading by its interval and substitute what height and weight implied; that
+        // substitution is gone, because it returned one number for every photograph of one
+        // body at one weight. What is left is the bound itself, and the bound is the thing
+        // that stops a man with a soft midsection being told he is below essential fat.
         listOf(0.788, 0.69).forEach { ratio ->
             val measured = hipReading(ratio)
+
             assertNotNull(measured, "ratio $ratio")
-
-            val resolved = PlateauPrior.resolve(measured, man, weightKg = 70.0)
-
-            assertNotNull(resolved, "ratio $ratio")
-            assertTrue(resolved.percent > 10.0, "ratio $ratio gave ${resolved.percent}")
+            assertTrue(measured.percent > 10.0, "ratio $ratio gave ${measured.percent}")
+            assertTrue(
+                PlateauPrior.isBounded(
+                    measured.percent, measured.standardErrorPercent, man, 70.0,
+                ),
+                "ratio $ratio should be recognisable as a bound",
+            )
         }
     }
 
