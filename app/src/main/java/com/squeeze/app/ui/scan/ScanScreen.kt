@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -841,7 +842,25 @@ private fun ResultStep(
         val shape = state.resolvedShape(weight.toCm())
 
         shape?.let {
-            ShapeHeadline(it, hasWeight = weight.toCm() != null, indices = state.shapeIndices)
+            ShapeHeadline(
+                estimate = it,
+                hasWeight = weight.toCm() != null,
+                indices = state.shapeIndices,
+                // Ordered by how much each one costs. Light first: it is the only one that
+                // can destroy the abdominal shading outright, and the only one whose damage
+                // no later step can undo.
+                blockers = listOfNotNull(
+                    state.lightingAdvice,
+                    state.poseAdvice,
+                    "Your hips were not in shot, so your waist was read against your " +
+                        "shoulders — the weaker of the two denominators, because your arms " +
+                        "attach there."
+                        .takeIf { _ -> state.framing == ScanFraming.UPPER_BODY },
+                    "No side photo, so the axis abdominal fat actually moves along was " +
+                        "never measured."
+                        .takeIf { _ -> state.abdominalBodyFatPercent == null },
+                ),
+            )
         }
 
         // Said before the advice, because it changes what the advice is for. A trunk scan is
@@ -1295,6 +1314,14 @@ private fun ShapeHeadline(
     estimate: BodyFatEstimate,
     hasWeight: Boolean,
     indices: ShapeIndices? = null,
+    /**
+     * The specific things this photograph got wrong, in the order they cost accuracy.
+     *
+     * Passed in rather than left to the cards further down the screen, because on an
+     * unresolved reading they are not footnotes — they are the reason there is no reading,
+     * and they are the only part of this card the user can act on.
+     */
+    blockers: List<String> = emptyList(),
 ) {
     // A reading carrying the plateau's interval is not a measurement of this body's fat — the
     // outline could not separate lean from very lean, and said so by widening to ±9. The card
@@ -1309,7 +1336,13 @@ private fun ShapeHeadline(
         HeroMetric(
             value = "%.1f".format(estimate.percent),
             unit = "%",
-            label = if (bounded) "Best estimate" else "From your shape",
+            // "Best estimate" was a claim this figure cannot support when it is bounded.
+            // Three photographs of the same man at 70 kg and 175 cm — soft, mid, and with
+            // visible abdominal separation — all returned 17.3%, and they had to: on a
+            // bounded reading the number is Deurenberg's equation on height, weight, age and
+            // sex, and every one of those inputs was identical. It is not an estimate of the
+            // body in the picture. It is what any body at that weight would be told.
+            label = if (bounded) "From your height and weight" else "From your shape",
             // Shown for every reading, not only the uncertain ones. Every figure in this app
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
@@ -1323,10 +1356,11 @@ private fun ShapeHeadline(
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
                         "throws that away — it knows your edge and nothing inside it. So " +
-                        "this figure comes from your height, weight and age instead, " +
-                        "which are measured rather than inferred. A side photo, a tape " +
-                        "measurement at your navel, or matching yourself to the pictures " +
-                        "below will all beat it."
+                        "this figure is Deurenberg's equation on your height, weight, age " +
+                        "and sex. Nothing in it came from the photograph, and it would be " +
+                        "the same number for any body at your weight — lean or soft. A " +
+                        "side photo, a tape measurement at your navel, or matching " +
+                        "yourself to the pictures below will all beat it."
 
                 bounded ->
                     "Your outline could not settle this one, and without a weight there " +
@@ -1345,6 +1379,39 @@ private fun ShapeHeadline(
             color = if (dark) Brand.DarkMuted else Brand.Muted,
             modifier = Modifier.padding(top = 12.dp),
         )
+
+        // Why this photograph could not answer, inside the card rather than below it.
+        //
+        // The scan already detects each of these and already says so — in separate cards
+        // further down, under a figure in display type. That ordering had the app diagnosing
+        // the exact reason it could not read the body and then answering anyway, with the
+        // diagnosis out of sight.
+        //
+        // It is not a cosmetic complaint. Measured on a real scan: on an overexposed
+        // photograph the abdomen came back with a standard deviation of 12 grey levels out
+        // of 255, against 31 and 33 on two normally-lit bodies. The shading that carries
+        // abdominal definition was gone before the file was written, so no amount of work on
+        // the estimator recovers it — but "step out of direct light" recovers it entirely,
+        // and that sentence was three cards down.
+        if (bounded && blockers.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "What stopped it reading you:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                blockers.forEach { blocker ->
+                    Text(
+                        text = "• $blocker",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (dark) Brand.DarkMuted else Brand.Muted,
+                    )
+                }
+            }
+        }
 
         // What the outline actually measured, shown only when it could not settle the answer.
         //
