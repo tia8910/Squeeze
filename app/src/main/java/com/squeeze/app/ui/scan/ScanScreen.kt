@@ -844,7 +844,6 @@ private fun ResultStep(
         shape?.let {
             ShapeHeadline(
                 estimate = it,
-                hasWeight = weight.toCm() != null,
                 indices = state.shapeIndices,
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
@@ -1312,7 +1311,6 @@ private fun KnownBodyFatCard(value: String, onValueChange: (String) -> Unit) {
 @Composable
 private fun ShapeHeadline(
     estimate: BodyFatEstimate,
-    hasWeight: Boolean,
     indices: ShapeIndices? = null,
     /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
@@ -1336,13 +1334,12 @@ private fun ShapeHeadline(
         HeroMetric(
             value = "%.1f".format(estimate.percent),
             unit = "%",
-            // "Best estimate" was a claim this figure cannot support when it is bounded.
-            // Three photographs of the same man at 70 kg and 175 cm — soft, mid, and with
-            // visible abdominal separation — all returned 17.3%, and they had to: on a
-            // bounded reading the number is Deurenberg's equation on height, weight, age and
-            // sex, and every one of those inputs was identical. It is not an estimate of the
-            // body in the picture. It is what any body at that weight would be told.
-            label = if (bounded) "From your height and weight" else "From your shape",
+            // "Best estimate" was a claim a bounded reading cannot support, and the figure
+            // it labelled was worse than imprecise: it came from height and weight through
+            // Deurenberg, so three photographs of the same man at 70 kg — soft, mid, and with
+            // visible abdominal separation — all returned 17.3%. That substitution is gone;
+            // what is left is the outline's own floor, which is a bound and says so.
+            label = if (bounded) "Leanest your outline can claim" else "From your shape",
             // Shown for every reading, not only the uncertain ones. Every figure in this app
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
@@ -1352,22 +1349,18 @@ private fun ShapeHeadline(
 
         Text(
             text = when {
-                bounded && hasWeight ->
+                bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
                         "throws that away — it knows your edge and nothing inside it. So " +
-                        "this figure is Deurenberg's equation on your height, weight, age " +
-                        "and sex. Nothing in it came from the photograph, and it would be " +
-                        "the same number for any body at your weight — lean or soft. A " +
-                        "side photo, a tape measurement at your navel, or matching " +
-                        "yourself to the pictures below will all beat it."
-
-                bounded ->
-                    "Your outline could not settle this one, and without a weight there " +
-                        "is nothing left to settle it with — so this is the leanest " +
-                        "figure the shape reading is allowed to claim, not a reading of " +
-                        "you. Enter your weight above and it becomes an estimate of your " +
-                        "body."
+                        "this is a floor, not a reading of you: you are no leaner than " +
+                        "this, and the outline cannot say how much softer. The app used " +
+                        "to fill the gap from your height and weight, which gave every " +
+                        "photo at your weight the same answer whatever your body looked " +
+                        "like. It no longer does that. A side photo settles it from a " +
+                        "picture — it measures your abdomen front to back, the axis a " +
+                        "front view cannot see — and a tape at your navel or your own " +
+                        "known figure settle it from a measurement."
 
                 else ->
                     "Read from how wide your waist is relative to your shoulders and " +

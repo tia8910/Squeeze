@@ -1,52 +1,49 @@
 package com.squeeze.core.bodycomp
 
-import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Profile
 import com.squeeze.core.scan.SilhouetteBodyFat
 
 /**
- * What to report when the outline has admitted it cannot tell.
+ * What a photo scan may say when the outline has admitted it cannot tell — and what it may not.
  *
- * [SilhouetteBodyFat] stops extrapolating below its plateau and returns the leanest figure
- * the outline could support — 11.6% for a man, 21.2% for a woman. That fixed a genuine harm:
- * the app no longer tells someone with a soft midsection that they are 4.93%. It did not
- * produce a right answer. A man of 1.75 m and 68 kg with no abdominal definition is nearer
- * eighteen per cent than twelve, and 11.6 was still six points of nonsense, merely a safer
- * kind.
+ * [SilhouetteBodyFat] stops extrapolating below its plateau and returns the leanest figure the
+ * outline could support: 11.6% for a man, 21.2% for a woman, carrying ±9. That is a bound, not
+ * an estimate. It says "no leaner than this, and I cannot say how much fatter", and it is the
+ * same number for every body that lands there — because on the plateau the outline carries no
+ * information about adiposity, which is what "plateau" means.
  *
- * The reason it was still wrong is structural, and naming it is the whole of this file. On
- * the plateau the outline carries no information about adiposity — that is what "plateau"
- * means. So the plateau ceiling is not an estimate of the person; it is a property of the
- * *method*, the same number for every body that lands there. Printing a constant as though it
- * were a measurement is the exact failure this codebase keeps rediscovering: an 8.00% reading
- * from a texture score pinned at its lean end, a 36.6% reading nobody sanity-checked against
- * lean mass, and now a plateau ceiling shown as a percentage of a specific man.
+ * This file used to answer that by substituting a figure from height, weight, age and sex. The
+ * argument was that when one instrument says nothing, the answer is the instrument that says
+ * something rather than that instrument's floor, and every input to Deurenberg is measured to a
+ * precision no silhouette approaches. It shipped, and for 68 kg at 1.75 m it produced 16.5%
+ * where the outline had been saying 11.6% — closer to what a coach standing in front of that
+ * body says, which is why it looked right.
  *
- * **When one instrument says nothing, the answer is the instrument that says something — not
- * that instrument's floor.** Height, weight, age and sex are known, measured to a precision no
- * silhouette approaches, and completely untouched by every failure the outline has: a clipped
- * arm, a waistband inside the hip band, a sideways frame, laundry joined to the mask. Through
- * the Deurenberg equation they give a figure for *this* body rather than for this method.
+ * **It was a constant too.** Deurenberg runs on height, weight, age and sex, so for one person
+ * at one weight it returns exactly one number regardless of what was photographed. Three
+ * photographs of the same man at 70 kg and 1.75 m — soft in loose trousers, a mirror selfie in
+ * the middle, and one with visible abdominal separation and vascular forearms — all came back
+ * **17.3%**. Not approximately: identically, because all four inputs were identical. The trade
+ * had swapped the method's constant for the body's constant, which made the figure personal
+ * without making it a measurement.
  *
- * For 68 kg at 1.75 m that is a BMI of 22.2 and, at thirty-three, 16.5% once the equation's
- * known bias for trained subjects is taken off — which is what a coach standing in front of
- * that body says, and five points from what the outline was reporting.
+ * And it hid the swap. The substituted value was written to the row under
+ * [com.squeeze.core.model.EstimationMethod.PHOTO_SHAPE], so [MethodFusion]'s rule that the BMI
+ * fallback is never a peer — the rule written precisely to stop a number that never looked at
+ * the body from outvoting one that did — could not see it. A height-and-weight figure was
+ * laundered through a photo method's name and reached the user as "Best estimate".
  *
- * **What this is not.** It is not a correction applied to a working measurement. Off the
- * plateau the outline is measuring something real, and BMI is blind to muscle — fold it into
- * a good reading and a trained user is dragged upward toward a known bias, which is precisely
- * why [MethodFusion] excludes [com.squeeze.core.model.EstimationMethod.DEURENBERG_BMI] from
- * any pool containing a measured method. So this substitutes only where there is nothing to
- * damage: readings the outline has already declared uninformative.
+ * **So a photo scan now reports what the photograph supports.** On the plateau that is the
+ * outline's own bound with its own interval: a weaker claim than the substitute, and a true
+ * one. What resolves it is another photograph rather than another equation — a side view, which
+ * measures abdominal depth against the ribcage and is the one axis a front view is blind to.
+ * A tape measurement or a known reference figure resolve it too, and both are measurements of
+ * the body.
  *
- * **The substituted figure keeps the plateau's crippled interval**, and that is load-bearing
- * rather than cautious. Deurenberg's own published error is nearer 4.5 points, so narrowing to
- * it would be defensible on paper and wrong here for two reasons. It was fitted on general
- * adults and overestimates trained ones, who are this app's users; and at ±4.5 a figure
- * derived from height and weight would start outweighing a tape measurement in
- * [MethodFusion]'s inverse-variance pool. Nothing that never looked at the body should ever
- * outvote something that did. Anything between 4.5 and 9 would be a constant picked by
- * argument, which this file has enough of, so the interval that was already there is kept.
+ * What survives here is [isBounded], which recognises a bound so the rest of the app can refuse
+ * to let one veto a real measurement or re-enter a fusion claiming precision it never had.
+ * [buildPercent] and [ceiling] survive only to serve it on rows written before intervals were
+ * stored. Nothing displays them.
  */
 object PlateauPrior {
 
@@ -164,49 +161,13 @@ object PlateauPrior {
     }
 
     /**
-     * Resolves a fresh silhouette estimate against what the body's build implies.
-     *
-     * Only readings the outline has already bounded are touched, and **which readings those
-     * are is decided by the interval rather than by the value**.
-     *
-     * Both tests give the same answer today, because [SilhouetteBodyFat] floors every path at
-     * [SilhouetteBodyFat.leanestClaimable] and widens the interval whenever it does. The
-     * interval is the better of the two to depend on: it is the estimator *stating* that it
-     * bounded something, where the value merely happens to coincide with the bound. When an
-     * exemption to the floor was briefly added, the positional test silently kept replacing
-     * the readings it exempted — a coupling that was invisible until it shipped.
-     *
-     * @return the estimate unchanged when the outline resolved something, the build-implied
-     *   figure when it did not, and null for null
-     */
-    fun resolve(
-        estimate: BodyFatEstimate?,
-        profile: Profile,
-        weightKg: Double?,
-    ): BodyFatEstimate? {
-        if (estimate == null) return null
-        if (!isBounded(estimate.percent, estimate.standardErrorPercent, profile, weightKg)) {
-            return estimate
-        }
-
-        return estimate.copy(
-            percent = ceiling(profile, weightKg),
-            // Never narrower than the plateau's own interval. The point became specific to
-            // this body; the amount that was actually measured did not change.
-            standardErrorPercent = maxOf(
-                estimate.standardErrorPercent,
-                SilhouetteBodyFat.PLATEAU_ERROR_PERCENT,
-            ),
-        )
-    }
-
-    /**
      * Whether a stored figure is a bound rather than a measurement of adiposity.
      *
      * Prefers the stored interval, which is what actually distinguishes the two and is written
      * alongside the figure by every scan since this file shipped. Rows recorded before that
      * have no interval, so they fall back to comparing against the bound the same inputs would
-     * produce — sound because [resolve] maps every unresolved reading onto exactly that value.
+     * produce — sound because the code that wrote those rows mapped every unresolved
+     * reading onto exactly that value.
      *
      * Callers use this to decide what a shape figure is allowed to *do*, not what it says: a
      * bound may not veto another method's measurement, and it must re-enter the fusion at the

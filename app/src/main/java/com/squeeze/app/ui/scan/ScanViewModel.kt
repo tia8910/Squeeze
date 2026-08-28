@@ -16,7 +16,6 @@ import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.bodycomp.LeanMassPlausibility
-import com.squeeze.core.bodycomp.PlateauPrior
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.MeasurementSource
@@ -81,8 +80,8 @@ data class ScanUiState(
      *
      * The whole estimate rather than its percentage, because the interval is what says
      * whether the outline measured this body or merely bounded it, and the result screen has
-     * to show the difference. It is the *unresolved* reading: [PlateauPrior] is applied at the
-     * point of display and of saving, where the user's weight is known.
+     * to show the difference. It is exactly what the outline produced — on the plateau, a
+     * bound carrying ±9 rather than a figure about this body.
      */
     val shape: BodyFatEstimate? = null,
     /**
@@ -99,21 +98,21 @@ data class ScanUiState(
     /**
      * The most recent recorded bodyweight, before the user types one on this screen.
      *
-     * Needed because what the outline reports on its plateau depends on the body's build. Also
-     * prefills the weight field, which is worth doing on its own: a scan with no weight is a
-     * scan the plausibility gate and the lean-mass trend cannot use.
+     * Prefills the weight field. A scan with no weight is a scan the plausibility gate and
+     * the lean-mass trend cannot use — but it no longer changes the body-fat figure, which
+     * comes from the photograph or does not come at all.
      */
     val knownWeightKg: Double? = null,
     /**
      * The weight the user entered when the scan started.
      *
-     * Asked for before the camera rather than after the photograph, because it is an input to
-     * the answer and not a footnote to it. When the outline lands on its plateau the reported
-     * figure comes from the body's build, so a scan taken without a weight cannot produce a
-     * figure about the person at all — it falls back to the leanest number the method is
-     * allowed to claim, which is the same for everybody. Collecting it first also means the
-     * scan is never one forgotten field away from being unusable by the plausibility gate
-     * and the lean-mass trend.
+     * Asked for before the camera so the scan is never one forgotten field away from being
+     * unusable by the plausibility gate and the lean-mass trend, and so the record carries the
+     * weight it was actually taken at.
+     *
+     * It is **not** an input to the body-fat figure. It was, for one release: on the plateau
+     * the reported figure came from height and weight through Deurenberg, which meant the same
+     * number for every photograph of one person at one weight. That is gone.
      */
     val enteredWeightKg: Double? = null,
     /**
@@ -150,27 +149,28 @@ data class ScanUiState(
     val framing: ScanFraming = ScanFraming.FULL_BODY,
 ) {
     /**
-     * What the app should print, given a weight the user may have typed since the scan ran.
+     * What the photograph supports, and nothing else.
      *
-     * Recomputed rather than stored so that entering a weight updates the headline
-     * immediately. On the plateau the outline contributes only a bound, and the figure comes
-     * from the build — so the weight field is not an afterthought on this screen, it is an
-     * input to the number above it.
+     * This used to hand a bounded reading to `PlateauPrior.resolve`, which replaced it with a
+     * figure from height, weight, age and sex. That figure is a constant for one person at
+     * one weight — three photographs of the same man at 70 kg all returned 17.3%, necessarily
+     * — and it was stored under the photo method's own name, which is how it slipped past
+     * [com.squeeze.core.bodycomp.MethodFusion]'s rule that a BMI figure never outvotes a
+     * measurement. A scan's answer must come from the scan.
+     *
+     * So on the plateau the app now prints the outline's own bound with its own ±9. Weaker,
+     * and true. Weight still reaches this function, but only through the plausibility gate
+     * below, which can rule a reading out and cannot invent one.
      */
     fun resolvedShape(weightKg: Double?): BodyFatEstimate? {
         val profile = profile ?: return shape
         val weight = weightKg ?: knownWeightKg
 
-        return PlateauPrior
-            .resolve(estimate = shape, profile = profile, weightKg = weight)
-            // The same gate the stored record goes through, applied to the figure on screen.
-            //
-            // Belt and braces rather than load-bearing: the estimator's own floor already
-            // stops a silhouette reading arriving here in single digits. It is kept because
-            // the screen and the record disagreeing about the same scan is its own kind of
-            // bug, and because the one time the floor was exempted this was the only thing
-            // between a broken hip measurement and a 3.00% headline.
-            ?.let { LeanMassPlausibility.clampToRange(it, profile, weight) }
+        // A gate, not a source. It moves a reading only when height and weight make it
+        // physically impossible — the check that caught 36.6% on a normally-built man — and
+        // widens the interval to say it was moved. Nothing it does can put a number on a
+        // body the photograph failed to read.
+        return shape?.let { LeanMassPlausibility.clampToRange(it, profile, weight) }
     }
 }
 
@@ -528,8 +528,8 @@ class ScanViewModel @Inject constructor(
         // back to the leanest number the method is allowed to claim.
         val weight = weightKg ?: _state.value.enteredWeightKg
 
-        // Resolved against the weight the user just entered rather than the one on file, so
-        // the figure that is stored is the figure they were looking at when they pressed save.
+        // The same figure the user was looking at when they pressed save, gated against the
+        // weight they entered rather than the one on file.
         val shape = _state.value.resolvedShape(weight)
         val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
