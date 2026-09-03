@@ -169,4 +169,75 @@ class AnatomicalLevelFinderTest {
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
     }
+
+    /**
+     * A figure with arm and leg data, to test ARM and CALF detection.
+     *
+     *   rows   0..19   head
+     *   rows  20..29   neck, narrowest
+     *   rows  30..49   shoulders + chest (torso 0.26, arm 0.08)
+     *   rows  50..99   torso tapering (arm present at 0.07)
+     *   rows 100..119  hips (torso 0.24)
+     *   rows 120..159  thighs (leg 0.09)
+     *   rows 160..199  calves (leg 0.06)
+     */
+    private fun figureWithLimbs(): WidthProfile {
+        val torso = DoubleArray(200)
+        val leg = DoubleArray(200)
+        for (row in 0..19) torso[row] = 0.10
+        for (row in 20..29) torso[row] = 0.06
+        for (row in 30..49) { torso[row] = 0.26; leg[row] = 0.08 }
+        for (row in 50..99) {
+            torso[row] = if (row <= 80) 0.26 - (row - 50) * 0.002
+                else 0.20 + (row - 80) * 0.002
+            leg[row] = 0.07
+        }
+        for (row in 100..119) torso[row] = 0.24
+        for (row in 120..159) leg[row] = 0.09
+        for (row in 160..199) leg[row] = 0.06
+        return WidthProfile(torso, leg, topRow = 0, bottomRow = 199)
+    }
+
+    @Test
+    fun `arm is detected at the widest non-torso run in the upper arm region`() {
+        val sites = AnatomicalLevelFinder.detectSites(figureWithLimbs(), anchors())
+
+        val arm = sites[ScanSite.ARM]
+        assertNotNull(arm, "arm should be detected when leg data is present")
+        assertTrue(arm in 36..62, "arm should be in the upper arm band, got row $arm")
+        // The arm run width at that row must be less than the torso width.
+        assertTrue(
+            figureWithLimbs().legWidthAt(arm) < figureWithLimbs().torsoWidthAt(arm),
+            "arm must be narrower than the torso",
+        )
+    }
+
+    @Test
+    fun `calf is detected at the widest single-leg row below the knee`() {
+        val sites = AnatomicalLevelFinder.detectSites(figureWithLimbs(), anchors())
+
+        val calf = sites[ScanSite.CALF]
+        assertNotNull(calf, "calf should be detected when leg data is present")
+        assertTrue(calf > 160, "calf should be below the knee, got row $calf")
+    }
+
+    @Test
+    fun `arm is not detected when leg data is all zeros`() {
+        val sites = AnatomicalLevelFinder.detectSites(humanFigure(), anchors())
+        assertNull(sites[ScanSite.ARM], "no arm without leg data")
+    }
+
+    @Test
+    fun `hipsInFrame skips hip and thigh detection`() {
+        val sites = AnatomicalLevelFinder.detectSites(
+            humanFigure(), anchors(), hipsInFrame = false,
+        )
+
+        assertNull(sites[ScanSite.HIP], "hip must not be detected when out of frame")
+        assertNull(sites[ScanSite.THIGH], "thigh must not be detected when hips are out")
+        // Neck, waist, chest, arm, calf are unaffected.
+        assertNotNull(sites[ScanSite.NECK])
+        assertNotNull(sites[ScanSite.WAIST])
+        assertNotNull(sites[ScanSite.CHEST])
+    }
 }

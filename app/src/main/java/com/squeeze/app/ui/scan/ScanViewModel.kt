@@ -389,6 +389,7 @@ class ScanViewModel @Inject constructor(
             sideAnchors = side?.anchors,
             backProfile = back?.profile,
             backAnchors = back?.anchors,
+            hipsInFrame = front.framing.hipsInShot,
         )
 
         // Centimetres only where the photograph can support them. A trunk-framed shot has

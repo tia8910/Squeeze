@@ -230,21 +230,30 @@ object AutomaticScanBuilder {
         sideAnchors: PoseAnchors? = null,
         backProfile: WidthProfile? = null,
         backAnchors: PoseAnchors? = null,
+        hipsInFrame: Boolean = true,
     ): List<ScanMarker> {
-        val frontSites = AnatomicalLevelFinder.detectSites(frontProfile, frontAnchors)
+        val frontSites = AnatomicalLevelFinder.detectSites(
+            frontProfile, frontAnchors, hipsInFrame = hipsInFrame,
+        )
         val sideSites = if (sideProfile != null && sideAnchors != null) {
-            AnatomicalLevelFinder.detectSites(sideProfile, sideAnchors)
+            AnatomicalLevelFinder.detectSites(
+                sideProfile, sideAnchors, hipsInFrame = hipsInFrame,
+            )
         } else {
             emptyMap()
         }
         val backSites = if (backProfile != null && backAnchors != null) {
-            AnatomicalLevelFinder.detectSites(backProfile, backAnchors)
+            AnatomicalLevelFinder.detectSites(
+                backProfile, backAnchors, hipsInFrame = hipsInFrame,
+            )
         } else {
             emptyMap()
         }
 
         return frontSites.mapNotNull { (site, frontRow) ->
-            val useLeg = site == ScanSite.THIGH
+            val useLeg = site == ScanSite.THIGH ||
+                site == ScanSite.ARM ||
+                site == ScanSite.CALF
 
             val frontWidth = frontProfile.widthFor(frontRow, useLeg)
             if (frontWidth <= 0.0) return@mapNotNull null

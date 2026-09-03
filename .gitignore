@@ -17,3 +17,4 @@ keystore.properties
 # See app/mediapipe-models.gradle.kts — ~6 MB of immutable binary does not belong in git.
 app/src/main/assets/*.task
 app/src/main/assets/*.tflite
+walletlens-app

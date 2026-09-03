@@ -162,13 +162,49 @@ object AnatomicalLevelFinder {
     private const val THIGH_BAND_END = 0.48
 
     /**
+     * Arm measurement: the upper arm between the acromion (shoulder joint) and the elbow.
+     *
+     * The arm hangs at the side of the body in a front-on photograph. At shoulder height
+     * the deltoid merges with the torso into one run, but a few rows below, the arm
+     * separates and can be measured as the widest non-torso run. This is the same data
+     * the mask already stores in legWidths for rows above the hips. When the arm is
+     * touching the body everywhere in this band, no arm is returned.
+     *
+     * The band is expressed as a fraction of the trunk height (shoulder-to-hip).
+     */
+    private const val ARM_BAND_START = 0.02
+    private const val ARM_BAND_END = 0.28
+
+    /**
+     * Calf measurement: the widest point of the lower leg, below the knee.
+     *
+     * Measured on leg-width data (a single leg's width). At this height the two legs are
+     * typically separate, but when they are close together the mask extractor halves the
+     * shared run to approximate one leg.
+     */
+    private const val CALF_BAND_START = 0.50
+    private const val CALF_BAND_END = 0.78
+
+    /**
      * Finds every site the silhouette supports.
      *
      * @return rows keyed by site. A site is absent when its search band is degenerate or
      *   the relevant width is unavailable; callers must treat absence as "not measured"
      *   rather than substituting a default.
      */
-    fun detectSites(profile: WidthProfile, anchors: PoseAnchors): Map<ScanSite, Int> {
+    /**
+     * @param hipsInFrame false when only an upper-body photograph was taken and the pelvis
+     *   sits outside the frame. In that case the hip search clamps to the bottom rows of the
+     *   mask — which are the lower abdomen, not the hip — and the resulting measurement
+     *   produces a wrong waist-to-hip ratio and a wrong body fat. Skipping the search
+     *   instead returns no hip, which feeds the male Navy equation (which does not need one)
+     *   and signals the female path to rely on shape-based estimates.
+     */
+    fun detectSites(
+        profile: WidthProfile,
+        anchors: PoseAnchors,
+        hipsInFrame: Boolean = true,
+    ): Map<ScanSite, Int> {
         val sites = mutableMapOf<ScanSite, Int>()
 
         // Not the whole chin-to-shoulder span. The anchor above the neck comes from the
@@ -192,17 +228,64 @@ object AnatomicalLevelFinder {
                 ?.let { sites[ScanSite.CHEST] = it }
         }
 
-        val hipSpan = anchors.kneeRow - anchors.hipRow
+        if (hipsInFrame) {
+            val hipSpan = anchors.kneeRow - anchors.hipRow
 
-        widestBetween(profile, anchors.hipRow, anchors.hipRow + (hipSpan * HIP_BAND_END).toInt())
-            ?.let { sites[ScanSite.HIP] = it }
+            widestBetween(
+                profile,
+                anchors.hipRow,
+                anchors.hipRow + (hipSpan * HIP_BAND_END).toInt(),
+            )?.let { sites[ScanSite.HIP] = it }
 
-        widestBetween(
-            profile = profile,
-            fromRow = anchors.hipRow + (hipSpan * THIGH_BAND_START).toInt(),
-            toRow = anchors.hipRow + (hipSpan * THIGH_BAND_END).toInt(),
-            useLegWidth = true,
-        )?.let { sites[ScanSite.THIGH] = it }
+            widestBetween(
+                profile = profile,
+                fromRow = anchors.hipRow + (hipSpan * THIGH_BAND_START).toInt(),
+                toRow = anchors.hipRow + (hipSpan * THIGH_BAND_END).toInt(),
+                useLegWidth = true,
+            )?.let { sites[ScanSite.THIGH] = it }
+        }
+
+        // Arm: the widest non-torso run in the upper arm region. Arms hang at the sides
+        // of the body; at shoulder height the deltoid merges with the torso, but a few
+        // rows below the arm separates and can be measured as the widest non-torso run.
+        // The data is already in legWidths for rows above the hips. When the arm is
+        // touching the body everywhere in this band, no arm is returned.
+        val armSpan = anchors.hipRow - anchors.shoulderRow
+        val armFrom = anchors.shoulderRow + (armSpan * ARM_BAND_START).toInt()
+        val armTo = anchors.shoulderRow + (armSpan * ARM_BAND_END).toInt()
+
+        var bestArmRow: Int? = null
+        var bestArmWidth = 0.0
+        for (row in maxOf(armFrom, profile.topRow)..minOf(armTo, profile.bottomRow)) {
+            if (profile.wasClippedAt(row)) continue
+            val w = profile.legWidthAt(row)
+            if (w > bestArmWidth) {
+                bestArmWidth = w
+                bestArmRow = row
+            }
+        }
+        bestArmRow?.let { row ->
+            // The arm width must be materially wider than noise but cannot exceed the
+            // torso width at that level — that would mean the "arm" run is the trunk.
+            if (bestArmWidth > 0.01 &&
+                bestArmWidth < profile.torsoWidthAt(row)
+            ) {
+                sites[ScanSite.ARM] = row
+            }
+        }
+
+        // Calf: the widest single-leg width below the knee band.
+        val legSpan = profile.bottomRow - anchors.kneeRow
+        if (legSpan > 0) {
+            val calfFrom = anchors.kneeRow + (legSpan * CALF_BAND_START).toInt()
+            val calfTo = anchors.kneeRow + (legSpan * CALF_BAND_END).toInt()
+            widestBetween(
+                profile = profile,
+                fromRow = calfFrom,
+                toRow = calfTo,
+                useLegWidth = true,
+            )?.let { sites[ScanSite.CALF] = it }
+        }
 
         return sites
     }
