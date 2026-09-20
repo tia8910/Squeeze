@@ -841,10 +841,36 @@ private fun ResultStep(
 
         val shape = state.resolvedShape(weight.toCm())
 
-        shape?.let {
+        // Whether the outline gave up. Computed here rather than inside the headline because
+        // it decides the order of this whole screen, not just one card's wording.
+        val bounded = shape != null &&
+            shape.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+
+        // The appearance match, as an estimate rather than a number, so it carries its own
+        // error alongside it.
+        val visual = state.profile?.let { profile ->
+            visualPercent?.let { VisualAssessment.estimate(it, profile.sex) }
+        }
+
+        // **What the card leads with when the outline could not answer.**
+        //
+        // A bounded reading is the method's own constant — 11.6% for every man who lands on
+        // the plateau — carrying ±9. The appearance match carries ±5 and is measured on the
+        // one thing the outline throws away: whether the muscle is visible through the skin.
+        // On an unresolved scan it is strictly the better instrument, and it was sitting six
+        // cards below the figure it outperforms, under the word "optional".
+        //
+        // Off the plateau the outline measured this body, so the headline stays the outline's
+        // and the match goes back to being a cross-check further down.
+        val headline = if (bounded) visual ?: shape else shape
+
+        headline?.let {
             ShapeHeadline(
                 estimate = it,
                 indices = state.shapeIndices,
+                // Non-null only when the appearance match has replaced a bound, so the copy
+                // can say what the outline managed on its own before being superseded.
+                supersededBound = shape.takeIf { _ -> bounded && visual != null },
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
                 // no later step can undo.
@@ -860,6 +886,30 @@ private fun ResultStep(
                         .takeIf { _ -> state.abdominalBodyFatPercent == null },
                 ),
             )
+        }
+
+        // **Directly under the headline, and only when the outline could not answer.**
+        //
+        // This section spent its life at the foot of the screen, after the weight field,
+        // labelled "optional" and introduced as something that "checks the rest". On a scan
+        // that resolved, that is exactly right. On a scan that did not, it was the app
+        // offering its most accurate remaining instrument as a footnote to its least: ±5
+        // against a ±9 bound that is the same constant for every body that reaches it.
+        //
+        // The user reading that screen saw a figure in display type, the words "not resolved
+        // by the photo" beneath it, and six cards of advice before reaching the one question
+        // that would have resolved it. Position was the whole of the problem; the instrument
+        // was already built, already fused into the saved record, and already better.
+        if (bounded) {
+            state.profile?.let { profile ->
+                VisualMatchSection(
+                    sex = profile.sex,
+                    selected = visualPercent,
+                    onSelect = { visualPercent = if (visualPercent == it) null else it },
+                    measured = null,
+                    resolving = true,
+                )
+            }
         }
 
         // Said before the advice, because it changes what the advice is for. A trunk scan is
@@ -921,13 +971,18 @@ private fun ResultStep(
 
         KnownBodyFatCard(knownPercent) { knownPercent = it }
 
-        state.profile?.let { profile ->
-            VisualMatchSection(
-                sex = profile.sex,
-                selected = visualPercent,
-                onSelect = { visualPercent = if (visualPercent == it) null else it },
-                measured = shape?.percent,
-            )
+        // The cross-check position, for a scan the outline did resolve. When it did not, this
+        // has already appeared directly under the headline instead.
+        if (!bounded) {
+            state.profile?.let { profile ->
+                VisualMatchSection(
+                    sex = profile.sex,
+                    selected = visualPercent,
+                    onSelect = { visualPercent = if (visualPercent == it) null else it },
+                    measured = shape?.percent,
+                    resolving = false,
+                )
+            }
         }
 
         AccuracyDisclaimer()
@@ -1184,6 +1239,12 @@ private fun VisualMatchSection(
     selected: Double?,
     onSelect: (Double) -> Unit,
     measured: Double?,
+    /**
+     * True when the outline landed on its plateau, so this is not a cross-check on an answer
+     * — it is the answer. The wording changes with it, because "optional, and it checks the
+     * rest" is actively misleading on a screen where there is nothing above it to check.
+     */
+    resolving: Boolean,
 ) {
     val bands = VisualAssessment.bandsFor(sex)
 
@@ -1194,11 +1255,28 @@ private fun VisualMatchSection(
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Which describes you? — optional", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "Everything above was worked out from your measurements. This is the " +
-                    "one thing the tape cannot see, so it checks the rest rather than " +
-                    "repeating it.",
+                text = if (resolving) {
+                    "Which describes you? — this is what settles it"
+                } else {
+                    "Which describes you? — optional"
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = if (resolving) {
+                    // Said in the terms the person can act on rather than as an apology.
+                    "Your outline could not separate lean from very lean — it knows your " +
+                        "edge and nothing inside it, and what separates those bodies is " +
+                        "entirely inside. Look at your own midsection and pick the line " +
+                        "that matches. It is worth more here than the figure above: five " +
+                        "points either side against nine, and it reads the one thing a " +
+                        "silhouette throws away."
+                } else {
+                    "Everything above was worked out from your measurements. This is the " +
+                        "one thing the tape cannot see, so it checks the rest rather than " +
+                        "repeating it."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1313,6 +1391,15 @@ private fun ShapeHeadline(
     estimate: BodyFatEstimate,
     indices: ShapeIndices? = null,
     /**
+     * The outline's own bound, when the appearance match has taken over the headline from it.
+     *
+     * Non-null means [estimate] is no longer the outline's — the outline gave a floor, the
+     * user placed themselves on the appearance ladder, and that carries ±5 against the
+     * floor's ±9. The bound is still worth printing, because it is a genuine second opinion
+     * and because a user who picks a band well under it should be told the two disagree.
+     */
+    supersededBound: BodyFatEstimate? = null,
+    /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
      *
      * Passed in rather than left to the cards further down the screen, because on an
@@ -1326,6 +1413,8 @@ private fun ShapeHeadline(
     // has to say the same thing, because a number in display type reads as certain no matter
     // what is printed under it.
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+    // The outline gave up and the appearance ladder answered in its place.
+    val fromAppearance = supersededBound != null
     // The interval starts where the method's knowledge starts. A bounded reading has ruled
     // out everything below its floor — the copy under this number says so in words — so
     // drawing the range down to 3% contradicted the card's own sentence, and made the leanest
@@ -1348,6 +1437,7 @@ private fun ShapeHeadline(
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
             label = when {
+                fromAppearance -> "From how you look"
                 bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
             },
@@ -1360,11 +1450,29 @@ private fun ShapeHeadline(
             // score had no zero, so a patch of blank wall cleared the threshold too, and the
             // band was asserting a photographic reading over the plateau's own constant. A
             // false claim of precision is worse than the honest refusal it replaced.
-            band = if (bounded) "Not resolved by the photo" else null,
+            band = when {
+                bounded -> "Not resolved by the photo"
+                fromAppearance -> "Your appearance, not your outline"
+                else -> null
+            },
         )
 
         Text(
             text = when {
+                // The outline bounded it and the ladder answered. Both numbers are printed,
+                // because a user who places himself well under what his own outline would
+                // allow has told the app something it should not quietly average away.
+                fromAppearance ->
+                    "Read from how you look, which is the one thing a silhouette cannot " +
+                        "see. Your outline only got as far as \"no leaner than " +
+                        "%.1f%%\"".format(
+                            supersededBound?.floorPercent ?: supersededBound?.percent ?: 0.0,
+                        ) +
+                        " — it knows your edge and nothing inside it, and what separates a " +
+                        "lean body from a very lean one is entirely inside. This carries " +
+                        "five points either side against the outline's nine, so it leads. " +
+                        "The saved record combines the two."
+
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
@@ -1403,7 +1511,10 @@ private fun ShapeHeadline(
         // abdominal definition was gone before the file was written, so no amount of work on
         // the estimator recovers it — but "step out of direct light" recovers it entirely,
         // and that sentence was three cards down.
-        if (bounded && blockers.isNotEmpty()) {
+        // Shown on an appearance-led reading too: the outline still failed, the reasons are
+        // still the ones the user can act on, and a better photograph next time is what stops
+        // this needing a self-assessment at all.
+        if ((bounded || fromAppearance) && blockers.isNotEmpty()) {
             Column(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),

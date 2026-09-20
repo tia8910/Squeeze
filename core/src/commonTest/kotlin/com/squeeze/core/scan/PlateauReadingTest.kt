@@ -1,5 +1,7 @@
 package com.squeeze.core.scan
 
+import com.squeeze.core.bodycomp.VisualAssessment
+import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.Sex
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +75,32 @@ class PlateauReadingTest {
                 "$sex: the floor must be doing work, not sitting below the interval",
             )
         }
+    }
+
+    @Test
+    fun `the appearance ladder is the better instrument on a bounded reading`() {
+        // The scan result screen is ordered on this and nothing else. When the outline gives
+        // a bound, the visual match moves out of the footer and directly under the headline,
+        // and its figure leads. That is only right while it is the more precise of the two.
+        //
+        // It was in the footer, marked "optional", introduced as a check on the figure above
+        // it — six cards below a constant it beats by four points of standard error. If the
+        // two ever cross, the screen ordering is wrong and this fails rather than the user
+        // finding out.
+        assertTrue(
+            EstimationMethod.VISUAL_ASSESSMENT.standardErrorPercent <
+                SilhouetteBodyFat.PLATEAU_ERROR_PERCENT,
+            "visual ${EstimationMethod.VISUAL_ASSESSMENT.standardErrorPercent} vs " +
+                "plateau ${SilhouetteBodyFat.PLATEAU_ERROR_PERCENT}",
+        )
+
+        // And it must stay a genuinely different instrument rather than a second opinion on
+        // the same measurement: the outline reads the border, this reads what is inside it.
+        val bound = SilhouetteBodyFat.estimate(ShapeIndices(0.65, null), Sex.MALE)
+        assertNotNull(bound)
+        val fromAppearance = VisualAssessment.estimate(15.0, Sex.MALE)
+        assertNotNull(fromAppearance)
+        assertTrue(fromAppearance.standardErrorPercent < bound.standardErrorPercent)
     }
 
     @Test
