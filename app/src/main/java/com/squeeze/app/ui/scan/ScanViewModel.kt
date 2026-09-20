@@ -25,7 +25,6 @@ import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
-import com.squeeze.core.scan.PlateauCorroboration
 import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
@@ -151,22 +150,12 @@ data class ScanUiState(
     /**
      * How much abdominal structure the front photograph showed, in arbitrary units.
      *
-     * Null when the crop was too dark or too small. Not a percentage and not comparable
-     * between people — a model's sharper abdomen measured 21.9 against another man's soft one
-     * at 16.5 — which is why it corroborates a reading rather than producing one.
+     * Null when the crop was too dark, too small or too evenly lit. Not a percentage and not
+     * comparable between people, which is why nothing on the result screen is decided by it:
+     * it is kept so one user's own scans can be compared with each other, and for no other
+     * purpose. A release that let it settle a reading is described in the view model.
      */
     val definitionScore: Double? = null,
-    /** What that reading said about the surface, and so what the scan may claim. */
-    val definitionVerdict: PlateauCorroboration.Verdict =
-        PlateauCorroboration.Verdict.UNCERTAIN,
-    /**
-     * True when the outline landed on its plateau and the abdomen settled it.
-     *
-     * Recorded rather than inferred on the screen: from the figure alone the screen cannot
-     * tell a corroborated plateau reading from one the outline resolved by itself, and
-     * guessing would need the sex and the floor and would still be a guess.
-     */
-    val settledByAbdomen: Boolean = false,
 ) {
     /**
      * What the photograph supports, and nothing else.
@@ -464,22 +453,18 @@ class ScanViewModel @Inject constructor(
         // difference between eight per cent and fifteen.
         val definition = frontBitmap?.let { AbdomenCrop.measure(it, front.geometry) }
 
-        val outlineOnly = shapeIndices
+        // The outline's reading, and the only one. A previous release let the definition score
+        // above corroborate a reading the outline could not resolve — a lean outline over a
+        // defined abdomen being two independent signals agreeing — and the argument was sound
+        // while the measurement was not. That score had no zero: a patch of blank painted wall
+        // in a real scan photograph read 21.3 against a threshold of 20, and the smooth
+        // abdomen it was asked about read 37.9, the highest figure this project has recorded.
+        // It was reading the camera's noise, so the app printed "Read from your photo" over
+        // the plateau's own constant. See AbdominalDefinition, which now has a measured zero
+        // and still has no threshold, because having a zero is not the same as being
+        // calibrated against other people's bodies.
+        val shapeEstimate = shapeIndices
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
-
-        // Two photo-derived signals that fail independently. Every way an outline is
-        // corrupted makes a denominator wider and the reading leaner; none of them puts
-        // grooves on a stomach. So a lean outline over a defined abdomen is agreement, and a
-        // plateau reading stops being "not resolved by the photo" — the photograph resolved
-        // it, just not with its border.
-        val shapeEstimate = PlateauCorroboration.apply(outlineOnly, definition)
-
-        // Whether that is what happened, decided here rather than re-derived on the screen
-        // from the figure and the sex. The screen would have to guess; this knows.
-        val settledByAbdomen = outlineOnly != null &&
-            shapeEstimate != null &&
-            outlineOnly.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT &&
-            shapeEstimate.standardErrorPercent < SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
 
         // Fetched here so the headline has a build to fall back on before the user types
         // anything. Without it a plateau reading has nothing to resolve against and prints
@@ -545,8 +530,6 @@ class ScanViewModel @Inject constructor(
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
             definitionScore = definition?.takeIf { it.usable }?.score,
-            definitionVerdict = PlateauCorroboration.verdict(definition),
-            settledByAbdomen = settledByAbdomen,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.
             posture = front.geometry
