@@ -1347,12 +1347,8 @@ private fun ShapeHeadline(
             // Deurenberg, so three photographs of the same man at 70 kg — soft, mid, and with
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
-            // "Leanest your outline can claim" was accurate about the old figure and that was
-            // the problem: the card led with the bottom of its own range. The figure is now
-            // the middle of what the outline admits, so the label says which part of the
-            // range it is, and the floor moves into the sentence below where it belongs.
             label = when {
-                bounded -> "Middle of what your outline allows"
+                bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
             },
             // Shown for every reading, not only the uncertain ones. Every figure in this app
@@ -1372,15 +1368,16 @@ private fun ShapeHeadline(
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
-                        "throws that away — it knows your edge and nothing inside it. " +
-                        "What it can say is that you are no leaner than " +
-                        "%.1f%%".format(estimate.floorPercent ?: low) +
-                        ", and softer than that by an amount it cannot measure. The " +
-                        "figure above is the middle of that range rather than its lean " +
-                        "end — the app used to print the lean end, which made every " +
-                        "unresolved scan read several points leaner than the body in it. " +
-                        "A side photo narrows this from a picture: it measures your " +
-                        "abdomen front to back, the axis a front view cannot see."
+                        "throws that away — it knows your edge and nothing inside it. So " +
+                        "this is a floor, not a reading of you: you are no leaner than " +
+                        "this, and the outline cannot say how much softer — which is why " +
+                        "the range above starts here and runs upwards only. The app used " +
+                        "to fill the gap from your height and weight, which gave every " +
+                        "photo at your weight the same answer whatever your body looked " +
+                        "like. It no longer does that. A side photo settles it from a " +
+                        "picture — it measures your abdomen front to back, the axis a " +
+                        "front view cannot see — and a tape at your navel or your own " +
+                        "known figure settle it from a measurement."
 
                 else ->
                     "Read from how wide your waist is relative to your shoulders and " +

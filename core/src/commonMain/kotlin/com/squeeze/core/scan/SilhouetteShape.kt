@@ -369,52 +369,43 @@ object SilhouetteBodyFat {
     /** What the interval widens to once the outline has stopped distinguishing anything. */
     const val PLATEAU_ERROR_PERCENT = 9.0
 
-    /**
-     * What a bounded reading should actually report, given that it has a floor.
-     *
-     * **The bug this fixes is that the app reported the floor itself.** A plateau scan knows
-     * two things: this body is no leaner than [leanestClaimable], and the outline cannot say
-     * how much softer. That describes a range starting at the floor — and the app published
-     * its lowest point as the answer. Of every value the method admitted, the one displayed
-     * was the leanest, on every plateau scan ever taken, which understates by half the
-     * interval whatever the body in the photograph looks like.
-     *
-     * The user who noticed was reported at 11.6% over a midsection that a coach would read
-     * around sixteen or seventeen. The floor was not wrong — he is not leaner than 11.6% —
-     * but the floor is not an estimate, and printing it in display type made it one.
-     *
-     * So the figure moves to the middle of the admitted range and the floor is carried
-     * alongside it in [BodyFatEstimate.floorPercent], so the interval can start where the
-     * method's knowledge actually starts rather than nine points below it.
-     *
-     * The interval itself does **not** narrow. [PLATEAU_ERROR_PERCENT] stays on the reading,
-     * so fusion still weights a bound as the least trustworthy thing it has and
-     * [com.squeeze.core.bodycomp.PlateauPrior.isBounded] still recognises one. Only the point
-     * inside the range changes, which is the part that was indefensible.
-     *
-     * **Why the centre sits above the floor rather than on it.** The plateau was measured as
-     * flat from about eight per cent to fifteen, so an uncontaminated reading on it is
-     * somewhere in that span. But every way this method fails makes a width wider, a
-     * denominator larger and the reading leaner — arms in the shoulder band, trousers at the
-     * hip, two thighs read as one. So the distribution is that span plus a tail running
-     * upward, truncated at the bottom by the floor, and the centre of what survives is above
-     * the floor rather than on it. Half the declared interval is the size of that shift.
-     *
-     * **The cost, stated rather than buried.** A body just off the plateau at 0.80 reads about
-     * 13.2, and one on the plateau now reads 16.1 — so a leaner-looking outline can report
-     * higher than a softer one. The two are different statements, with intervals that overlap
-     * across their whole width, but a user photographing themselves twice with different arm
-     * positions can cross that boundary and see the figure jump. It was already a jump in the
-     * other direction, of about a point and a half; this makes it nearly three. That is the
-     * price of not understating every unresolved scan, and it is the better trade while the
-     * failure direction is one-sided.
-     *
-     * Worth being plain about what this is not: it is not a reading of the body. Every plateau
-     * scan still returns one number, and it is this one. It removes a systematic lean bias; it
-     * does not resolve the photograph, and nothing in an outline can.
-     */
-    fun plateauMidpointPercent(sex: Sex): Double =
-        leanestClaimable(sex) + PLATEAU_ERROR_PERCENT / 2.0
+    // **Why a bounded reading reports its floor and not the middle of its range — which was
+    // tried, and had to be taken out again.**
+    //
+    // The complaint behind it is real and the diagnosis was right. A plateau scan knows two
+    // things: this body is no leaner than `leanestClaimable`, and the outline cannot say how
+    // much softer. That is a range starting at the floor, and the app publishes its lowest
+    // point. Of every value the method admits, the one printed in display type is the leanest,
+    // on every plateau scan ever taken. The user who noticed was shown 11.6% over a midsection
+    // a coach would read near sixteen.
+    //
+    // So the figure was moved to the middle of the admitted range — the floor plus half the
+    // declared interval, 16.1 for a man — and a test caught what that does at the edge of the
+    // plateau. The floor truncates hard, so lifting only the truncated readings makes the
+    // function fall where it has to rise:
+    //
+    //     hip ratio 0.853 -> 16.1%
+    //     hip ratio 0.860 -> 12.2%
+    //     hip ratio 0.870 -> 13.3%
+    //
+    // A body that got softer read 3.9 points leaner, on the hip path, which is the denominator
+    // most scans actually use. WaistSiteTest asserts the property directly — a belly that grows
+    // must move the answer up — and it failed.
+    //
+    // A figure that moves the wrong way when the body changes is worse than one that is
+    // biased. A bias is systematic and cancels when someone compares themselves against
+    // themselves; this does not. It is precision rather than accuracy, and precision is what
+    // this app is for.
+    //
+    // Making it continuous would mean lifting the resolved readings too, by up to four and a
+    // half points, and there is no evidence for that. The anchors are what they are.
+    //
+    // What survived is `BodyFatEstimate.floorPercent`: the bound travels with the reading, so
+    // the interval starts where the method's knowledge starts instead of nine points below it.
+    // The card used to print "most likely 3-21%" under a sentence promising the reader was no
+    // leaner than 11.6 — a range whose lower half the method had already ruled out. That
+    // contradiction is gone. The figure is not, and will not be until something reads the
+    // surface rather than the border.
 
     /**
      * The highest percentage a plateau reading can produce, for a given sex.
@@ -542,19 +533,11 @@ object SilhouetteBodyFat {
             // is about the shoulder.
             val hipHitFloor = fromHip < leanestClaimable(sex)
             return BodyFatEstimate(
-                // Floored, this reading is "no leaner than the floor, and softer by an
-                // unknown amount" — a range, not a point. It reports the middle of that
-                // range; see [plateauMidpointPercent] for why publishing its lowest point
-                // was a four-and-a-half point lean bias on every floored scan.
-                // `floored` in the else branch still carries the upper cap, which is the half
-                // of it that is still load-bearing here: a hip ratio of 1.45 extrapolates to
-                // 73.5 per cent, and nothing this method produces may leave the scale.
-                percent = if (hipHitFloor) plateauMidpointPercent(sex) else floored(fromHip, sex),
+                percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
                 // A floored reading is a bound rather than a measurement, and carries the
                 // interval that says so — which is also the signature PlateauPrior recognises
-                // a bound by. Unchanged by the centring above: what the method knows has not
-                // widened or narrowed, only the point chosen inside it.
+                // a bound by.
                 standardErrorPercent = if (hipHitFloor) {
                     PLATEAU_ERROR_PERCENT
                 } else {
@@ -583,17 +566,7 @@ object SilhouetteBodyFat {
         // definition at all. The plateau ceiling with a nine-point interval says the same
         // thing the data supports: somewhere in the lean region, and this method cannot say
         // where.
-        //
-        // What it reports is the *middle* of that lean region rather than its leanest edge.
-        // Reporting the edge is what produced 11.6% for a man a coach would read at sixteen:
-        // not a wrong bound, but the bound published as though it were an estimate. See
-        // [plateauMidpointPercent].
-        val hitFloor = fromShoulder < leanestClaimable(sex)
-        val percent = if (onPlateau || hitFloor) {
-            plateauMidpointPercent(sex)
-        } else {
-            floored(fromShoulder, sex)
-        }
+        val percent = if (onPlateau) plateauCeilingPercent(sex) else floored(fromShoulder, sex)
 
         // A reading the floor moved is a bound, whichever side of LEAN_PLATEAU_RATIO it came
         // from, and it has to carry the interval that says so. It did not: between 0.76 and
@@ -602,6 +575,8 @@ object SilhouetteBodyFat {
         // the interval stayed at the ordinary shoulder-only width. Nothing downstream could
         // then tell that figure from a measurement, which matters now that PlateauPrior reads
         // the interval rather than the value to decide what it may replace.
+        val hitFloor = fromShoulder < leanestClaimable(sex)
+
         val error = if (onPlateau || hitFloor) {
             PLATEAU_ERROR_PERCENT
         } else {

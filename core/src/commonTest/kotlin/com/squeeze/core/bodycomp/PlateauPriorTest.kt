@@ -126,7 +126,7 @@ class PlateauPriorTest {
 
         val fromOutline = scan()
         assertNotNull(fromOutline)
-        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), fromOutline.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), fromOutline.percent, 1e-9)
         assertTrue(
             fromOutline.percent < implied - 4.0,
             "the outline's bound must not have become the build figure: ${fromOutline.percent}",

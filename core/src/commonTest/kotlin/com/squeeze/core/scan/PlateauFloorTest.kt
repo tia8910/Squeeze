@@ -31,7 +31,7 @@ class PlateauFloorTest {
         val estimate = shoulderOnly(0.686)
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE), estimate.percent, 1e-9)
         // The old extrapolation gave 4.93. Anything under the essential-fat line is a claim
         // this method has never been able to support.
         assertTrue(estimate.percent > 8.0, "got ${estimate.percent}")
@@ -45,7 +45,7 @@ class PlateauFloorTest {
             val estimate = shoulderOnly(ratio)
             assertNotNull(estimate, "ratio $ratio")
             assertEquals(
-                SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE),
+                SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE),
                 estimate.percent,
                 1e-9,
                 "ratio $ratio",
@@ -86,9 +86,9 @@ class PlateauFloorTest {
         val estimate = shoulderOnly(0.60, Sex.FEMALE)
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.FEMALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.plateauCeilingPercent(Sex.FEMALE), estimate.percent, 1e-9)
         assertTrue(
-            estimate.percent > SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE),
+            estimate.percent > SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE),
             "a woman's floor cannot sit at a man's",
         )
     }
@@ -114,7 +114,7 @@ class PlateauFloorTest {
         )
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
         assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.floorPercent)
     }
 
