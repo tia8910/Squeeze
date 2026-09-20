@@ -26,6 +26,22 @@ enum class ScaleSource {
      * pose model will not put a nose on a door frame.
      */
     LANDMARK,
+
+    /**
+     * Pose landmarks again, but from the trunk alone, via
+     * [LandmarkStature.frameFractionFromTrunk].
+     *
+     * The last resort, for a photograph with no feet in it. There is no cross-check available
+     * here — the mask's vertical extent is not stature when the body runs off the frame — so
+     * this is a single soft estimate where the others are corroborated ones, and everything
+     * built on it has to widen to say so.
+     *
+     * It exists because refusing to scale is not the safe option it looks like. A scan with no
+     * scale has no circumferences, a scan with no circumferences never runs the Navy equation,
+     * and what is then left in the fusion is the outline's bound — nine points wide and the
+     * same value for every body that reaches it.
+     */
+    TRUNK_SPAN,
 }
 
 /**
@@ -68,6 +84,69 @@ object LandmarkStature {
      * two percent — small next to the errors it is being used to catch, which are twenty.
      */
     const val NOSE_TO_ANKLE_FRACTION = 0.886
+
+    /**
+     * Nose tip to hip joint, as a fraction of standing height.
+     *
+     * **Why a second, worse span exists.** The one above needs ankles, and a photograph framed
+     * on the trunk does not have them. That framing is not a mistake — it is the one the shape
+     * reading actually wants, because it puts far more pixels on the midsection — and the app
+     * recommends it. But with no ankles there is no stature, with no stature there is no
+     * scale, with no scale there are no circumferences, and with no circumferences the Navy
+     * equation never runs. What is then left in the fusion is the outline's bound, which is a
+     * constant. A user photographed exactly as instructed was shown 11.6% and told his scan
+     * could not resolve his photo; the reason was that his feet were out of shot.
+     *
+     * From the same segment tables as the constant above: the nose tip sits near 0.925 of
+     * stature and the hip joint near 0.530, leaving 0.395 between them.
+     *
+     * **It is the weaker estimate and the numbers say by how much.** The span is 0.395 of
+     * stature against 0.886, so the same landmark error counts for 2.2 times as much, and
+     * trunk-to-stature proportion varies more between adults than whole-body proportion does
+     * — call the result five per cent rather than the two the ankle span carries.
+     *
+     * That is worth paying, and it is worth paying *because the cost is computable*. Run five
+     * per cent through the density equation and it is 1.8 points of body fat for a man, 3.1
+     * for a woman. Even fifteen per cent is 5.2 and 9.0. The figure it replaces carries nine
+     * points and is the same value for every body that reaches it — so on the worst plausible
+     * scale error this is still no worse, and unlike the constant it moves when the body does.
+     * [com.squeeze.core.bodycomp.BodyFatCalculator.navyScaleSensitivityPercent] computes it
+     * from the equation's own coefficients rather than from this comment.
+     *
+     * **It may not print centimetres.** A scale this soft multiplies every girth in the scan
+     * by the same wrong number, which is the failure this whole file exists to prevent — two
+     * photographs of one body giving waists of 75.4 cm and 92.2 cm. A body-fat percentage
+     * survives it because the equation takes a logarithm of one girth difference and the error
+     * enters once, bounded, and quantified above. A tape reading does not survive it at all.
+     */
+    const val NOSE_TO_HIP_FRACTION = 0.395
+
+    /**
+     * Stature from the trunk alone, for a photograph with no ankles in it.
+     *
+     * @return null when the nose or both hips are missing, on the same principle as the ankle
+     *   span: a half-present landmark set is where a fabricated scale does the most damage.
+     */
+    fun frameFractionFromTrunk(
+        nose: PosePoint?,
+        hipLeft: PosePoint?,
+        hipRight: PosePoint?,
+    ): Double? {
+        if (nose == null) return null
+
+        // The mean of the two, unlike the ankles above. One foot forward lifts an ankle in
+        // the image, so the lower one is the one on the floor; the hip joints of a standing
+        // adult sit at the same height and the pair averages out landmark noise instead.
+        val hips = listOfNotNull(hipLeft?.y, hipRight?.y)
+        if (hips.isEmpty()) return null
+        val hipY = hips.sum() / hips.size
+
+        val span = hipY - nose.y
+        if (span <= 0.0) return null
+
+        val stature = span / NOSE_TO_HIP_FRACTION
+        return stature.takeIf { it in 0.05..1.6 }
+    }
 
     /**
      * Full stature as a fraction of the frame height.

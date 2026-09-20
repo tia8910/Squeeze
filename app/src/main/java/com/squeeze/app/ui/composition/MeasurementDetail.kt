@@ -321,6 +321,9 @@ private fun DetailGroup(
 private fun sourceLabel(source: String): String = when (source) {
     "PHOTO" -> "Photo scan"
     "PHOTO_FRONT_ONLY" -> "Photo scan, front only"
+    // Without this it fell through to "Tape measurement", which is the one label it must
+    // never carry: its scale was inferred rather than measured.
+    "PHOTO_TRUNK_SCALED" -> "Photo scan, trunk framing"
     "REFERENCE_SCAN" -> "Reference scan"
     "BIA_SCALE" -> "Bioimpedance scale"
     else -> "Tape measurement"

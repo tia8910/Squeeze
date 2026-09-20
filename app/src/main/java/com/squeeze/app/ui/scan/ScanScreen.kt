@@ -917,11 +917,29 @@ private fun ResultStep(
         // and the only thing it gives up is a set of centimetres the figure never used.
         if (state.framing == ScanFraming.TORSO) {
             InfoCard(
-                "Measured from your trunk. Your waist, shoulders and hips were all in " +
-                    "shot, which is everything the shape reading needs — and closer " +
-                    "framing puts far more detail on your midsection. Tape measurements " +
-                    "in centimetres need your full height in the picture, so this scan " +
-                    "does not produce them.",
+                if (state.scaleFromTrunk) {
+                    // It used to end "so this scan does not produce them", and that refusal
+                    // cost the whole measurement: no centimetres meant no waist, no waist
+                    // meant the tape equation never ran, and what was left was the outline's
+                    // bound — a constant, printed under the words "not resolved by the
+                    // photo" on a photograph that had the waist and the neck in it.
+                    "Measured from your trunk. Your waist, shoulders and hips were all " +
+                        "in shot, which is everything the shape reading needs, and closer " +
+                        "framing puts far more detail on your midsection. Your feet were " +
+                        "not in shot, so your height in the picture was worked out from " +
+                        "your own proportions rather than measured. That is good enough " +
+                        "for the body-fat figure, which reads one girth difference against " +
+                        "your height and barely moves when the scale is a few per cent " +
+                        "out — the range above already includes it. It is not good enough " +
+                        "to print your waist in centimetres, because a scale error moves " +
+                        "every measurement together, so those are not shown."
+                } else {
+                    "Measured from your trunk. Your waist, shoulders and hips were all in " +
+                        "shot, which is everything the shape reading needs — and closer " +
+                        "framing puts far more detail on your midsection. Tape " +
+                        "measurements in centimetres need your full height in the " +
+                        "picture, so this scan does not produce them."
+                },
             )
         }
 

@@ -17,6 +17,7 @@ import com.squeeze.core.scan.PosePoint
 import com.squeeze.core.scan.ScanFraming
 import com.squeeze.core.scan.ScaleCrossCheck
 import com.squeeze.core.scan.ScaleDecision
+import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.TorsoFraming
 import com.squeeze.core.scan.TrunkBounds
 import com.squeeze.core.scan.UpperBodyFraming
@@ -305,7 +306,28 @@ class BodyDetector @Inject constructor(
         // subject's stature is not reliably in the picture, and each is a veto rather than a
         // warning: a wrong scale multiplies every centimetre in the scan at once.
         val scale = when {
-            isCropped(poseResult) -> null
+            // **Cropped is not the same as unmeasurable, and treating it as such cost a
+            // user his scan.**
+            //
+            // He photographed his trunk, which is the framing this app recommends — waist,
+            // shoulders and hips all in shot, and far more pixels on the midsection than a
+            // full-body frame gives. His ankles were outside the picture, so the stature
+            // span this file knew about returned nothing, so there was no scale, so there
+            // were no circumferences, so the Navy equation never ran. The fusion was left
+            // with the outline's bound, which is a constant, and he was shown 11.6% under
+            // the words "not resolved by the photo". His waist and his neck were both in
+            // the frame the whole time.
+            //
+            // The trunk span is a worse ruler and is labelled as one: no cross-check is
+            // possible, so it cannot be corroborated, and a scan built on it is stored as
+            // its own source and weighted by its own wider error. What it is not is worse
+            // than nothing — see LandmarkStature.NOSE_TO_HIP_FRACTION, which costs this out
+            // through the equation rather than asserting it.
+            isCropped(poseResult) -> geometry
+                ?.let { LandmarkStature.frameFractionFromTrunk(it.nose, it.hipLeft, it.hipRight) }
+                ?.takeIf { it >= MIN_BODY_HEIGHT_FRACTION }
+                ?.let { ScaleDecision(it, ScaleSource.TRUNK_SPAN, disagreementPercent = null) }
+
             else -> ScaleCrossCheck.resolve(
                 maskFraction = profile.bodyHeightFraction,
                 landmarkFraction = geometry?.let {

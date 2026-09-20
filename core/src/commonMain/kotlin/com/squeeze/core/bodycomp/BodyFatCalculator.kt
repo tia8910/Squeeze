@@ -57,6 +57,63 @@ object BodyFatCalculator {
     }
 
     /**
+     * How many points of body fat a given error in the photograph's scale is worth.
+     *
+     * **Why this is computed rather than assumed.** A scan whose stature came from the trunk
+     * span rather than from the whole body carries a softer scale — see
+     * [com.squeeze.core.scan.LandmarkStature.NOSE_TO_HIP_FRACTION] — and the estimate built
+     * on it has to say so in its interval. Picking a number for that by feel is how this
+     * project has gone wrong before, so it is measured instead: perturb the girths by the
+     * scale error and ask [navy] what changed.
+     *
+     * Derived from the equation's own coefficients by construction, because it calls the
+     * equation. Nothing here restates 0.19077 or 1.0324, so the two cannot drift apart.
+     *
+     * The shape of the answer is worth knowing. A scale error multiplies every girth, the
+     * equation takes a logarithm of one girth difference, and a logarithm turns a
+     * multiplicative error into an additive one — so the cost is roughly proportional to the
+     * error and nowhere near as violent as it would be in a linear equation. For a man it
+     * runs about 36 points of body fat per unit of scale error: five per cent costs 1.8
+     * points, fifteen per cent costs 5.2. For a woman the coefficient is nearly double,
+     * because her equation leans on a larger girth term.
+     *
+     * @param scaleErrorFraction the fractional uncertainty in the scan's scale, e.g. 0.05
+     * @return the extra standard error in percentage points, or null when the inputs do not
+     *   support the equation at all. Never negative, and symmetric enough to add in
+     *   quadrature: the two directions differ by under a tenth of a point at these sizes.
+     */
+    fun navyScaleSensitivityPercent(
+        profile: Profile,
+        c: Circumferences,
+        scaleErrorFraction: Double,
+    ): Double? {
+        if (scaleErrorFraction <= 0.0) return 0.0
+
+        val centre = navy(profile, c) ?: return null
+        // Every girth moves together, because a scale error is one number applied to the
+        // whole photograph. Perturbing the waist alone would model a measurement mistake,
+        // which is a different thing and already covered by the method's published error.
+        fun scaled(f: Double) = c.copy(
+            neckCm = c.neckCm?.times(f),
+            waistCm = c.waistCm?.times(f),
+            hipCm = c.hipCm?.times(f),
+            chestCm = c.chestCm?.times(f),
+            thighCm = c.thighCm?.times(f),
+            armCm = c.armCm?.times(f),
+            calfCm = c.calfCm?.times(f),
+        )
+
+        val up = navy(profile, scaled(1.0 + scaleErrorFraction))?.percent
+        val down = navy(profile, scaled(1.0 - scaleErrorFraction))?.percent
+        val deltas = listOfNotNull(up, down).map { kotlin.math.abs(it - centre.percent) }
+        if (deltas.isEmpty()) return null
+
+        // The larger of the two sides, so the interval covers the worse direction rather than
+        // averaging it away.
+        return deltas.max()
+    }
+
+    /**
      * Jackson-Pollock 3-site skinfolds, converted to body fat with the Siri equation.
      *
      * Men use chest, abdomen and thigh; women use triceps, suprailiac and thigh. This is

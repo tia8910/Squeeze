@@ -148,6 +148,15 @@ data class ScanUiState(
      */
     val framing: ScanFraming = ScanFraming.FULL_BODY,
     /**
+     * True when the scan's centimetres rest on a stature inferred from the trunk, because the
+     * feet were outside the frame.
+     *
+     * Recorded so the saved row can say so and be weighted accordingly. Without it a scan
+     * scaled from a soft ruler would be stored as though its girths were measured, and a
+     * scale error multiplies every one of them together.
+     */
+    val scaleFromTrunk: Boolean = false,
+    /**
      * How much abdominal structure the front photograph showed, in arbitrary units.
      *
      * Null when the crop was too dark, too small or too evenly lit. Not a percentage and not
@@ -526,6 +535,7 @@ class ScanViewModel @Inject constructor(
             shapeIndices = shapeIndices,
             knownWeightKg = knownWeight,
             framing = front.framing,
+            scaleFromTrunk = front.scale?.source == ScaleSource.TRUNK_SPAN,
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
@@ -577,10 +587,15 @@ class ScanViewModel @Inject constructor(
                     // A front-only scan assumed its depth, so it is stored as a distinct
                     // source and weighted by its own wider error rather than passed off as
                     // a full two-photo measurement.
-                    source = if (result.depthAssumed) {
-                        MeasurementSource.PHOTO_FRONT_ONLY.name
-                    } else {
-                        MeasurementSource.PHOTO.name
+                    // A trunk-scaled scan is named first, because its inference sits further
+                    // upstream than the assumed depth: depth affects one axis of each girth,
+                    // an inferred scale multiplies all of them at once.
+                    source = when {
+                        _state.value.scaleFromTrunk ->
+                            MeasurementSource.PHOTO_TRUNK_SCALED.name
+
+                        result.depthAssumed -> MeasurementSource.PHOTO_FRONT_ONLY.name
+                        else -> MeasurementSource.PHOTO.name
                     },
                     weightKg = weight,
                     neckCm = c.neckCm,

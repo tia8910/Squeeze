@@ -190,6 +190,31 @@ class BodyCompositionRepository @Inject constructor(
                             EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent,
                     )
 
+                    // Scaled from the trunk because the feet were out of frame, so every
+                    // girth in the row rests on an inferred stature. The extra error is not
+                    // a chosen constant: the scale uncertainty is run through the equation's
+                    // own coefficients and added in quadrature to the method's published
+                    // figure. At five per cent that is about 1.8 points for a man.
+                    //
+                    // Wider than a measured scan, and far narrower than the alternative —
+                    // before this source existed such a photograph produced no centimetres
+                    // at all, so the fusion fell back to the outline's nine-point bound,
+                    // which is the same value for every body that reaches it.
+                    MeasurementSource.PHOTO_TRUNK_SCALED.name -> {
+                        val base = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent
+                        val fromScale = BodyFatCalculator.navyScaleSensitivityPercent(
+                            profile,
+                            entity.toCircumferences(),
+                            TRUNK_SCALE_ERROR_FRACTION,
+                        ) ?: 0.0
+                        navy.copy(
+                            method = EstimationMethod.PHOTO_FRONT_ONLY,
+                            standardErrorPercent = kotlin.math.sqrt(
+                                base * base + fromScale * fromScale,
+                            ),
+                        )
+                    }
+
                     else -> navy
                 }
             }
@@ -245,7 +270,11 @@ class BodyCompositionRepository @Inject constructor(
         // BMI fallback out of the answer, and to refuse the record outright when nothing
         // photo-derived survived.
         val fromPhoto = entity.source == MeasurementSource.PHOTO.name ||
-            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name
+            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name ||
+            // A trunk-scaled row is still a photograph's answer, and must keep the BMI
+            // fallback out for exactly the reason the other two do: leaving it in returned
+            // one number for every scan of one body at one weight.
+            entity.source == MeasurementSource.PHOTO_TRUNK_SCALED.name
 
         // The BMI fallback, and **only where a photograph is not the question**.
         //
@@ -443,6 +472,21 @@ class BodyCompositionRepository @Inject constructor(
          * produces a dozen.
          */
         const val SHAPE_DISAGREEMENT_POINTS = 6.0
+
+        /**
+         * How far out a stature inferred from the trunk span is taken to be.
+         *
+         * The nose-to-hip span is 0.395 of stature against the ankle route's 0.886, so the
+         * same landmark error counts for 2.2 times as much, and trunk-to-stature proportion
+         * varies more between adults than whole-body proportion does. Five per cent is the
+         * honest order of that, against the two per cent the ankle span carries.
+         *
+         * It is not a body-fat figure and never becomes one directly — it is fed through
+         * [com.squeeze.core.bodycomp.BodyFatCalculator.navyScaleSensitivityPercent], which
+         * converts it using the equation's own coefficients. So getting it somewhat wrong
+         * widens or narrows an interval; it cannot move a number.
+         */
+        const val TRUNK_SCALE_ERROR_FRACTION = 0.05
 
         /**
          * Within-day bodyweight scatter, as a fraction of bodyweight.

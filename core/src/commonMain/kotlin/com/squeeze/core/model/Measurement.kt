@@ -18,6 +18,22 @@ enum class MeasurementSource {
     /** Silhouette extraction from a front photograph alone, with depth assumed. */
     PHOTO_FRONT_ONLY,
 
+    /**
+     * Silhouette extraction whose stature came from the trunk, because the feet were out of
+     * frame.
+     *
+     * Stored separately for the same reason [PHOTO_FRONT_ONLY] is: something was inferred
+     * rather than measured, and the estimate has to be weighted by its own wider error rather
+     * than passed off as a fully measured scan. Here it is the scale — see
+     * [com.squeeze.core.scan.ScaleSource.TRUNK_SPAN] — and a scale error multiplies every
+     * girth in the scan at once, so it is not a detail.
+     *
+     * The width of "wider" is computed rather than chosen:
+     * [com.squeeze.core.bodycomp.BodyFatCalculator.navyScaleSensitivityPercent] runs the
+     * scale uncertainty through the equation's own coefficients.
+     */
+    PHOTO_TRUNK_SCALED,
+
     /** Bioimpedance scale, imported via Health Connect. Highly hydration sensitive. */
     BIA_SCALE,
 
