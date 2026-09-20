@@ -83,7 +83,7 @@ class HipDenominatorTest {
         )
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), estimate.percent, 1e-9)
     }
 
     @Test

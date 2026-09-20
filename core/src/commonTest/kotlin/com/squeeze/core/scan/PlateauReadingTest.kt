@@ -11,8 +11,9 @@ import kotlin.test.assertTrue
  *
  * Below [SilhouetteBodyFat.LEAN_PLATEAU_RATIO] the outline stops carrying information about
  * adiposity — measured, not assumed: waist-to-shoulder reads 0.586 at eight per cent, 0.592
- * at twelve and 0.580 at fifteen. The method reports its lean-end value there and widens its
- * interval to ±9 points to say so.
+ * at twelve and 0.580 at fifteen. The method widens its interval to ±9 points to say so, and
+ * reports the middle of what that leaves rather than its leanest edge — see
+ * [SilhouetteBodyFat.plateauMidpointPercent], which exists because it used to report the edge.
  *
  * The failure these guard against is what happens next. A figure that uncertain was being
  * treated as evidence strong enough to discard a whole competing method, and it produced a
@@ -37,19 +38,51 @@ class PlateauReadingTest {
     }
 
     @Test
-    fun `a ratio on the plateau produces a figure at or under the ceiling`() {
-        // The property the veto rule depends on: a stored percentage at or below the ceiling
-        // can only have come from the plateau, so a caller holding nothing but the number can
-        // still recognise one.
-        val ceiling = SilhouetteBodyFat.plateauCeilingPercent(Sex.MALE)
+    fun `a ratio on the plateau reports the middle of the range, not its lean end`() {
+        // This used to assert the opposite — that a plateau figure sits at or below the
+        // ceiling — on the reasoning that a caller holding nothing but the number could then
+        // recognise a bound. The number it recognised was the leanest value the method
+        // admitted, published as the answer on every unresolved scan ever taken. A user
+        // photographed at a midsection a coach reads around sixteen per cent was shown 11.6,
+        // over a sentence saying he was no leaner than that: the card disagreeing with itself.
+        //
+        // Recognition was never really doing that work anyway — it reads the stored interval,
+        // and has since intervals were stored. The value is free to be the honest one.
+        val floor = SilhouetteBodyFat.leanestClaimable(Sex.MALE)
+        val middle = SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE)
 
         listOf(0.58, 0.62, 0.70, 0.7599).forEach { ratio ->
             val estimate = SilhouetteBodyFat.estimate(ShapeIndices(ratio, null), Sex.MALE)
 
             assertNotNull(estimate, "ratio $ratio")
+            assertEquals(middle, estimate.percent, 1e-9, "ratio $ratio")
+            // The floor is still asserted, and now travels with the reading so the interval
+            // can start at it instead of nine points below it.
+            assertEquals(floor, estimate.floorPercent, "ratio $ratio")
+            assertTrue(estimate.percent > floor, "ratio $ratio gave ${estimate.percent}")
+        }
+    }
+
+    @Test
+    fun `the interval a bounded reading implies never reaches below its floor`() {
+        // The contradiction that prompted the change, asserted as arithmetic rather than as
+        // copy: percent minus its own error used to land at 2.6 for a man, drawn as "most
+        // likely 3-21%" under a sentence promising he was no leaner than 11.6.
+        Sex.entries.forEach { sex ->
+            val estimate = SilhouetteBodyFat.estimate(ShapeIndices(0.65, null), sex)
+
+            assertNotNull(estimate, "$sex")
+            val floor = estimate.floorPercent
+            assertNotNull(floor, "$sex lost its floor")
             assertTrue(
-                estimate.percent <= ceiling + 1e-9,
-                "ratio $ratio gave ${estimate.percent}, above the ceiling $ceiling",
+                estimate.percent - estimate.standardErrorPercent <= floor,
+                "$sex: the floor must be doing work, not sitting above the interval",
+            )
+            assertEquals(
+                SilhouetteBodyFat.PLATEAU_ERROR_PERCENT,
+                estimate.standardErrorPercent,
+                1e-9,
+                "$sex: centring the figure must not narrow what the method admits",
             )
         }
     }

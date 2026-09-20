@@ -1326,7 +1326,15 @@ private fun ShapeHeadline(
     // has to say the same thing, because a number in display type reads as certain no matter
     // what is printed under it.
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
-    val low = (estimate.percent - estimate.standardErrorPercent).coerceAtLeast(3.0)
+    // The interval starts where the method's knowledge starts. A bounded reading has ruled
+    // out everything below its floor — the copy under this number says so in words — so
+    // drawing the range down to 3% contradicted the card's own sentence, and made the leanest
+    // thing on screen a figure the method had already excluded.
+    val low = (estimate.percent - estimate.standardErrorPercent)
+        .coerceAtLeast(estimate.floorPercent ?: 3.0)
+        // An interval cannot begin above the figure it belongs to, whatever any upstream
+        // clamp did to one and not the other.
+        .coerceAtMost(estimate.percent)
     val high = estimate.percent + estimate.standardErrorPercent
     val dark = LocalIsDarkTheme.current
 
@@ -1339,8 +1347,12 @@ private fun ShapeHeadline(
             // Deurenberg, so three photographs of the same man at 70 kg — soft, mid, and with
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
+            // "Leanest your outline can claim" was accurate about the old figure and that was
+            // the problem: the card led with the bottom of its own range. The figure is now
+            // the middle of what the outline admits, so the label says which part of the
+            // range it is, and the floor moves into the sentence below where it belongs.
             label = when {
-                bounded -> "Leanest your outline can claim"
+                bounded -> "Middle of what your outline allows"
                 else -> "From your shape"
             },
             // Shown for every reading, not only the uncertain ones. Every figure in this app
@@ -1360,15 +1372,15 @@ private fun ShapeHeadline(
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
-                        "throws that away — it knows your edge and nothing inside it. So " +
-                        "this is a floor, not a reading of you: you are no leaner than " +
-                        "this, and the outline cannot say how much softer. The app used " +
-                        "to fill the gap from your height and weight, which gave every " +
-                        "photo at your weight the same answer whatever your body looked " +
-                        "like. It no longer does that. A side photo settles it from a " +
-                        "picture — it measures your abdomen front to back, the axis a " +
-                        "front view cannot see — and a tape at your navel or your own " +
-                        "known figure settle it from a measurement."
+                        "throws that away — it knows your edge and nothing inside it. " +
+                        "What it can say is that you are no leaner than " +
+                        "%.1f%%".format(estimate.floorPercent ?: low) +
+                        ", and softer than that by an amount it cannot measure. The " +
+                        "figure above is the middle of that range rather than its lean " +
+                        "end — the app used to print the lean end, which made every " +
+                        "unresolved scan read several points leaner than the body in it. " +
+                        "A side photo narrows this from a picture: it measures your " +
+                        "abdomen front to back, the axis a front view cannot see."
 
                 else ->
                     "Read from how wide your waist is relative to your shoulders and " +

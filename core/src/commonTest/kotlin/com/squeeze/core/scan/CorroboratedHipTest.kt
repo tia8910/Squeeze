@@ -54,7 +54,8 @@ class CorroboratedHipTest {
         val estimate = hipReading(0.788)
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.floorPercent)
         assertEquals(SilhouetteBodyFat.PLATEAU_ERROR_PERCENT, estimate.standardErrorPercent, 1e-9)
     }
 
@@ -65,7 +66,7 @@ class CorroboratedHipTest {
         val estimate = hipReading(0.69)
 
         assertNotNull(estimate)
-        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.plateauMidpointPercent(Sex.MALE), estimate.percent, 1e-9)
     }
 
     @Test

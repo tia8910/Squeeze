@@ -76,12 +76,23 @@ data class Measurement(
  *   noise and what the UI must show alongside the number. Presenting an estimate without
  *   its error is the core dishonesty of this app category.
  * @param calibrated true when a personal reference scan has been applied
+ * @param floorPercent the leanest value the method is willing to admit, when it has ruled a
+ *   region out rather than merely being uncertain. Null for an ordinary estimate, whose
+ *   uncertainty is symmetric and needs no extra field.
+ *
+ *   It exists because a symmetric interval around a one-sided reading says something the
+ *   method does not believe. A plateau scan used to report 11.6% with ±9, drawn as "most
+ *   likely 3–21%" beneath a sentence reading "you are no leaner than this" — the figure and
+ *   the range contradicting each other and the copy on the same card. Worse, the reported
+ *   figure *was* the floor, so of every value the method admitted the app displayed the
+ *   leanest one, every time, which is a systematic understatement of half the interval.
  */
 data class BodyFatEstimate(
     val percent: Double,
     val method: EstimationMethod,
     val standardErrorPercent: Double,
     val calibrated: Boolean = false,
+    val floorPercent: Double? = null,
 )
 
 /**
