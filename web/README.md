@@ -15,6 +15,29 @@ the internet permission to the app, which would quietly destroy the one guarante
 
 If a feature ever seems to need a server, the answer is to do it on the device or not do it.
 
+### The one exception, and its fence
+
+`POST /lab/assess` sends a photograph to a vision model and returns a coach-style body-fat
+assessment. It exists because the on-device silhouette reader has been wrong five times on the
+same body, and the reason is structural rather than a bug: a ratio of two widths cannot see
+what a coach sees. A coach reads markers — whether the upper abdominals separate, whether the
+flank folds — and no width ratio recovers that.
+
+**The app does not call it and must never call it.** It has no `INTERNET` permission, so it
+physically cannot, and that is the point. This endpoint serves the measurement lab: its output
+is ground truth for a labelled corpus, and what ships to users is not the endpoint but better
+constants fitted to what it labelled.
+
+Two guards, because a public deployment that forwards images to a paid API is an open relay:
+
+| Guard | Behaviour |
+| --- | --- |
+| `LAB_TOKEN` | Required as `Authorization: Bearer …`; anything else is 401 |
+| `ANTHROPIC_API_KEY` | Absent → the route answers 503 and admits nothing |
+
+Neither is set on the public deployment, so the route is simply not there. Set both only on a
+private instance. `LAB_VISION_MODEL` overrides the model when a cheaper one is worth trying.
+
 ## Running it
 
 ```sh
@@ -55,6 +78,7 @@ working directory, so they are found regardless of where the app is started from
 | Path | Purpose |
 | --- | --- |
 | `/` | Landing page |
+| `/lab/assess` | Coach-style assessment for the lab; gated, see above |
 | `/privacy`, `/privacy-policy` | Privacy policy |
 | `/static/*` | Logo assets |
 | `/robots.txt`, `/sitemap.xml` | Crawler metadata |
