@@ -90,6 +90,7 @@ import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
+import com.squeeze.core.scan.PlateauCorroboration
 import com.squeeze.core.scan.ScanFraming
 import com.squeeze.core.scan.ShapeIndices
 import com.squeeze.core.scan.SilhouetteBodyFat
@@ -845,6 +846,8 @@ private fun ResultStep(
             ShapeHeadline(
                 estimate = it,
                 indices = state.shapeIndices,
+                definitionVerdict = state.definitionVerdict,
+                corroborated = state.settledByAbdomen,
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
                 // no later step can undo.
@@ -1313,6 +1316,13 @@ private fun ShapeHeadline(
     estimate: BodyFatEstimate,
     indices: ShapeIndices? = null,
     /**
+     * What the abdomen's surface said, which is the only thing that can settle a plateau
+     * reading from a photograph alone. Changes what this card claims, never the figure.
+     */
+    definitionVerdict: PlateauCorroboration.Verdict = PlateauCorroboration.Verdict.UNCERTAIN,
+    /** True when the outline was on its plateau and the abdomen's surface settled it. */
+    corroborated: Boolean = false,
+    /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
      *
      * Passed in rather than left to the cards further down the screen, because on an
@@ -1326,6 +1336,10 @@ private fun ShapeHeadline(
     // has to say the same thing, because a number in display type reads as certain no matter
     // what is printed under it.
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+    // Whether the abdomen is what settled this. By the time the card sees it `bounded` is
+    // already false — PlateauCorroboration narrowed the interval upstream — so the flag comes
+    // from the view model, which knows what the outline said before the surface was consulted.
+    val contradicted = bounded && definitionVerdict == PlateauCorroboration.Verdict.SMOOTH
     val low = (estimate.percent - estimate.standardErrorPercent).coerceAtLeast(3.0)
     val high = estimate.percent + estimate.standardErrorPercent
     val dark = LocalIsDarkTheme.current
@@ -1339,16 +1353,51 @@ private fun ShapeHeadline(
             // Deurenberg, so three photographs of the same man at 70 kg — soft, mid, and with
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
-            label = if (bounded) "Leanest your outline can claim" else "From your shape",
+            label = when {
+                !bounded && corroborated -> "From your shape and your abdomen"
+                bounded -> "Leanest your outline can claim"
+                else -> "From your shape"
+            },
             // Shown for every reading, not only the uncertain ones. Every figure in this app
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
             interval = "most likely %.0f–%.0f%%".format(low, high),
-            band = if (bounded) "Not resolved by the photo" else null,
+            band = when {
+                bounded -> "Not resolved by the photo"
+                // Said plainly because it is the thing the user has been waiting to see: the
+                // photograph settled it, using the surface the outline throws away.
+                corroborated -> "Read from your photo"
+                else -> null
+            },
         )
 
         Text(
             text = when {
+                // The outline landed on its plateau and the abdomen in the same photograph
+                // showed visible structure. Those two fail in different ways — everything
+                // that corrupts an outline makes a denominator wider and the reading leaner,
+                // and none of it puts grooves on a stomach — so the pair is a measurement
+                // where either alone was not.
+                corroborated ->
+                    "Settled from the photo itself. Your outline put you in the lean " +
+                        "range and could not say where in it — a silhouette knows your " +
+                        "edge and nothing inside it. So the scan read the surface too, " +
+                        "and your abdomen showed visible separation. Those two can fail " +
+                        "in opposite directions and they agreed, which is what makes this " +
+                        "a reading of you rather than a floor. Nothing here came from " +
+                        "your height or your weight."
+
+                // A lean outline over a smooth abdomen. The exact shape of every wrong
+                // answer this app has shipped, and the user is told rather than floored
+                // quietly.
+                contradicted ->
+                    "Your outline read lean, and your abdomen did not. Those disagree, and " +
+                        "when they do it is almost always the outline that is wrong: " +
+                        "anything it picked up beside you — an arm against your side, " +
+                        "trousers at the hip, your thighs together — widens a denominator " +
+                        "and makes the reading leaner. So this stays a floor rather than a " +
+                        "reading. Arms a hand's width clear, hips in shot, and scan again."
+
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +

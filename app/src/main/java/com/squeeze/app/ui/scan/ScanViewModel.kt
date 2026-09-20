@@ -25,6 +25,7 @@ import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
+import com.squeeze.core.scan.PlateauCorroboration
 import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
@@ -147,6 +148,25 @@ data class ScanUiState(
      * used it.
      */
     val framing: ScanFraming = ScanFraming.FULL_BODY,
+    /**
+     * How much abdominal structure the front photograph showed, in arbitrary units.
+     *
+     * Null when the crop was too dark or too small. Not a percentage and not comparable
+     * between people — a model's sharper abdomen measured 21.9 against another man's soft one
+     * at 16.5 — which is why it corroborates a reading rather than producing one.
+     */
+    val definitionScore: Double? = null,
+    /** What that reading said about the surface, and so what the scan may claim. */
+    val definitionVerdict: PlateauCorroboration.Verdict =
+        PlateauCorroboration.Verdict.UNCERTAIN,
+    /**
+     * True when the outline landed on its plateau and the abdomen settled it.
+     *
+     * Recorded rather than inferred on the screen: from the figure alone the screen cannot
+     * tell a corroborated plateau reading from one the outline resolved by itself, and
+     * guessing would need the sex and the floor and would still be a guess.
+     */
+    val settledByAbdomen: Boolean = false,
 ) {
     /**
      * What the photograph supports, and nothing else.
@@ -436,8 +456,30 @@ class ScanViewModel @Inject constructor(
             hipInFrame = front.framing.hipsInShot,
         )
 
-        val shapeEstimate = shapeIndices
+        // How much structure the abdomen showed, read from *inside* the outline.
+        //
+        // The only reading this scan takes from the surface rather than from the border, and
+        // the only one that can separate a lean body from a very lean one — an outline knows
+        // where the body ends and nothing about what is inside it, which is the entire
+        // difference between eight per cent and fifteen.
+        val definition = frontBitmap?.let { AbdomenCrop.measure(it, front.geometry) }
+
+        val outlineOnly = shapeIndices
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
+
+        // Two photo-derived signals that fail independently. Every way an outline is
+        // corrupted makes a denominator wider and the reading leaner; none of them puts
+        // grooves on a stomach. So a lean outline over a defined abdomen is agreement, and a
+        // plateau reading stops being "not resolved by the photo" — the photograph resolved
+        // it, just not with its border.
+        val shapeEstimate = PlateauCorroboration.apply(outlineOnly, definition)
+
+        // Whether that is what happened, decided here rather than re-derived on the screen
+        // from the figure and the sex. The screen would have to guess; this knows.
+        val settledByAbdomen = outlineOnly != null &&
+            shapeEstimate != null &&
+            outlineOnly.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT &&
+            shapeEstimate.standardErrorPercent < SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
 
         // Fetched here so the headline has a build to fall back on before the user types
         // anything. Without it a plateau reading has nothing to resolve against and prints
@@ -502,6 +544,9 @@ class ScanViewModel @Inject constructor(
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
+            definitionScore = definition?.takeIf { it.usable }?.score,
+            definitionVerdict = PlateauCorroboration.verdict(definition),
+            settledByAbdomen = settledByAbdomen,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.
             posture = front.geometry
