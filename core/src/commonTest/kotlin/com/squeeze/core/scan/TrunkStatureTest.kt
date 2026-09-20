@@ -123,6 +123,44 @@ class TrunkStatureTest {
     }
 
     @Test
+    fun `a trunk-derived ruler may never be paired with full-body framing`() {
+        // **This shipped and crashed the app on the measure button.** The trunk span was
+        // wired into the detector's full-body branch, which labelled a cropped photograph
+        // FULL_BODY and handed it to the anchor builder that reads knee and ankle landmarks
+        // — landmarks a pose model extrapolates outside the image when the feet are missing.
+        //
+        // Framing is a routing decision rather than a label: it chooses which anchor builder
+        // runs, and the two make opposite assumptions about whether the body fits the frame.
+        // A stature inferred from the trunk exists because it does not.
+        assertTrue(!ScaleSource.TRUNK_SPAN.canFrameFullBody())
+        assertTrue(ScaleSource.MASK.canFrameFullBody())
+        assertTrue(ScaleSource.LANDMARK.canFrameFullBody())
+    }
+
+    @Test
+    fun `the real photograph this was built for produces a usable stature`() {
+        // Landmarks measured off the scan in the class header: nose at y=952 and hip joints
+        // at y=1517 in a frame 1994 tall. The frame holds him from crown to mid-shin.
+        val nose = PosePoint(0.5, 952.0 / 1994.0)
+        val hip = PosePoint(0.5, 1517.0 / 1994.0)
+
+        val fraction = LandmarkStature.frameFractionFromTrunk(nose, hip, hip)
+
+        assertNotNull(fraction)
+        // 0.717 of the frame — his stature is not taller than the picture, because the
+        // picture holds most of him. Worth pinning, because the intuition that a cropped
+        // photo always implies a stature past the frame edge is wrong, and a threshold set
+        // on that intuition would refuse exactly the scans this exists to rescue.
+        assertTrue(fraction in 0.70..0.74, "got $fraction")
+
+        // At 175 cm that is 0.122 cm per pixel, which agrees with an independent check on
+        // the same photograph: his head measures 195 px, and head height is near 0.13 of
+        // stature, giving 1500 px against this route's 1430.
+        val statureInPixels = fraction * 1994.0
+        assertTrue(statureInPixels in 1350.0..1550.0, "got $statureInPixels px")
+    }
+
+    @Test
     fun `what a soft scale costs is computed from the equation, not asserted`() {
         // A reconstruction of the scan in the class header: 175 cm, waist about 84 cm, neck
         // about 38. The point is the shape of the answer rather than the exact figures.

@@ -42,6 +42,27 @@ enum class ScaleSource {
      * same value for every body that reaches it.
      */
     TRUNK_SPAN,
+    ;
+
+    /**
+     * Whether this ruler may be attached to a photograph framed as [ScanFraming.FULL_BODY].
+     *
+     * **[TRUNK_SPAN] may not, and the reason is a crash rather than a principle.** It was
+     * first wired into the full-body branch of the detector, which labelled a cropped
+     * photograph FULL_BODY and handed it to the anchor builder that reads knee and ankle
+     * landmarks — landmarks a pose model happily extrapolates outside the image when the feet
+     * are not in it. The scan died on the measure button.
+     *
+     * The framing is not a label on the result, it is a routing decision: it picks which
+     * anchor builder runs, and those builders make opposite assumptions about whether the
+     * body fits in the frame. A stature inferred from the trunk exists precisely because the
+     * body does not fit, so the two can never pair.
+     *
+     * It would also have started printing centimetres from an inferred ruler, which is the
+     * failure the whole of [ScaleCrossCheck] exists to prevent — the same body measured twice
+     * at 75.4 cm and 92.2 cm.
+     */
+    fun canFrameFullBody(): Boolean = this != TRUNK_SPAN
 }
 
 /**

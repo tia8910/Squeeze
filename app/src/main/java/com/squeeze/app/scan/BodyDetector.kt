@@ -306,27 +306,11 @@ class BodyDetector @Inject constructor(
         // subject's stature is not reliably in the picture, and each is a veto rather than a
         // warning: a wrong scale multiplies every centimetre in the scan at once.
         val scale = when {
-            // **Cropped is not the same as unmeasurable, and treating it as such cost a
-            // user his scan.**
-            //
-            // He photographed his trunk, which is the framing this app recommends — waist,
-            // shoulders and hips all in shot, and far more pixels on the midsection than a
-            // full-body frame gives. His ankles were outside the picture, so the stature
-            // span this file knew about returned nothing, so there was no scale, so there
-            // were no circumferences, so the Navy equation never ran. The fusion was left
-            // with the outline's bound, which is a constant, and he was shown 11.6% under
-            // the words "not resolved by the photo". His waist and his neck were both in
-            // the frame the whole time.
-            //
-            // The trunk span is a worse ruler and is labelled as one: no cross-check is
-            // possible, so it cannot be corroborated, and a scan built on it is stored as
-            // its own source and weighted by its own wider error. What it is not is worse
-            // than nothing — see LandmarkStature.NOSE_TO_HIP_FRACTION, which costs this out
-            // through the equation rather than asserting it.
-            isCropped(poseResult) -> geometry
-                ?.let { LandmarkStature.frameFractionFromTrunk(it.nose, it.hipLeft, it.hipRight) }
-                ?.takeIf { it >= MIN_BODY_HEIGHT_FRACTION }
-                ?.let { ScaleDecision(it, ScaleSource.TRUNK_SPAN, disagreementPercent = null) }
+            // A cropped photograph has no stature in it and cannot take the full-body path.
+            // The trunk span below is how it gets a scale — on the branch built for it, not
+            // this one. Putting it here instead shipped a crash and would have printed
+            // centimetres from an inferred ruler; see the trunk branch for both.
+            isCropped(poseResult) -> null
 
             else -> ScaleCrossCheck.resolve(
                 maskFraction = profile.bodyHeightFraction,
@@ -359,8 +343,9 @@ class BodyDetector @Inject constructor(
 
         // No stature in shot. That used to end the scan, and it no longer does: the shape
         // figure and every ratio the app reports divide one width by another in the same
-        // image, so none of them ever needed a stature. What is lost is centimetres, and
-        // ScanFraming.TORSO is how the rest of the pipeline is told they are gone.
+        // image, so none of them ever needed a stature. ScanFraming.TORSO is how the rest of
+        // the pipeline is told which frame it is looking at — and, since the trunk span
+        // below, centimetres are no longer necessarily gone with it, only softer.
         if (geometry != null && TorsoFraming.supports(geometry)) {
             val anchors = TorsoFraming.anchorsFor(geometry, maskHeight)
                 ?: return DetectionResult.Failure(DetectionFailure.PoseImplausible)
@@ -368,8 +353,38 @@ class BodyDetector @Inject constructor(
             FrontalityCheck.evaluateTorso(geometry)
                 ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
 
+            // **A trunk photograph can have a scale after all, and refusing it cost a whole
+            // measurement.**
+            //
+            // A user photographed exactly as this app recommends — waist, shoulders and hips
+            // in shot, far more pixels on the midsection than a full-body frame gives — and
+            // his ankles were outside the picture. The only stature span the app knew was
+            // nose to ankle, so it returned nothing, so there was no scale, so there were no
+            // circumferences, so the Navy equation never ran, so the fusion was left with
+            // the outline's bound. That bound is a constant. He was shown 11.6% under the
+            // words "not resolved by the photo", on a photograph with his waist and his neck
+            // plainly in it.
+            //
+            // The trunk span is the weaker ruler and everything downstream is told so: it
+            // carries no cross-check, the row is stored as its own measurement source, and
+            // the interval is widened by the sensitivity the equation itself reports. See
+            // LandmarkStature.NOSE_TO_HIP_FRACTION, which costs it out rather than asserting
+            // it — five per cent of scale is 1.8 points of body fat for a man, against the
+            // nine-point constant it replaces.
+            //
+            // **It belongs on this branch and not on the full-body one.** The first attempt
+            // attached it up there, which labelled a cropped photograph FULL_BODY, handed it
+            // to the anchor builder that reads knee and ankle landmarks the pose model
+            // extrapolates outside the image, and crashed. TorsoFraming.anchorsFor is built
+            // for exactly this frame and says so: it lets the knee row fall past the bottom
+            // of the picture because the searches clamp to the silhouette's own extent.
+            val trunkScale = LandmarkStature
+                .frameFractionFromTrunk(geometry.nose, geometry.hipLeft, geometry.hipRight)
+                ?.takeIf { it >= MIN_BODY_HEIGHT_FRACTION }
+                ?.let { ScaleDecision(it, ScaleSource.TRUNK_SPAN, disagreementPercent = null) }
+
             return DetectionResult.Success(
-                DetectedBody(profile, anchors, geometry, scale = null, ScanFraming.TORSO),
+                DetectedBody(profile, anchors, geometry, trunkScale, ScanFraming.TORSO),
             )
         }
 

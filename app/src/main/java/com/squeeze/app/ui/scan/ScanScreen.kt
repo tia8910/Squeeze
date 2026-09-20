@@ -930,9 +930,10 @@ private fun ResultStep(
                         "your own proportions rather than measured. That is good enough " +
                         "for the body-fat figure, which reads one girth difference against " +
                         "your height and barely moves when the scale is a few per cent " +
-                        "out — the range above already includes it. It is not good enough " +
-                        "to print your waist in centimetres, because a scale error moves " +
-                        "every measurement together, so those are not shown."
+                        "out — the range above already includes it. Treat the centimetres " +
+                        "in your history as softer than a tape: a scale worked out this " +
+                        "way moves every one of them together, which is why the scan is " +
+                        "saved under its own name rather than as a measured one."
                 } else {
                     "Measured from your trunk. Your waist, shoulders and hips were all in " +
                         "shot, which is everything the shape reading needs — and closer " +
