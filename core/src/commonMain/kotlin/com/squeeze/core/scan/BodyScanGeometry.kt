@@ -53,10 +53,36 @@ class ScaleRecovery(
     /** Exposed so the analyser can judge a measurement against the person's own stature. */
     val heightCm: Double,
     private val bodyHeightFraction: Double,
+    /**
+     * True when [bodyHeightFraction] was inferred from a body part rather than measured from
+     * the subject's own extent in the frame.
+     *
+     * Changes two things, and both are about a stature the picture does not contain. See the
+     * bound below and [isFramingTooTight].
+     */
+    private val statureInferred: Boolean = false,
 ) {
     init {
         require(heightCm in 100.0..250.0) { "implausible height: $heightCm" }
-        require(bodyHeightFraction in 0.05..1.0) {
+        // **A measured stature cannot exceed the frame. An inferred one routinely does, and
+        // assuming otherwise crashed the app on the measure button.**
+        //
+        // For a full-body photograph this fraction is the subject's own extent in the
+        // picture, so it is at most 1.0 by construction and a larger value means the mask
+        // has gone wrong. For a trunk photograph the stature is worked out from the nose-to-
+        // hip span — see LandmarkStature.NOSE_TO_HIP_FRACTION — and the whole point is that
+        // the body does not fit: a frame holding a person from the crown to just past the
+        // hips implies a stature around 1.3 times the frame's height.
+        //
+        // That value was handed straight to this constructor, which rejected it, and an
+        // IllegalArgumentException inside the scan coroutine closes the app.
+        //
+        // The arithmetic below never needed the old bound. `heightCm / bodyHeightFraction` is
+        // centimetres per unit of frame height and is well behaved for any positive fraction;
+        // three is a sanity ceiling, not a modelling assumption — a frame holding under a
+        // third of a person has no waist in it and has already been refused upstream.
+        val limit = if (statureInferred) 3.0 else 1.0
+        require(bodyHeightFraction in 0.05..limit) {
             "body must occupy a positive fraction of the frame, was $bodyHeightFraction"
         }
     }
@@ -81,7 +107,12 @@ class ScaleRecovery(
      * to dominate. The capture UI should ask the user to step back rather than silently
      * returning a measurement it does not believe.
      */
-    fun isFramingTooTight(): Boolean = bodyHeightFraction > PERSPECTIVE_WARNING_RATIO
+    fun isFramingTooTight(): Boolean =
+        // Never on an inferred stature, because there the fraction is not measuring how much
+        // of the frame the subject fills — it is reporting how much of the subject the frame
+        // missed. A trunk photograph would trip this every time and tell someone who framed
+        // their midsection deliberately, as this app advises, to step back.
+        !statureInferred && bodyHeightFraction > PERSPECTIVE_WARNING_RATIO
 
     companion object {
         /**

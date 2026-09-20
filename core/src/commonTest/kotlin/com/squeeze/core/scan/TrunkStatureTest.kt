@@ -7,6 +7,7 @@ import com.squeeze.core.model.Sex
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -158,6 +159,73 @@ class TrunkStatureTest {
         // stature, giving 1500 px against this route's 1430.
         val statureInPixels = fraction * 1994.0
         assertTrue(statureInPixels in 1350.0..1550.0, "got $statureInPixels px")
+    }
+
+    @Test
+    fun `every stature this can return is one ScaleRecovery will accept`() {
+        // **The assertion that was missing, and the app crashed for want of it.**
+        //
+        // frameFractionFromTrunk returns up to 1.6 — deliberately, because an inferred
+        // stature exceeds the frame whenever the frame does not hold the whole person, which
+        // is the only situation it exists for. ScaleRecovery required at most 1.0, because
+        // for a measured extent anything larger means the mask has gone wrong. The two were
+        // written a commit apart and never introduced, so the scan threw
+        // IllegalArgumentException inside a coroutine and the app closed on the measure
+        // button.
+        //
+        // Asserted across the whole reachable range rather than at one convenient value,
+        // because the failure lived at the top of it.
+        var hipY = 0.20
+        while (hipY <= 0.99) {
+            val fraction = LandmarkStature.frameFractionFromTrunk(
+                PosePoint(0.5, 0.02), PosePoint(0.5, hipY), PosePoint(0.5, hipY),
+            )
+            if (fraction != null) {
+                // Must not throw. Nothing else in this test matters as much as that.
+                val scale = ScaleRecovery(
+                    heightCm = 175.0,
+                    bodyHeightFraction = fraction,
+                    statureInferred = true,
+                )
+                val waistCm = scale.widthToCm(0.15, imageAspectRatio = 0.887)
+                assertTrue(
+                    waistCm in 5.0..120.0,
+                    "hip at $hipY gave a stature of $fraction and a width of $waistCm cm",
+                )
+            }
+            hipY += 0.01
+        }
+    }
+
+    @Test
+    fun `an inferred stature may exceed the frame, a measured one may not`() {
+        // A frame holding someone from the crown to just past the hips implies a stature
+        // around 1.3 times its own height. That is a correct reading, not a broken mask.
+        val tall = ScaleRecovery(
+            heightCm = 175.0,
+            bodyHeightFraction = 1.3,
+            statureInferred = true,
+        )
+        assertTrue(tall.widthToCm(0.15, 0.887) > 0.0)
+
+        // The guard stays exactly as strict where it was doing real work: a mask claiming
+        // the body is taller than the picture it came from has gone wrong.
+        assertFailsWith<IllegalArgumentException> {
+            ScaleRecovery(heightCm = 175.0, bodyHeightFraction = 1.3)
+        }
+    }
+
+    @Test
+    fun `a deliberately framed trunk is not told to step back`() {
+        // isFramingTooTight reads the fraction as "how much of the frame the subject fills",
+        // which is not what it means once the stature is inferred — there it reports how much
+        // of the subject the frame missed. Left alone, every trunk scan would have advised
+        // stepping back, which is the opposite of what this app tells people to do.
+        val trunk = ScaleRecovery(175.0, bodyHeightFraction = 1.2, statureInferred = true)
+        assertTrue(!trunk.isFramingTooTight())
+
+        val measured = ScaleRecovery(175.0, bodyHeightFraction = 0.95)
+        assertTrue(measured.isFramingTooTight(), "the real warning must still fire")
     }
 
     @Test

@@ -415,17 +415,44 @@ class ScanViewModel @Inject constructor(
         // a fabricated stature does not produce a slightly wrong scan, it produces a
         // confidently wrong one — every girth is multiplied by the same bad number.
         val result = front.scale?.let { scale ->
-            BodyScanAnalyser(
-                scale = ScaleRecovery(
-                    heightCm = profile.heightCm,
-                    // The cross-checked figure, not the silhouette's own extent. Detection
-                    // has already compared the outline against the pose landmarks and, where
-                    // they disagreed, dropped back to the reference that cannot pick up a
-                    // mirror frame — see ScaleCrossCheck.
-                    bodyHeightFraction = scale.bodyHeightFraction,
-                ),
-                imageAspectRatio = frontAspectRatio,
-            ).analyse(markers)
+            // **The trunk-scaled path degrades instead of dying, and only that path.**
+            //
+            // Enabling it turned a scan that produced no centimetres into one that produces
+            // them, which put a photograph through code it had never reached. The first
+            // attempt crashed the app on the measure button. A second bug of the same shape
+            // would do it again, and a user staring at "Squeeze.fit closed because this app
+            // has a bug" has lost the whole scan — including the shape figure, which never
+            // needed a scale at all.
+            //
+            // So a failure here falls back to exactly what this photograph did before the
+            // trunk span existed: no centimetres, the shape reading intact. That is a real
+            // outcome the app already knows how to present, not a swallowed error.
+            //
+            // Deliberately not extended to a measured scale. A full-body scan throwing is a
+            // bug in code that has always run, and hiding it would cost the evidence.
+            val measureInCentimetres: () -> ScanResult = {
+                BodyScanAnalyser(
+                    scale = ScaleRecovery(
+                        heightCm = profile.heightCm,
+                        // The cross-checked figure, not the silhouette's own extent.
+                        // Detection has already compared the outline against the pose
+                        // landmarks and, where they disagreed, dropped back to the reference
+                        // that cannot pick up a mirror frame — see ScaleCrossCheck.
+                        bodyHeightFraction = scale.bodyHeightFraction,
+                        // A trunk-framed scan's stature was worked out from the nose-to-hip
+                        // span rather than measured, so it may exceed the frame — which is a
+                        // legitimate reading and used to be an uncaught exception.
+                        statureInferred = scale.source == ScaleSource.TRUNK_SPAN,
+                    ),
+                    imageAspectRatio = frontAspectRatio,
+                ).analyse(markers)
+            }
+
+            if (scale.source == ScaleSource.TRUNK_SPAN) {
+                runCatching(measureInCentimetres).getOrNull()
+            } else {
+                measureInCentimetres()
+            }
         } ?: ScanResult(
             circumferences = Circumferences(),
             warnings = emptyList(),
