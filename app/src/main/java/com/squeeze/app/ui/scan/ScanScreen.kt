@@ -90,7 +90,10 @@ import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
+import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.ScanFraming
+import com.squeeze.core.scan.ScanSite
+import com.squeeze.core.scan.ScanWarning
 import com.squeeze.core.scan.ShapeIndices
 import com.squeeze.core.scan.SilhouetteBodyFat
 import com.google.common.util.concurrent.ListenableFuture
@@ -902,6 +905,23 @@ private fun ResultStep(
                         "No side photo, so the axis abdominal fat actually moves along was " +
                             "never measured."
                         ).takeIf { state.abdominalBodyFatPercent == null },
+                    // **Something the app could not see until it had a part model.**
+                    //
+                    // Every width in this scan is the outline of whatever was in the
+                    // photograph, and over a loose shirt that outline is the shirt. The error
+                    // is not small and it is not random: fabric only ever adds width, so a
+                    // covered midsection reports a larger waist, and a larger waist reports
+                    // more body fat, on every scan taken that way. Nothing in a one-bit mask
+                    // distinguishes that from a wider person.
+                    state.bareAbdomenFraction
+                        ?.takeIf { it < BodyPartMap.MIN_BARE_ABDOMEN }
+                        ?.let { bare ->
+                            ("Only %.0f%% of your midsection was bare skin — the rest was " +
+                                "clothing, and the waist above is the outline of the " +
+                                "clothing. Fabric can only add width, so this reading is " +
+                                "too high rather than uncertain. Retake it bare-midriff.")
+                                .format(bare * 100.0)
+                        },
                     // **The failure that used to be silent.**
                     //
                     // The tape equation needs a waist and a neck and a gap between them. When
@@ -915,13 +935,44 @@ private fun ResultStep(
                     // a neck near half the waist is a neck, and a neck much above that is a
                     // trapezius.
                     (
-                        state.result?.circumferences?.let { c ->
+                        state.result?.let { scan ->
+                            val c = scan.circumferences
                             val neck = c.neckCm
                             val waist = c.waistCm
+
+                            // The number the scan measured and then discarded. It has always
+                            // been carried in the warnings and has never reached a screen, so
+                            // a neck rejected at 52 cm and a neck never found at all produced
+                            // the same sentence.
+                            val rejectedNeckCm = scan.warnings
+                                .filterIsInstance<ScanWarning.ImplausibleMeasurement>()
+                                .firstOrNull { it.site == ScanSite.NECK }
+                                ?.centimetres
+
                             when {
                                 waist == null ->
                                     "Your waist was not measured, so the tape equation had " +
                                         "nothing to run on."
+
+                                // **Two different failures that read identically until the
+                                // part model existed.** Either nothing found a neck at all,
+                                // or one was measured and thrown out for being outside human
+                                // limits — and the app used to discard the rejected value
+                                // without showing it, so there was no way to tell which had
+                                // happened or by how much it had missed.
+                                neck == null && rejectedNeckCm != null ->
+                                    ("Your waist measured %.1f cm and your neck came out at " +
+                                        "%.1f cm, which is outside the range a neck can be " +
+                                        "on your frame — so it was thrown out rather than " +
+                                        "used, and the tape equation needs both.")
+                                        .format(waist, rejectedNeckCm)
+
+                                neck == null && !state.neckFromModel ->
+                                    ("Your waist measured %.1f cm but no bare neck was " +
+                                        "visible between your chin and your shoulders, so " +
+                                        "there is nothing for the tape equation to measure " +
+                                        "against. A collar, a hood or a head out of frame " +
+                                        "will all do it.").format(waist)
 
                                 neck == null ->
                                     "Your waist measured %.1f cm but your neck could not ".format(waist) +

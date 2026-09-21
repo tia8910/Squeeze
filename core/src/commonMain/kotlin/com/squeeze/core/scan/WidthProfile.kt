@@ -74,6 +74,17 @@ data class WidthProfile(
 
     fun heightFractionOf(row: Int): Double = row.toDouble() / torsoWidths.size.toDouble()
 
+    /**
+     * The row at a fraction of the frame's height, clamped into this profile.
+     *
+     * The inverse of [heightFractionOf], and the only sanctioned way to bring a position
+     * measured on a *different* mask into this one's row space. The part segmenter emits at
+     * 256 square whatever the photograph was, so its rows are not this profile's rows, and
+     * treating them as if they were would index the wrong band by a factor of two or three.
+     */
+    fun rowAt(heightFraction: Double): Int =
+        (heightFraction * torsoWidths.size).toInt().coerceIn(0, torsoWidths.lastIndex)
+
     // Explicit equals/hashCode: a data class compares DoubleArray by identity, which would
     // make two identical profiles unequal.
     override fun equals(other: Any?): Boolean {

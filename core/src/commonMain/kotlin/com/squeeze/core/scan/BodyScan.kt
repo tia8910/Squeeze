@@ -220,6 +220,12 @@ object AutomaticScanBuilder {
      * @param backProfile optional. A back view supplies a second, independent coronal
      *   measurement of the same body, so averaging it with the front reduces random error by
      *   roughly root-two. It adds no depth information and cannot substitute for a side view.
+     * @param neck optional, from the part segmenter — see [BodyPartMap]. When present it
+     *   **replaces** the silhouette's neck outright rather than being averaged with it,
+     *   because the two are not two measurements of the same thing: the silhouette's neck is
+     *   the narrowest row of head-plus-hair-plus-collar and the model's is bare neck skin.
+     *   Averaging a measurement with a quantity that is not the measurement is how a pipeline
+     *   ends up confidently between two answers, neither of them right.
      * @return markers for every site the available views support. A site needing a width
      *   that was not found is dropped rather than guessed.
      */
@@ -231,10 +237,20 @@ object AutomaticScanBuilder {
         backProfile: WidthProfile? = null,
         backAnchors: PoseAnchors? = null,
         hipsInFrame: Boolean = true,
+        neck: NeckReading? = null,
     ): List<ScanMarker> {
-        val frontSites = AnatomicalLevelFinder.detectSites(
+        val detected = AnatomicalLevelFinder.detectSites(
             frontProfile, frontAnchors, hipsInFrame = hipsInFrame,
         )
+
+        // **The one site the silhouette could not find, and the reason this app had no tape
+        // reading at all.** A neck the model located is added even when the silhouette search
+        // returned nothing, which is the usual case and was the whole failure: no neck, no
+        // `waist − neck`, no Navy estimate, and a constant printed in its place.
+        val frontSites = when (neck) {
+            null -> detected
+            else -> detected + (ScanSite.NECK to frontProfile.rowAt(neck.heightFraction))
+        }
         val sideSites = if (sideProfile != null && sideAnchors != null) {
             AnatomicalLevelFinder.detectSites(
                 sideProfile, sideAnchors, hipsInFrame = hipsInFrame,
@@ -255,12 +271,18 @@ object AutomaticScanBuilder {
                 site == ScanSite.ARM ||
                 site == ScanSite.CALF
 
-            val frontWidth = frontProfile.widthFor(frontRow, useLeg)
+            // The model's width where it has one; the silhouette's everywhere else.
+            val fromModel = if (site == ScanSite.NECK) neck?.widthFraction else null
+
+            val frontWidth = fromModel ?: frontProfile.widthFor(frontRow, useLeg)
             if (frontWidth <= 0.0) return@mapNotNull null
 
             // A back view measures the same axis as the front, so the two are averaged
-            // rather than treated as different quantities.
-            val coronalWidth = backSites[site]
+            // rather than treated as different quantities. A neck read from bare skin is
+            // exempt: the back view's neck is a silhouette neck, and averaging the two would
+            // put back most of the error the model was brought in to remove.
+            val backRow = if (fromModel == null) backSites[site] else null
+            val coronalWidth = backRow
                 ?.let { backProfile?.widthFor(it, useLeg) }
                 ?.takeIf { it > 0.0 }
                 ?.let { (frontWidth + it) / 2.0 }

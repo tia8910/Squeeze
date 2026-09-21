@@ -25,6 +25,7 @@ import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AutomaticScanBuilder
+import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
 import com.squeeze.core.scan.PostureAnalysis
@@ -180,6 +181,22 @@ data class ScanUiState(
      * purpose. A release that let it settle a reading is described in the view model.
      */
     val definitionScore: Double? = null,
+    /**
+     * True when the neck in [tape] came from the part-segmentation model rather than being
+     * absent.
+     *
+     * Surfaced because the difference is the whole scan. Without it there is no `waist − neck`
+     * and no tape reading at all, and the result screen has spent several releases printing
+     * the outline method's constant while saying "not resolved by the photo" underneath.
+     */
+    val neckFromModel: Boolean = false,
+    /**
+     * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
+     *
+     * Null when no part mask was produced. Below [BodyPartMap.MIN_BARE_ABDOMEN] the definition
+     * score is withheld rather than shown, because at that point it is measuring cloth.
+     */
+    val bareAbdomenFraction: Double? = null,
 ) {
     /**
      * What the photograph supports, and nothing else.
@@ -423,6 +440,17 @@ class ScanViewModel @Inject constructor(
             backProfile = back?.profile,
             backAnchors = back?.anchors,
             hipsInFrame = front.framing.hipsInShot,
+            // **The neck the part model found, and the whole reason the tape path can run.**
+            //
+            // The silhouette search that used to supply this looked for the narrowest row
+            // between the chin and the shoulders in a one-bit mask, where neck, hair, collar
+            // and trapezius are all the same colour. On real photographs it returned nothing
+            // at all, which meant no `waist − neck`, no Navy estimate, and the outline
+            // method's constant printed under the words "not resolved by the photo".
+            //
+            // Null here is still null downstream — a covered neck is refused rather than
+            // guessed — but it is now refused for a reason the app can name.
+            neck = front.neck,
         )
 
         // Centimetres only where the photograph can support them. A trunk-framed shot has
@@ -603,7 +631,17 @@ class ScanViewModel @Inject constructor(
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
-            definitionScore = definition?.takeIf { it.usable }?.score,
+            // Withheld over clothing. The metric reads shadow contrast across the midsection
+            // and a shirt supplies plenty of it — harder-edged than skin, in fact, because a
+            // fold casts a line that no amount of body fat does. Until the part model existed
+            // there was no way to tell the two apart, so a clothed scan produced a score in
+            // the same units and the same range as a bare one and nothing said which it was.
+            definitionScore = definition
+                ?.takeIf { it.usable }
+                ?.score
+                ?.takeIf { (front.bareAbdomenFraction ?: 1.0) >= BodyPartMap.MIN_BARE_ABDOMEN },
+            neckFromModel = front.neck != null,
+            bareAbdomenFraction = front.bareAbdomenFraction,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.
             posture = front.geometry

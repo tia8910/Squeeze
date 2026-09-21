@@ -12,6 +12,7 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.FrontalityCheck
 import com.squeeze.core.scan.LandmarkStature
+import com.squeeze.core.scan.NeckReading
 import com.squeeze.core.scan.PoseAnchors
 import com.squeeze.core.scan.PosePoint
 import com.squeeze.core.scan.ScanFraming
@@ -61,6 +62,23 @@ data class DetectedBody(
      * broken scan, and the user has no way to tell that it is not.
      */
     val quarterTurnsApplied: Int = 0,
+    /**
+     * The neck, as the part-segmentation model read it — see [com.squeeze.core.scan.BodyPartMap].
+     *
+     * Null whenever the photograph does not show bare neck skin between the chin and the
+     * shoulders: a collar, a hood, a head out of frame. Null is an answer here, not a gap to
+     * be filled; the silhouette's neck is not a weaker version of this measurement, it is a
+     * different quantity that happened to be stored in the same field.
+     */
+    val neck: NeckReading? = null,
+    /**
+     * What share of the midsection is bare skin rather than clothing, 0.0 to 1.0.
+     *
+     * [com.squeeze.core.scan.AbdominalDefinition] scores shadow gradients across the abdomen
+     * and cannot tell a waistband from a linea alba, so it will happily return a number for a
+     * man in a t-shirt. This is what lets the caller know that number is fabric.
+     */
+    val bareAbdomenFraction: Double? = null,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -124,14 +142,28 @@ sealed interface DetectionResult {
 /**
  * Finds a body in a photograph, entirely on-device.
  *
- * Two models run per image. The pose landmarker locates joints, which is what it is good
- * at; the segmenter produces a body mask, which is reduced to a per-row width profile. The
- * division of labour matters: a pose model cannot see soft tissue, so it cannot find a
- * natural waist, while a mask has no idea which part of a silhouette is a waist. Together
- * the joints bound the search and the silhouette decides the exact level.
+ * Three models run per image, each answering the question the other two cannot.
  *
- * Nothing here touches the network — the models ship inside the APK and the app holds no
- * INTERNET permission, so a body photo cannot leave the device.
+ * The **pose landmarker** locates joints, which is what it is good at. The **selfie
+ * segmenter** produces a body outline, which is reduced to a per-row width profile. The
+ * division of labour between those two matters: a pose model cannot see soft tissue, so it
+ * cannot find a natural waist, while an outline has no idea which part of a silhouette is a
+ * waist. Together the joints bound the search and the silhouette decides the exact level.
+ *
+ * The **part segmenter** is the third, and it was added because those two together still
+ * could not find a neck. An outline cannot separate a neck from the hair beside it or the
+ * collar beneath it, and a pose model has no neck landmark at all — so `waist − neck` could
+ * not be formed, the Navy equation returned null, and the app fell back to printing the
+ * silhouette method's constant to every user who reached it. The part model labels each
+ * pixel as background, hair, body-skin, face-skin, clothes or accessory, which turns that
+ * unreadable band into bare skin below a face and above a pair of shoulders. See
+ * [com.squeeze.core.scan.BodyPartMap].
+ *
+ * Nothing here touches the network — all three models ship inside the APK and the app holds
+ * no INTERNET permission, so a body photo cannot leave the device. That is what makes
+ * on-device inference the only form of AI this app is allowed: there is no endpoint to call
+ * and no permission with which to call one, and the guarantee is enforced by the operating
+ * system rather than by this comment.
  *
  * Not thread-safe: MediaPipe tasks hold native state. Callers should serialise access, and
  * must [close] to release the native handles.
@@ -143,6 +175,17 @@ class BodyDetector @Inject constructor(
 
     private var poseLandmarker: PoseLandmarker? = null
     private var segmenter: ImageSegmenter? = null
+
+    /**
+     * The part segmenter: six classes rather than one, and the only model here that can see
+     * anatomy instead of outline. See [com.squeeze.core.scan.BodyPartMap].
+     *
+     * Separate from [segmenter] rather than replacing it. The binary selfie model traces the
+     * body's outer edge at the photograph's own resolution and is what every width in the
+     * scan is measured on; this one emits 256 square and is used for the questions an outline
+     * cannot answer — where the face stops, which pixels are hair, which are cloth.
+     */
+    private var partSegmenter: ImageSegmenter? = null
 
     private fun ensureLoaded() {
         if (poseLandmarker == null) {
@@ -168,6 +211,22 @@ class BodyDetector @Inject constructor(
                     .setBaseOptions(
                         BaseOptions.builder()
                             .setModelAssetPath(SEGMENTER_MODEL_ASSET)
+                            .build(),
+                    )
+                    .setRunningMode(RunningMode.IMAGE)
+                    .setOutputCategoryMask(true)
+                    .setOutputConfidenceMasks(false)
+                    .build(),
+            )
+        }
+
+        if (partSegmenter == null) {
+            partSegmenter = ImageSegmenter.createFromOptions(
+                context,
+                ImageSegmenter.ImageSegmenterOptions.builder()
+                    .setBaseOptions(
+                        BaseOptions.builder()
+                            .setModelAssetPath(PART_SEGMENTER_MODEL_ASSET)
                             .build(),
                     )
                     .setRunningMode(RunningMode.IMAGE)
@@ -299,6 +358,28 @@ class BodyDetector @Inject constructor(
         // lets a torso run be cut back when an arm is touching the body.
         val trunk = geometry?.let { TrunkBounds.from(it, maskHeight) }
 
+        // **The third inference, and the only one that can see which part of a person a
+        // pixel belongs to.**
+        //
+        // It answers two questions the silhouette above cannot. Where is the neck — bare skin
+        // below the face and above the shoulders, with the hair that used to be measured as
+        // part of it now a class of its own. And how much of the midsection is skin rather
+        // than cloth, which is what tells the definition metric whether it is scoring a body.
+        //
+        // Wrapped, and every downstream use is nullable, because this is an addition to a
+        // pipeline that already worked without it. A model that fails to load, or a mask that
+        // comes back in an unexpected shape, must cost the neck and nothing else — not the
+        // widths, not the shape reading, and certainly not the scan.
+        val parts = geometry?.let { pose ->
+            runCatching {
+                val partMask = partSegmenter?.segment(image)?.categoryMask()?.orElse(null)
+                partMask?.let {
+                    PartMaskReader.readNeck(it, pose) to
+                        PartMaskReader.bareAbdomenFraction(it, pose)
+                }
+            }.getOrNull()
+        }
+
         val profile = MaskWidthExtractor.extract(mask, maskWidth, maskHeight, trunk)
             ?: return DetectionResult.Failure(DetectionFailure.SegmentationFailed)
 
@@ -337,7 +418,15 @@ class BodyDetector @Inject constructor(
             }
 
             return DetectionResult.Success(
-                DetectedBody(profile, anchors, geometry, scale, ScanFraming.FULL_BODY),
+                DetectedBody(
+                    profile = profile,
+                    anchors = anchors,
+                    geometry = geometry,
+                    scale = scale,
+                    framing = ScanFraming.FULL_BODY,
+                    neck = parts?.first,
+                    bareAbdomenFraction = parts?.second,
+                ),
             )
         }
 
@@ -384,7 +473,15 @@ class BodyDetector @Inject constructor(
                 ?.let { ScaleDecision(it, ScaleSource.TRUNK_SPAN, disagreementPercent = null) }
 
             return DetectionResult.Success(
-                DetectedBody(profile, anchors, geometry, trunkScale, ScanFraming.TORSO),
+                DetectedBody(
+                    profile = profile,
+                    anchors = anchors,
+                    geometry = geometry,
+                    scale = trunkScale,
+                    framing = ScanFraming.TORSO,
+                    neck = parts?.first,
+                    bareAbdomenFraction = parts?.second,
+                ),
             )
         }
 
@@ -404,7 +501,15 @@ class BodyDetector @Inject constructor(
                 ?.let { return DetectionResult.Failure(DetectionFailure.NotFacingCamera(it)) }
 
             return DetectionResult.Success(
-                DetectedBody(profile, anchors, geometry, scale = null, ScanFraming.UPPER_BODY),
+                DetectedBody(
+                    profile = profile,
+                    anchors = anchors,
+                    geometry = geometry,
+                    scale = null,
+                    framing = ScanFraming.UPPER_BODY,
+                    neck = parts?.first,
+                    bareAbdomenFraction = parts?.second,
+                ),
             )
         }
 
@@ -501,11 +606,14 @@ class BodyDetector @Inject constructor(
         poseLandmarker = null
         segmenter?.close()
         segmenter = null
+        partSegmenter?.close()
+        partSegmenter = null
     }
 
     private companion object {
         const val POSE_MODEL_ASSET = "pose_landmarker_lite.task"
         const val SEGMENTER_MODEL_ASSET = "selfie_segmenter.tflite"
+        const val PART_SEGMENTER_MODEL_ASSET = "selfie_multiclass_256x256.tflite"
 
         const val MIN_POSE_CONFIDENCE = 0.5f
 
