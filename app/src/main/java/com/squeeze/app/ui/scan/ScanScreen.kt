@@ -902,6 +902,41 @@ private fun ResultStep(
                         "No side photo, so the axis abdominal fat actually moves along was " +
                             "never measured."
                         ).takeIf { state.abdominalBodyFatPercent == null },
+                    // **The failure that used to be silent.**
+                    //
+                    // The tape equation needs a waist and a neck and a gap between them. When
+                    // the neck is mis-measured the gap collapses, the equation goes under two
+                    // per cent, and it returns null — so a scan that had measured both sites
+                    // printed the outline's constant and said nothing about why. A
+                    // competition-lean bodybuilder and a soft-midsectioned man both came back
+                    // at 11.6% with a waist in hand.
+                    //
+                    // Now it prints the two numbers it could not use. They are the diagnosis:
+                    // a neck near half the waist is a neck, and a neck much above that is a
+                    // trapezius.
+                    (
+                        state.result?.circumferences?.let { c ->
+                            val neck = c.neckCm
+                            val waist = c.waistCm
+                            when {
+                                waist == null ->
+                                    "Your waist was not measured, so the tape equation had " +
+                                        "nothing to run on."
+
+                                neck == null ->
+                                    "Your waist measured %.1f cm but your neck could not ".format(waist) +
+                                        "be measured, and the tape equation needs both."
+
+                                else ->
+                                    "Your waist measured %.1f cm and your neck %.1f cm. "
+                                        .format(waist, neck) +
+                                        "The tape equation works on the gap between them " +
+                                        "and this one is too small to give a sane answer — " +
+                                        "a neck reading much over half the waist is the " +
+                                        "trapezius, not the neck."
+                            }
+                        }
+                        ).takeIf { state.tape == null },
                 ),
             )
         }
