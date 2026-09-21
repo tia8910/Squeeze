@@ -843,8 +843,13 @@ private fun ResultStep(
 
         // Whether the outline gave up. Computed here rather than inside the headline because
         // it decides the order of this whole screen, not just one card's wording.
+        // Whether the outline gave up *and* nothing else in the photograph answered. The
+        // second half is new: a trunk-framed scan measures a waist and a neck, so the tape
+        // equation runs, and the card was still printing the outline's constant over the
+        // words "not resolved by the photo" while a real measurement sat unused beside it.
         val bounded = shape != null &&
-            shape.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
+            shape.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT &&
+            state.tape == null
 
         // The appearance match, as an estimate rather than a number, so it carries its own
         // error alongside it.
@@ -862,7 +867,9 @@ private fun ResultStep(
         //
         // Off the plateau the outline measured this body, so the headline stays the outline's
         // and the match goes back to being a cross-check further down.
-        val headline = if (bounded) visual ?: shape else shape
+        // The tape reading leads whenever the photograph produced one: it is measured from
+        // this body's own girths rather than bounded by the method's limits.
+        val headline = state.tape ?: if (bounded) visual ?: shape else shape
 
         headline?.let {
             ShapeHeadline(
@@ -871,19 +878,30 @@ private fun ResultStep(
                 // Non-null only when the appearance match has replaced a bound, so the copy
                 // can say what the outline managed on its own before being superseded.
                 supersededBound = shape.takeIf { _ -> bounded && visual != null },
+                fromTape = state.tape != null,
+                scaleInferred = state.scaleFromTrunk,
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
                 // no later step can undo.
+                // **Each of these is wrapped, and that is a fix rather than a style.**
+                //
+                // `+` binds looser than `.takeIf`, so `"a" + "b".takeIf { false }` is not null
+                // — it is the string "anull". Both entries below were written that way, which
+                // meant the hip blocker showed on every scan whatever the framing, ending in
+                // the word "null". A user photographed with his hips plainly in shot was told
+                // "your waist was read against your shoulders ... because your arms null".
                 blockers = listOfNotNull(
                     state.lightingAdvice,
                     state.poseAdvice,
-                    "Your hips were not in shot, so your waist was read against your " +
-                        "shoulders — the weaker of the two denominators, because your arms " +
-                        "attach there."
-                        .takeIf { _ -> state.framing == ScanFraming.UPPER_BODY },
-                    "No side photo, so the axis abdominal fat actually moves along was " +
-                        "never measured."
-                        .takeIf { _ -> state.abdominalBodyFatPercent == null },
+                    (
+                        "Your hips were not in shot, so your waist was read against your " +
+                            "shoulders — the weaker of the two denominators, because your " +
+                            "arms attach there."
+                        ).takeIf { state.framing == ScanFraming.UPPER_BODY },
+                    (
+                        "No side photo, so the axis abdominal fat actually moves along was " +
+                            "never measured."
+                        ).takeIf { state.abdominalBodyFatPercent == null },
                 ),
             )
         }
@@ -1419,6 +1437,16 @@ private fun ShapeHeadline(
      */
     supersededBound: BodyFatEstimate? = null,
     /**
+     * True when [estimate] is the tape equation run on the girths this photograph produced,
+     * rather than the outline's reading of its border.
+     *
+     * The card had no way to express this, which is why a scan that measured a waist, a neck
+     * and a chest still printed the outline's constant under "not resolved by the photo".
+     */
+    fromTape: Boolean = false,
+    /** True when those girths rest on a stature worked out from the trunk, not measured. */
+    scaleInferred: Boolean = false,
+    /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
      *
      * Passed in rather than left to the cards further down the screen, because on an
@@ -1456,6 +1484,7 @@ private fun ShapeHeadline(
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
             label = when {
+                fromTape -> "Measured from your waist and neck"
                 fromAppearance -> "From how you look"
                 bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
@@ -1471,6 +1500,9 @@ private fun ShapeHeadline(
             // false claim of precision is worse than the honest refusal it replaced.
             band = when {
                 bounded -> "Not resolved by the photo"
+                // Said because it is the thing that was untrue for a long time and is now
+                // true: the girths came off this photograph and the figure came off them.
+                fromTape -> "Read from your photo"
                 fromAppearance -> "Your appearance, not your outline"
                 else -> null
             },
@@ -1478,6 +1510,23 @@ private fun ShapeHeadline(
 
         Text(
             text = when {
+                // The scan measured this body rather than bounding it. Worth saying what it
+                // measured, because "read from your photo" has been claimed before on the
+                // strength of something that turned out to be reading the camera's noise.
+                fromTape ->
+                    "Your waist and your neck were measured off this photograph and put " +
+                        "through the tape equation — the same one a fabric tape feeds, on " +
+                        "girths the picture supplied instead of your hands. Nothing here " +
+                        "is the method's own floor and nothing came from your weight." +
+                        if (scaleInferred) {
+                            " Your feet were out of frame, so your height in the picture " +
+                                "was worked out from your proportions rather than measured. " +
+                                "That softens the scale, and the range above is already " +
+                                "widened for it."
+                        } else {
+                            ""
+                        }
+
                 // The outline bounded it and the ladder answered. Both numbers are printed,
                 // because a user who places himself well under what his own outline would
                 // allow has told the app something it should not quietly average away.

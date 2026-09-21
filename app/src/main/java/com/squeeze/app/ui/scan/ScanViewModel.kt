@@ -15,9 +15,11 @@ import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
+import com.squeeze.core.bodycomp.BodyFatCalculator
 import com.squeeze.core.bodycomp.LeanMassPlausibility
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
+import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
@@ -28,6 +30,7 @@ import com.squeeze.core.scan.BodyScanAnalyser
 import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
+import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanFraming
@@ -156,6 +159,18 @@ data class ScanUiState(
      * scale error multiplies every one of them together.
      */
     val scaleFromTrunk: Boolean = false,
+    /**
+     * What the tape equation made of the girths this photograph produced.
+     *
+     * **Here because the result card could not report it.** That card has only ever shown
+     * [shape] — the outline's own reading — so a scan that measured a waist, a neck and a
+     * chest still printed the outline's constant under the words "not resolved by the photo".
+     * The photograph had resolved it; the card had nowhere to say so.
+     *
+     * Null when the scan produced no usable girths, which is the honest case the copy was
+     * written for.
+     */
+    val tape: BodyFatEstimate? = null,
     /**
      * How much abdominal structure the front photograph showed, in arbitrary units.
      *
@@ -563,6 +578,28 @@ class ScanViewModel @Inject constructor(
             knownWeightKg = knownWeight,
             framing = front.framing,
             scaleFromTrunk = front.scale?.source == ScaleSource.TRUNK_SPAN,
+            // The tape equation on the girths this photograph produced, carrying the same
+            // widened interval the saved row will get, so the card and the record agree
+            // rather than quietly differing by a couple of points.
+            tape = BodyFatCalculator.navy(profile.toScanProfile(), result.circumferences)
+                ?.let { navy ->
+                    val fromScale = if (front.scale?.source == ScaleSource.TRUNK_SPAN) {
+                        BodyFatCalculator.navyScaleSensitivityPercent(
+                            profile.toScanProfile(),
+                            result.circumferences,
+                            LandmarkStature.TRUNK_SPAN_SCALE_ERROR,
+                        ) ?: 0.0
+                    } else {
+                        0.0
+                    }
+                    val base = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent
+                    navy.copy(
+                        method = EstimationMethod.PHOTO_FRONT_ONLY,
+                        standardErrorPercent = kotlin.math.sqrt(
+                            base * base + fromScale * fromScale,
+                        ),
+                    )
+                },
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,

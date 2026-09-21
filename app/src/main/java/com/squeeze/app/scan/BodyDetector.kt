@@ -427,6 +427,17 @@ class BodyDetector @Inject constructor(
             ankleLeft = point(LANDMARK_ANKLE_LEFT),
             ankleRight = point(LANDMARK_ANKLE_RIGHT),
             nose = point(LANDMARK_NOSE),
+            // The same pair buildAnchors uses for the full-body chin row. Carried on the
+            // geometry so a trunk-framed scan can reach it too, instead of synthesising a
+            // chin from the trunk span and landing the neck search on the trapezius.
+            mouth = listOfNotNull(point(LANDMARK_MOUTH_LEFT), point(LANDMARK_MOUTH_RIGHT))
+                .takeIf { it.isNotEmpty() }
+                ?.let { points ->
+                    PosePoint(
+                        x = points.sumOf { it.x } / points.size,
+                        y = points.sumOf { it.y } / points.size,
+                    )
+                },
         )
     }
 

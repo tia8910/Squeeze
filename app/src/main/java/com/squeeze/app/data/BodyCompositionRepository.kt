@@ -3,6 +3,7 @@ package com.squeeze.app.data
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.bodycomp.CalibrationPoint
 import com.squeeze.core.bodycomp.LeanMassPlausibility
@@ -205,7 +206,7 @@ class BodyCompositionRepository @Inject constructor(
                         val fromScale = BodyFatCalculator.navyScaleSensitivityPercent(
                             profile,
                             entity.toCircumferences(),
-                            TRUNK_SCALE_ERROR_FRACTION,
+                            LandmarkStature.TRUNK_SPAN_SCALE_ERROR,
                         ) ?: 0.0
                         navy.copy(
                             method = EstimationMethod.PHOTO_FRONT_ONLY,
@@ -473,20 +474,6 @@ class BodyCompositionRepository @Inject constructor(
          */
         const val SHAPE_DISAGREEMENT_POINTS = 6.0
 
-        /**
-         * How far out a stature inferred from the trunk span is taken to be.
-         *
-         * The nose-to-hip span is 0.395 of stature against the ankle route's 0.886, so the
-         * same landmark error counts for 2.2 times as much, and trunk-to-stature proportion
-         * varies more between adults than whole-body proportion does. Five per cent is the
-         * honest order of that, against the two per cent the ankle span carries.
-         *
-         * It is not a body-fat figure and never becomes one directly — it is fed through
-         * [com.squeeze.core.bodycomp.BodyFatCalculator.navyScaleSensitivityPercent], which
-         * converts it using the equation's own coefficients. So getting it somewhat wrong
-         * widens or narrows an interval; it cannot move a number.
-         */
-        const val TRUNK_SCALE_ERROR_FRACTION = 0.05
 
         /**
          * Within-day bodyweight scatter, as a fraction of bodyweight.

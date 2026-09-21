@@ -143,6 +143,25 @@ object LandmarkStature {
     const val NOSE_TO_HIP_FRACTION = 0.395
 
     /**
+     * How far out a stature taken from [NOSE_TO_HIP_FRACTION] is assumed to be.
+     *
+     * Five per cent, against the two the ankle span carries, for the two reasons above: the
+     * span is less than half as long, so the same landmark error counts for 2.2 times as
+     * much, and trunk-to-stature proportion varies more between adults than whole-body
+     * proportion does.
+     *
+     * It is not a body-fat figure and never becomes one directly — it is fed through
+     * [com.squeeze.core.bodycomp.BodyFatCalculator.navyScaleSensitivityPercent], which
+     * converts it using the equation's own coefficients. So getting it somewhat wrong widens
+     * or narrows an interval; it cannot move a number.
+     *
+     * Lives here rather than beside the repository that first used it, because it describes
+     * this span's accuracy and nothing else. The scan screen needs it too, to show the same
+     * interval the saved row will carry.
+     */
+    const val TRUNK_SPAN_SCALE_ERROR = 0.05
+
+    /**
      * Stature from the trunk alone, for a photograph with no ankles in it.
      *
      * @return null when the nose or both hips are missing, on the same principle as the ankle
