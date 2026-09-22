@@ -924,9 +924,14 @@ private fun ResultStep(
         // floor, below the tape equation (which measured this body's girths) and below a band
         // the user picked on the ladder themselves (which is their own call on their own
         // body). Where the outline did resolve, the outline leads and this does not.
+        //
+        // It leads every photograph it could read, above the tape equation too. The tape
+        // runs on girths converted from pixels through a scale, and on the photographs this
+        // was checked against those girths read small: one scan put a man the model read at
+        // about 15% on 10.3%. A band the user picks on the ladder still overrides it, because
+        // that is their own call on their own body.
         val ai = state.appearance
-        val headline = state.tape
-            ?: if (bounded) visual ?: ai ?: shape else shape ?: ai
+        val headline = visual.takeIf { bounded } ?: ai ?: state.tape ?: shape
         val fromAi = ai != null && headline === ai
 
         headline?.let {
@@ -936,7 +941,7 @@ private fun ResultStep(
                 // Non-null only when the appearance match has replaced a bound, so the copy
                 // can say what the outline managed on its own before being superseded.
                 supersededBound = shape.takeIf { _ -> bounded && (visual != null || fromAi) },
-                fromTape = state.tape != null,
+                fromTape = state.tape != null && headline === state.tape,
                 fromAi = fromAi,
                 scaleInferred = state.scaleFromTrunk,
                 // Ordered by how much each one costs. Light first: it is the only one that

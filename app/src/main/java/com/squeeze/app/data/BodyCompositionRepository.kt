@@ -379,6 +379,29 @@ class BodyCompositionRepository @Inject constructor(
         //
         // Tape and skinfold entries are untouched: for those the BMI fallback is what it was
         // always documented to be, a first-run placeholder before anything has been measured.
+        // **On a photo scan, the on-device model's reading is the answer.**
+        //
+        // Every other candidate a photograph produces reads the body's edge — its girths,
+        // its outline — and the edge cannot tell a stage-lean body from a soft one with the
+        // same waist; both test photographs came out at a waist-to-height of 0.42. Blending
+        // them in pulled the stage-lean bodybuilder from the model's 7.0% to 8.1%, and put a
+        // man the model read at about 15% on 12.1% because the tape equation, fed girths that
+        // read small, said 10.3%. The appearance reading goes into the column the scan
+        // screen writes it to; a band the user picked themselves lands in the same column
+        // and is taken the same way, as their own call.
+        //
+        // A reference scan still outranks it. That is a measurement of the answer rather
+        // than an estimate of it, and it is what calibration fits the model against.
+        if (fromPhoto) {
+            val answer = candidates.firstOrNull { it.method == EstimationMethod.REFERENCE_SCAN }
+                ?: candidates.firstOrNull { it.method == EstimationMethod.VISUAL_ASSESSMENT }
+            if (answer != null) {
+                return LeanMassPlausibility.filter(listOf(answer), profile, entity.weightKg)
+                    .firstOrNull()
+                    ?: LeanMassPlausibility.clampToRange(answer, profile, entity.weightKg)
+            }
+        }
+
         val photoDerived = candidates.any {
             it.method == EstimationMethod.PHOTO_SHAPE ||
                 it.method == EstimationMethod.PHOTO_SILHOUETTE ||

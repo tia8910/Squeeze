@@ -43,6 +43,15 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // **64-bit ARM only.** Three libraries here carry native code — ONNX Runtime for the
+        // on-device model, MediaPipe, SQLCipher — and each ships a copy per processor type.
+        // Four types meant four copies, most of the non-model weight of the APK, for x86
+        // emulators and 32-bit phones. Every phone Play has required 64-bit support on since
+        // 2019 runs arm64-v8a. Add "x86_64" here to run on an emulator.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+
 
         // Play Console licensing key, used by PurchaseVerifier. Blank disables local
         // verification and falls back to trusting the Play Store's own response, which is
