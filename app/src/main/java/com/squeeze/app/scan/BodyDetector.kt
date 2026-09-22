@@ -12,7 +12,9 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.FrontalityCheck
 import com.squeeze.core.scan.LandmarkStature
+import com.squeeze.core.scan.NeckOutcome
 import com.squeeze.core.scan.NeckReading
+import com.squeeze.core.scan.NeckRefusal
 import com.squeeze.core.scan.PoseAnchors
 import com.squeeze.core.scan.PosePoint
 import com.squeeze.core.scan.ScanFraming
@@ -89,6 +91,14 @@ data class DetectedBody(
      * trapezius.
      */
     val partMaskRead: Boolean = false,
+    /**
+     * Why the part model found no neck, when it ran and found none.
+     *
+     * Named because each reason asks something different of the person holding the camera,
+     * and the commonest — a chin resting on flexed shoulders, so that no neck is in the
+     * picture at all — was being measured as a 54 cm neck for five releases.
+     */
+    val neckRefusal: NeckRefusal? = null,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -477,7 +487,8 @@ class BodyDetector @Inject constructor(
                     geometry = geometry,
                     scale = scale,
                     framing = ScanFraming.FULL_BODY,
-                    neck = parts?.first,
+                    neck = (parts?.first as? NeckOutcome.Found)?.reading,
+                    neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
                 ),
@@ -533,7 +544,8 @@ class BodyDetector @Inject constructor(
                     geometry = geometry,
                     scale = trunkScale,
                     framing = ScanFraming.TORSO,
-                    neck = parts?.first,
+                    neck = (parts?.first as? NeckOutcome.Found)?.reading,
+                    neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
                 ),
@@ -562,7 +574,8 @@ class BodyDetector @Inject constructor(
                     geometry = geometry,
                     scale = null,
                     framing = ScanFraming.UPPER_BODY,
-                    neck = parts?.first,
+                    neck = (parts?.first as? NeckOutcome.Found)?.reading,
+                    neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
                 ),

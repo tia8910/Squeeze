@@ -91,6 +91,7 @@ import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.BodyPartMap
+import com.squeeze.core.scan.NeckRefusal
 import com.squeeze.core.scan.ScanFraming
 import com.squeeze.core.scan.ScanSite
 import com.squeeze.core.scan.ScanWarning
@@ -1012,6 +1013,30 @@ private fun ResultStep(
                                         "on your frame — so it was thrown out rather than " +
                                         "used, and the tape equation needs both.")
                                         .format(waist, rejectedNeckCm) + neckProvenance(state)
+
+                                // Named by what the model actually saw, because each reason
+                                // needs a different retake — and the commonest, a chin resting
+                                // on flexed shoulders, was being measured as a 54 cm neck.
+                                neck == null && state.neckRefusal == NeckRefusal.HIDDEN ->
+                                    ("Your waist measured %.1f cm, but your neck isn't " +
+                                        "visible in this photo: your chin sits down on your " +
+                                        "shoulders and traps, so what's under your jaw is " +
+                                        "trapezius, not neck. Flexed poses and a camera held " +
+                                        "below chest height both do this. For a reading, " +
+                                        "stand relaxed with your arms a little away from your " +
+                                        "sides, chin level, camera at chest height.")
+                                        .format(waist)
+
+                                neck == null && state.neckRefusal == NeckRefusal.COVERED ->
+                                    ("Your waist measured %.1f cm, but your neck is covered " +
+                                        "— a collar, hood or scarf — so it can't be measured. " +
+                                        "Retake it with your neck bare.").format(waist)
+
+                                neck == null && state.neckRefusal == NeckRefusal.NO_FACE ->
+                                    ("Your waist measured %.1f cm, but your face wasn't " +
+                                        "found, and the neck is located from the chin. Keep " +
+                                        "your head in the frame, facing the camera.")
+                                        .format(waist)
 
                                 neck == null && !state.neckFromModel ->
                                     ("Your waist measured %.1f cm but no bare neck was " +

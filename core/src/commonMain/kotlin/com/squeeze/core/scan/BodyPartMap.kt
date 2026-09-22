@@ -54,6 +54,24 @@ data class NeckReading(
     val waistWidthFraction: Double? = null,
 )
 
+/** Why a photograph produced no neck, each calling for something different from the user. */
+enum class NeckRefusal {
+    /** No face in the mask: the head is out of frame, turned away, or covered. */
+    NO_FACE,
+
+    /** The chin sits on the shoulders, so no neck column is visible. */
+    HIDDEN,
+
+    /** The neck is covered by a collar, hood or scarf. */
+    COVERED,
+}
+
+/** What the part model made of the neck. */
+sealed interface NeckOutcome {
+    data class Found(val reading: NeckReading) : NeckOutcome
+    data class Refused(val reason: NeckRefusal) : NeckOutcome
+}
+
 /**
  * Reads anatomy off a part-segmentation mask.
  *
@@ -196,6 +214,18 @@ object BodyPartMap {
     const val NECK_RISE = 1.5
 
     /**
+     * Fewest rows of neck, as a share of the face's own height, for there to be a neck.
+     *
+     * A visible neck runs from the chin to the trapezius line for a third or more of the face
+     * height in a front photograph taken at chest height with the head level. Under a sixth,
+     * the chin is resting on the shoulders — a flexed pose, a dropped chin, a camera held low
+     * — and what lies under the jaw is the top of the trapezius. Set well below any real neck
+     * so it only catches the photograph that has none; on the one that prompted it the neck
+     * ran for a sixteenth.
+     */
+    const val MIN_NECK_TO_FACE_HEIGHT = 0.15
+
+    /**
      * Share of the midsection that must be bare skin before a definition score means anything.
      *
      * [AbdominalDefinition] measures the contrast of shadow across an abdomen. Fabric has
@@ -224,11 +254,30 @@ object BodyPartMap {
         width: Int,
         height: Int,
         shoulderRow: Int,
-    ): NeckReading? {
-        if (width <= 0 || height <= 0 || labels.size < width * height) return null
+    ): NeckReading? =
+        (readNeckOutcome(labels, width, height, shoulderRow) as? NeckOutcome.Found)?.reading
+
+    /**
+     * Locates the neck, or says exactly why there is none.
+     *
+     * Every refusal is named, because the four ways a photograph can fail to show a neck call
+     * for four different things from the person holding the camera, and "could not be
+     * measured" helps with none of them.
+     */
+    fun readNeckOutcome(
+        labels: ByteArray,
+        width: Int,
+        height: Int,
+        shoulderRow: Int,
+    ): NeckOutcome {
+        if (width <= 0 || height <= 0 || labels.size < width * height) {
+            return NeckOutcome.Refused(NeckRefusal.NO_FACE)
+        }
 
         // The face, which supplies both ends of the search: its lowest row is the top of the
-        // band, and its horizontal centre is the midline the neck run has to contain.
+        // band, its horizontal centre is the midline the neck run has to contain, and its
+        // height is what a neck's own height is judged against.
+        var faceTop = -1
         var faceBottom = -1
         // Int rather than Long: the largest mask this sees is a few hundred square, so the
         // column sum cannot approach the range, and Kotlin/JS pays for every Long it is given.
@@ -248,19 +297,21 @@ object BodyPartMap {
                 last = column
             }
             if (rowCount < MIN_FACE_PIXELS_PER_ROW) continue
+            if (faceTop < 0) faceTop = row
             faceBottom = row
             faceSum += rowSum
             faceCount += rowCount
             widestFaceRow = maxOf(widestFaceRow, last - first + 1)
         }
 
-        if (faceBottom < 0 || faceCount == 0) return null
+        if (faceBottom < 0 || faceCount == 0) return NeckOutcome.Refused(NeckRefusal.NO_FACE)
 
         val midline = faceSum / faceCount
+        val faceHeight = faceBottom - faceTop + 1
 
         val bandStart = faceBottom + 1
         val bandEnd = minOf(shoulderRow, height - 1)
-        if (bandStart > bandEnd) return null
+        if (bandStart > bandEnd) return NeckOutcome.Refused(NeckRefusal.HIDDEN)
 
         // Width of the bare-skin run containing the midline, per row; -1 where the midline is
         // not on skin at all, which is a collar or a beard rather than a narrow neck.
@@ -271,21 +322,18 @@ object BodyPartMap {
 
         val covered = runWidths.count { it >= MIN_NECK_PIXELS }
         val coverage = covered.toDouble() / runWidths.size.toDouble()
-        if (coverage < MIN_BAND_COVERAGE) return null
+        if (coverage < MIN_BAND_COVERAGE) return NeckOutcome.Refused(NeckRefusal.COVERED)
 
         // **Walked down from the chin, not searched.**
         //
         // A neck narrows to the jaw and then widens into the shoulders, in that order and
         // without reversing, so the reading is the narrowest run met before the profile turns
         // — and the turn is the shoulder line, read off the body instead of taken from a pose
-        // landmark that may sit a few rows low. See [NECK_RISE] for what a landmark a few rows
-        // low costs: a 51.8 cm neck measured across the top of a trapezius, on a photograph
-        // whose real neck rows were in the mask the whole time.
+        // landmark that may sit a few rows low. See [NECK_RISE].
         //
         // The floor is the other half of it. A segmentation notch is a fraction of a neck and
         // would win any minimum; a neck is not a fraction of a face, so the ratio separates
-        // them — see [MIN_NECK_TO_FACE_WIDTH] — and it judges each row alone, which is what
-        // lets the neck be a single row tall.
+        // them — see [MIN_NECK_TO_FACE_WIDTH].
         val minimumWidth = maxOf(
             MIN_NECK_PIXELS.toDouble(),
             if (widestFaceRow > 0) widestFaceRow * MIN_NECK_TO_FACE_WIDTH else 0.0,
@@ -293,6 +341,9 @@ object BodyPartMap {
 
         var bestRow = -1
         var bestWidth = Int.MAX_VALUE
+        // How many rows the walk covered before the profile turned into the shoulders — the
+        // visible height of the neck column.
+        var neckRows = runWidths.size
         for (index in runWidths.indices) {
             // Named for what it is rather than `width`, which is this function's image width
             // and would be shadowed here — the return below divides by that one.
@@ -303,7 +354,10 @@ object BodyPartMap {
             if (runWidth < minimumWidth) continue
 
             // The profile has turned. Everything below this is shoulder, at any width.
-            if (bestWidth != Int.MAX_VALUE && runWidth > bestWidth * NECK_RISE) break
+            if (bestWidth != Int.MAX_VALUE && runWidth > bestWidth * NECK_RISE) {
+                neckRows = index
+                break
+            }
 
             if (runWidth < bestWidth) {
                 bestWidth = runWidth
@@ -311,18 +365,41 @@ object BodyPartMap {
             }
         }
 
-        if (bestRow < 0 || bestWidth == Int.MAX_VALUE) return null
+        if (bestRow < 0 || bestWidth == Int.MAX_VALUE) {
+            return NeckOutcome.Refused(NeckRefusal.HIDDEN)
+        }
+
+        // **Is there a neck in this picture at all?**
+        //
+        // The check that should have existed from the start, and the one every earlier fix
+        // was missing. On the front-double-biceps photograph that drove all of this, the chin
+        // sits directly on the flexed trapezius and the camera is a little below: the skin
+        // under the jaw is one row of the mask deep and then the shoulders begin. That row
+        // is the top of the trapezius where it meets the jaw — not a neck — and it measured
+        // 0.95 of the face, which looks exactly like a neck by width and is not one.
+        //
+        // Height is what gives it away. A visible neck runs from the chin to the trapezius
+        // line for a third or more of the face's own height; here it ran for a sixteenth.
+        // No width rule can tell those apart, because the failure is not that the width is
+        // wrong — it is that there is no neck for it to be the width of.
+        if (faceHeight > 0 && neckRows < faceHeight * MIN_NECK_TO_FACE_HEIGHT) {
+            return NeckOutcome.Refused(NeckRefusal.HIDDEN)
+        }
 
         // A last sanity check on the answer, for the photograph with no neck in it at all —
         // shoulders directly under the face, so the walk never meets a rise and settles on a
         // trapezius that was the first thing it saw.
-        if (widestFaceRow > 0 && bestWidth > widestFaceRow * MAX_NECK_TO_FACE_WIDTH) return null
+        if (widestFaceRow > 0 && bestWidth > widestFaceRow * MAX_NECK_TO_FACE_WIDTH) {
+            return NeckOutcome.Refused(NeckRefusal.HIDDEN)
+        }
 
-        return NeckReading(
-            heightFraction = (bestRow + 0.5) / height.toDouble(),
-            widthFraction = bestWidth.toDouble() / width.toDouble(),
-            bandCoverage = coverage,
-            faceWidthFraction = widestFaceRow.toDouble() / width.toDouble(),
+        return NeckOutcome.Found(
+            NeckReading(
+                heightFraction = (bestRow + 0.5) / height.toDouble(),
+                widthFraction = bestWidth.toDouble() / width.toDouble(),
+                bandCoverage = coverage,
+                faceWidthFraction = widestFaceRow.toDouble() / width.toDouble(),
+            ),
         )
     }
 

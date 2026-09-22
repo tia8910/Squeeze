@@ -4,7 +4,7 @@ import com.google.mediapipe.framework.image.ByteBufferExtractor
 import com.google.mediapipe.framework.image.MPImage
 import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.FrontPoseGeometry
-import com.squeeze.core.scan.NeckReading
+import com.squeeze.core.scan.NeckOutcome
 
 /**
  * Copies a part-segmentation category mask out of MediaPipe and into plain bytes.
@@ -27,7 +27,7 @@ object PartMaskReader {
      *   Skin alone cannot say where a neck ends — a bare chest is body-skin too — so the
      *   skeleton has to draw that line.
      */
-    fun readNeck(mask: MPImage, geometry: FrontPoseGeometry): NeckReading? {
+    fun readNeck(mask: MPImage, geometry: FrontPoseGeometry): NeckOutcome? {
         val width = mask.width
         val height = mask.height
         if (width <= 0 || height <= 0) return null
@@ -40,7 +40,8 @@ object PartMaskReader {
         val shoulderRow =
             (((geometry.shoulderLeft.y + geometry.shoulderRight.y) / 2.0) * height).toInt()
 
-        val neck = BodyPartMap.readNeck(labels, width, height, shoulderRow) ?: return null
+        val outcome = BodyPartMap.readNeckOutcome(labels, width, height, shoulderRow)
+        val neck = (outcome as? NeckOutcome.Found)?.reading ?: return outcome
 
         // **The waist from this same mask, which is what makes the neck usable.**
         //
@@ -50,9 +51,11 @@ object PartMaskReader {
         // 54.4 cm from a neck the model had measured correctly.
         val hipRow = (((geometry.hipLeft.y + geometry.hipRight.y) / 2.0) * height).toInt()
 
-        return neck.copy(
-            waistWidthFraction = BodyPartMap.readWaist(
-                labels, width, height, shoulderRow, hipRow,
+        return NeckOutcome.Found(
+            neck.copy(
+                waistWidthFraction = BodyPartMap.readWaist(
+                    labels, width, height, shoulderRow, hipRow,
+                ),
             ),
         )
     }

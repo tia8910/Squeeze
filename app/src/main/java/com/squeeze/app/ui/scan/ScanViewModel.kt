@@ -34,6 +34,7 @@ import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.scan.NeckReading
+import com.squeeze.core.scan.NeckRefusal
 import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanFraming
@@ -212,6 +213,8 @@ data class ScanUiState(
      * place; the two numbers side by side settle it in one glance.
      */
     val silhouetteWaistFraction: Double? = null,
+    /** Why the part model found no neck, when it ran and found none. */
+    val neckRefusal: NeckRefusal? = null,
     /**
      * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
      *
@@ -669,6 +672,7 @@ class ScanViewModel @Inject constructor(
             neckFromModel = front.neck != null,
             neckReading = front.neck,
             partMaskRead = front.partMaskRead,
+            neckRefusal = front.neckRefusal,
             silhouetteWaistFraction = AnatomicalLevelFinder
                 .narrowestBetween(front.profile, front.anchors.shoulderRow, front.anchors.hipRow)
                 ?.let { front.profile.torsoWidthAt(it) }

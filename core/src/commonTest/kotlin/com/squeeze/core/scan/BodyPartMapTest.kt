@@ -144,32 +144,53 @@ class BodyPartMapTest {
     }
 
     @Test
-    fun `a neck one row tall is still a neck`() {
-        // **The regression.** The rule this replaced smoothed each row against its neighbours
-        // before taking the minimum, which assumed a neck is at least three rows tall. Here it
-        // is one row tall, so the median turned twelve into forty-five, the width guard read
-        // that as a trapezius and refused — and the app fell back to the silhouette, measured
-        // 54.3 cm across a trapezius and two raised arms, threw that out as impossible, and
-        // printed its constant to a competition bodybuilder.
-        val reading = BodyPartMap.readNeck(armsRaised(), dim, dim, shoulderRow = 35)
+    fun `one row of skin under the chin is not a neck`() {
+        // **This test used to assert the opposite**, and the reversal is the finding.
+        //
+        // The fixture is built from the front-double-biceps photograph at the proportions the
+        // model returned: face 25 pixels, then under the chin 23, 88, 148, 147. That single
+        // 23-pixel row was taken for a one-row neck — 0.92 of the face, a perfectly neck-like
+        // width — and a rule was rewritten to keep it. Looking at the photograph settled it:
+        // the chin rests on the flexed trapezius and the camera is a little low, so there is
+        // no neck in the picture at all. The row is the top of the trapezius meeting the jaw,
+        // and on the phone it became a 54 cm neck that the plausibility ranges threw out.
+        //
+        // Width cannot tell those apart. Height can: a visible neck runs a third or more of
+        // the face's height, and this one runs a fifteenth.
+        val outcome = BodyPartMap.readNeckOutcome(armsRaised(), dim, dim, shoulderRow = 35)
 
-        assertNotNull(reading)
-        assertEquals(12.0 / 64.0, reading.widthFraction, 1e-9)
-        assertEquals((25.5) / 64.0, reading.heightFraction, 1e-9)
+        assertEquals(NeckOutcome.Refused(NeckRefusal.HIDDEN), outcome)
+        assertNull(BodyPartMap.readNeck(armsRaised(), dim, dim, shoulderRow = 35))
     }
 
     @Test
-    fun `where the shoulder landmark lands does not move a one row neck`() {
-        // The corollary, and why a bound on width beats a bound on rows: every row below the
-        // neck is out of range on its own, so adding more of them changes nothing. On the real
-        // photograph the reading was identical for every shoulder row from 59 to 80.
-        val readings = listOf(28, 35, 45, 60, 63).map {
-            BodyPartMap.readNeck(armsRaised(), dim, dim, shoulderRow = it)
+    fun `a hidden neck stays hidden wherever the shoulder landmark lands`() {
+        // The refusal is read off the body, so the landmark cannot talk it round.
+        listOf(28, 35, 45, 60, 63).forEach {
+            assertEquals(
+                NeckOutcome.Refused(NeckRefusal.HIDDEN),
+                BodyPartMap.readNeckOutcome(armsRaised(), dim, dim, shoulderRow = it),
+                "shoulder row $it",
+            )
         }
+    }
 
-        readings.forEach { assertNotNull(it) }
-        assertEquals(1, readings.map { it!!.widthFraction }.distinct().size, "$readings")
-        assertEquals(12.0 / 64.0, readings.first()!!.widthFraction, 1e-9)
+    @Test
+    fun `each refusal is named for what the user has to change`() {
+        val collar = standing().apply { fill(25..32, 29..35, BodyPartMap.CLOTHES) }
+        assertEquals(
+            NeckOutcome.Refused(NeckRefusal.COVERED),
+            BodyPartMap.readNeckOutcome(collar, dim, dim, shoulderRow = 35),
+        )
+
+        val faceless = standing().apply { fill(10..24, 26..38, BodyPartMap.HAIR) }
+        assertEquals(
+            NeckOutcome.Refused(NeckRefusal.NO_FACE),
+            BodyPartMap.readNeckOutcome(faceless, dim, dim, shoulderRow = 35),
+        )
+
+        val found = BodyPartMap.readNeckOutcome(standing(), dim, dim, shoulderRow = 35)
+        assertTrue(found is NeckOutcome.Found, "a visible neck must still be found: $found")
     }
 
     @Test
