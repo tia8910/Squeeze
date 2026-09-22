@@ -21,7 +21,8 @@ import javax.inject.Singleton
  * Runs the on-device vision-language model over a photograph and returns what body fat it
  * looks like. See [AppearanceEstimator] for what the reading is and how far to trust it.
  *
- * The model is OpenAI's CLIP ViT-B/32 image encoder, compressed to 48.5 MB and shipped inside
+ * The model is a CLIP ViT-B/32 image encoder that OpenCLIP trained on LAION-2B, compressed to
+ * 48.5 MB and shipped inside
  * the APK. It runs through ONNX Runtime on the phone's CPU. The app still holds no INTERNET
  * permission, so this adds a neural network without adding any way for a photograph to
  * leave the device — the only kind of AI this app is allowed to have.
@@ -172,10 +173,10 @@ class ClipAppearance @Inject constructor(
     }
 
     private companion object {
-        const val MODEL_ASSET = "clip_vitb32_visual_q4.onnx"
+        const val MODEL_ASSET = "clip_vitb32_laion_q4.onnx"
 
         /** Must change whenever the model does; tools/vlm/prepare_clip.py pins the same hash. */
-        const val MODEL_COPY = "clip_vitb32_visual_q4-66c8bdcb.onnx"
+        const val MODEL_COPY = "clip_vitb32_laion_q4-81148049.onnx"
         const val PROMPTS_ASSET = "clip_prompts.json"
         const val INPUT_NAME = "pixel_values"
         const val SIZE = 224

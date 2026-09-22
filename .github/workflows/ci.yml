@@ -120,8 +120,8 @@ jobs:
       - name: Cache the on-device CLIP model
         uses: actions/cache@v4
         with:
-          path: app/src/main/assets/clip_vitb32_visual_q4.onnx
-          key: clip-vitb32-q4-66c8bdcb
+          path: app/src/main/assets/clip_vitb32_laion_q4.onnx
+          key: clip-vitb32-laion-q4-81148049
 
       - name: Prepare the on-device CLIP model
         run: |

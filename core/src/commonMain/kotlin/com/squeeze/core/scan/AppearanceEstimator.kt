@@ -29,7 +29,7 @@ class PromptSet(
  * is the same width — both photographs this was built against came out at a waist-to-height
  * of 0.42 — because what separates them is inside the outline: whether the abdominal
  * muscles show through the skin. A coach sees that at a glance, and so, it turns out, does
- * CLIP.
+ * CLIP — best of the models tried, the one OpenCLIP trained on LAION-2B.
  *
  * **How.** CLIP maps images and sentences into the same space. The app embeds the
  * photograph, compares it with descriptions of five bodies from stage-lean to overweight,
@@ -38,13 +38,12 @@ class PromptSet(
  * are averaged, so the answer does not rest on one guess about how the model reads
  * language.
  *
- * **What it was tested against, stated plainly.** Three photographs: a stage-lean
- * bodybuilder and two of a man with a soft lower stomach. It read 7.3% and 13.5–14.6%, where
- * the truth is about 5% and 16%. It ranks them correctly with every phrasing tried and
- * every image mirrored, and it compresses toward the middle, as zero-shot readings do. That
- * is enough to separate bodies the outline cannot, and nowhere near enough to call it
- * validated — which is why [STANDARD_ERROR_PERCENT] is wide and why it never outranks a
- * tape reading or the user's own choice.
+ * **What it was tested against, stated plainly.** Four photographs: a stage-lean
+ * bodybuilder (about 5%), a lean man with his abdominals visible relaxed (about 10%), and two
+ * of a man with a soft lower stomach (about 16%). The shipped model reads them 7.7%, 10.8%,
+ * 16.8% and 15.5% — right order, within about two points, unmoved by mirroring. That is
+ * enough to trust the ordering and nowhere near enough to call it validated, which is why
+ * [STANDARD_ERROR_PERCENT] is wide.
  *
  * **What it does not do.** Read numbers. "A man with 15 percent body fat" scored every
  * photograph within a point of 16%; CLIP learned from captions, and captions describe what

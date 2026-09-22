@@ -22,9 +22,9 @@ from prompts import PROMPT_SETS  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 URL = ("https://clip-as-service.s3.us-east-2.amazonaws.com/"
-       "models-436c69702d61732d53657276696365/onnx/ViT-B-32/textual.onnx")
-SHA256 = "0af04c287a3be2570eaef7a1ef896d81c1989602df67a8905941afed589e545e"
-CACHE = pathlib.Path.home() / ".cache" / "squeeze" / "clip_vitb32_textual.onnx"
+       "models-436c69702d61732d53657276696365/onnx/ViT-B-32-laion2b-s34b-b79k/textual.onnx")
+SHA256 = "fc165a1458d398a241f7f01519d70f854ef0ec7a9685a54648ca9f829b9cb80e"
+CACHE = pathlib.Path.home() / ".cache" / "squeeze" / "clip_vitb32_laion_textual.onnx"
 
 
 def fetch():
@@ -54,7 +54,7 @@ def main():
             "embeddings": [[round(float(x), 6) for x in row] for row in out],
         })
     doc = {
-        "model": "OpenAI CLIP ViT-B/32 (MIT), ONNX export from Jina clip-as-service",
+        "model": "OpenCLIP ViT-B/32 trained on LAION-2B (MIT), ONNX export from Jina clip-as-service",
         "logitScale": 100.0,
         "sets": sets,
     }
