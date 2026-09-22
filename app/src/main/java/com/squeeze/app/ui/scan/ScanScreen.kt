@@ -827,7 +827,7 @@ private fun neckProvenance(state: ScanUiState): String {
             (
                 " The part model read it at %.3f of the frame against a face of %.3f — a " +
                     "ratio of %.2f, where a neck is about 0.9 — and %.0f%% of the band was " +
-                    "bare skin."
+                    "bare skin. Waist: %s of the frame by the outline, %s by the part model."
                 )
                 .format(
                     reading.widthFraction,
@@ -838,6 +838,8 @@ private fun neckProvenance(state: ScanUiState): String {
                         0.0
                     },
                     reading.bandCoverage * 100.0,
+                    state.silhouetteWaistFraction?.let { "%.3f".format(it) } ?: "none",
+                    reading.waistWidthFraction?.let { "%.3f".format(it) } ?: "none",
                 )
     }
 }

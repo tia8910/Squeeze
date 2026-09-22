@@ -284,13 +284,41 @@ object AutomaticScanBuilder {
             emptyMap()
         }
 
+        // **Both sides of `waist − neck` put on one ruler.**
+        //
+        // The neck is measured on the part mask and the waist on the silhouette, and the Navy
+        // equation subtracts one from the other. Two masks are two coordinate spaces — they
+        // may differ in resolution, in aspect, in whether the segmenter letterboxed — and a
+        // difference between quantities measured with different rulers is not a measurement of
+        // anything. It is undetectable downstream, because both numbers are individually
+        // plausible: one scan reported a neck-to-waist width ratio of 0.647 where the mask
+        // itself showed 0.483, and 54.4 cm was the answer.
+        //
+        // So the model's *ratio* is what carries over, not its absolute fraction. The part
+        // mask saw the neck as some proportion of the waist; that proportion applied to the
+        // silhouette's waist is the neck in the silhouette's space, whatever either mask is
+        // doing. Falls back to the raw fraction when there is no waist to calibrate against,
+        // which is the previous behaviour rather than a failure.
+        val silhouetteWaist = frontSites[ScanSite.WAIST]
+            ?.let { frontProfile.torsoWidthAt(it) }
+            ?.takeIf { it > 0.0 }
+
+        val modelNeckWidth = neck?.let { reading ->
+            val modelWaist = reading.waistWidthFraction?.takeIf { it > 0.0 }
+            if (modelWaist != null && silhouetteWaist != null) {
+                silhouetteWaist * (reading.widthFraction / modelWaist)
+            } else {
+                reading.widthFraction
+            }
+        }
+
         return frontSites.mapNotNull { (site, frontRow) ->
             val useLeg = site == ScanSite.THIGH ||
                 site == ScanSite.ARM ||
                 site == ScanSite.CALF
 
             // The model's width where it has one; the silhouette's everywhere else.
-            val fromModel = if (site == ScanSite.NECK) neck?.widthFraction else null
+            val fromModel = if (site == ScanSite.NECK) modelNeckWidth else null
 
             val frontWidth = fromModel ?: frontProfile.widthFor(frontRow, useLeg)
             if (frontWidth <= 0.0) return@mapNotNull null

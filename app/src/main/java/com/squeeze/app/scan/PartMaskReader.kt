@@ -40,7 +40,21 @@ object PartMaskReader {
         val shoulderRow =
             (((geometry.shoulderLeft.y + geometry.shoulderRight.y) / 2.0) * height).toInt()
 
-        return BodyPartMap.readNeck(labels, width, height, shoulderRow)
+        val neck = BodyPartMap.readNeck(labels, width, height, shoulderRow) ?: return null
+
+        // **The waist from this same mask, which is what makes the neck usable.**
+        //
+        // Not to report — the silhouette's waist is the better measurement and keeps its job.
+        // This one exists only so the pair can be compared inside one coordinate space. See
+        // NeckReading.waistWidthFraction: comparing them across two masks produced a neck of
+        // 54.4 cm from a neck the model had measured correctly.
+        val hipRow = (((geometry.hipLeft.y + geometry.hipRight.y) / 2.0) * height).toInt()
+
+        return neck.copy(
+            waistWidthFraction = BodyPartMap.readWaist(
+                labels, width, height, shoulderRow, hipRow,
+            ),
+        )
     }
 
     /**

@@ -24,6 +24,7 @@ import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AbdominalProfile
+import com.squeeze.core.scan.AnatomicalLevelFinder
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
@@ -202,6 +203,15 @@ data class ScanUiState(
     val neckReading: NeckReading? = null,
     /** Whether a part mask was produced at all, as distinct from it finding a neck. */
     val partMaskRead: Boolean = false,
+    /**
+     * The waist as the silhouette measured it, as a fraction of frame width.
+     *
+     * Printed beside the part model's own waist so the two masks can be compared directly
+     * rather than inferred from a centimetre figure. Inferring it is how a diagnosis of "two
+     * coordinate spaces, a factor of 1.34" was reached from a waist row measured in the wrong
+     * place; the two numbers side by side settle it in one glance.
+     */
+    val silhouetteWaistFraction: Double? = null,
     /**
      * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
      *
@@ -659,6 +669,10 @@ class ScanViewModel @Inject constructor(
             neckFromModel = front.neck != null,
             neckReading = front.neck,
             partMaskRead = front.partMaskRead,
+            silhouetteWaistFraction = AnatomicalLevelFinder
+                .narrowestBetween(front.profile, front.anchors.shoulderRow, front.anchors.hipRow)
+                ?.let { front.profile.torsoWidthAt(it) }
+                ?.takeIf { it > 0.0 },
             bareAbdomenFraction = front.bareAbdomenFraction,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.

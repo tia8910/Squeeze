@@ -30,6 +30,28 @@ data class NeckReading(
      * and anything approaching 1.3 is shoulder.
      */
     val faceWidthFraction: Double,
+    /**
+     * The waist, as **this same mask** measured it, or null when it was not in the picture.
+     *
+     * The most important field here, and it is not a measurement anyone displays.
+     *
+     * The neck comes from the part mask and the waist from the silhouette, and the Navy
+     * equation subtracts one from the other. Two masks are two coordinate spaces: they can
+     * differ in resolution, in aspect, in whether the segmenter letterboxed, in what a future
+     * MediaPipe decides to return. Nothing downstream can detect that, because both numbers
+     * are plausible on their own — and `waist − neck` is then a difference between quantities
+     * measured with different rulers.
+     *
+     * It happened. A scan reported a neck-to-waist width ratio of 0.647 where the mask itself
+     * showed 0.483, a factor of 1.34, which is very nearly the photograph's aspect ratio. The
+     * neck was correct, the waist was correct, and 54.4 cm was the answer.
+     *
+     * Carrying the waist from this mask makes the pair self-calibrating: the ratio
+     * `widthFraction / waistWidthFraction` is what the model saw, in its own space, and
+     * rescaling it onto the silhouette's waist puts both sides of the subtraction on one
+     * ruler whatever the two masks are doing. See [AutomaticScanBuilder.build].
+     */
+    val waistWidthFraction: Double? = null,
 )
 
 /**
@@ -344,6 +366,70 @@ object BodyPartMap {
     }
 
     /**
+     * The waist, measured on this mask, in this mask's own units.
+     *
+     * Not for display and not a replacement for the silhouette's waist, which has the trunk
+     * bound behind it and knows how to cut an arm off a torso. This exists so that the neck
+     * and the waist can be compared **inside one coordinate space** — see
+     * [NeckReading.waistWidthFraction] for the 54.4 cm reading that came of comparing them
+     * across two.
+     *
+     * Skin and clothing together, because a waistband is at the waist and a bare midriff is
+     * too; the question here is where the body's outline is, not what is covering it.
+     *
+     * @param shoulderRow and [hipRow] in this mask's rows, which bound the natural waist the
+     *   same way they do on the silhouette
+     * @return the narrowest midline run in that band as a fraction of image width, or null
+     *   when the band holds nothing measurable
+     */
+    fun readWaist(
+        labels: ByteArray,
+        width: Int,
+        height: Int,
+        shoulderRow: Int,
+        hipRow: Int,
+    ): Double? {
+        if (width <= 0 || height <= 0 || labels.size < width * height) return null
+
+        val start = maxOf(shoulderRow, 0)
+        val end = minOf(hipRow, height - 1)
+        if (start >= end) return null
+
+        // The midline from the torso itself rather than the face: at waist height the head may
+        // be out of frame, and a leaning subject moves their head further than their navel.
+        val midline = torsoMidline(labels, width, start, end) ?: return null
+
+        var narrowest = Int.MAX_VALUE
+        for (row in start..end) {
+            val run = midlineRunWidth(labels, width, row, midline, COVERED)
+            if (run >= MIN_NECK_PIXELS && run < narrowest) narrowest = run
+        }
+
+        return if (narrowest == Int.MAX_VALUE) null else narrowest.toDouble() / width.toDouble()
+    }
+
+    /** Median centre of the covered run in each row, which tracks the trunk. */
+    private fun torsoMidline(labels: ByteArray, width: Int, from: Int, to: Int): Int? {
+        val centres = mutableListOf<Int>()
+        for (row in from..to) {
+            var first = -1
+            var last = -1
+            for (column in 0 until width) {
+                if (labels[row * width + column].toInt() !in COVERED) continue
+                if (first < 0) first = column
+                last = column
+            }
+            if (first >= 0) centres += (first + last) / 2
+        }
+        if (centres.isEmpty()) return null
+        centres.sort()
+        return centres[centres.size / 2]
+    }
+
+    /** Classes that count as "this is the body's outline here": bare skin or what covers it. */
+    private val COVERED = setOf(BODY_SKIN, CLOTHES)
+
+    /**
      * Width of the bare-skin run containing [midline] on this row, or -1.
      *
      * The run has to be *on* the midline, give or take a defect's width — not merely the
@@ -352,7 +438,13 @@ object BodyPartMap {
      * row" is what lets [MIN_BAND_COVERAGE] detect a covered neck rather than measure a
      * collar, so the tolerance stops at [MAX_HOLE_PIXELS] and does not widen from there.
      */
-    private fun midlineRunWidth(labels: ByteArray, width: Int, row: Int, midline: Int): Int {
+    private fun midlineRunWidth(
+        labels: ByteArray,
+        width: Int,
+        row: Int,
+        midline: Int,
+        classes: Set<Int> = setOf(BODY_SKIN),
+    ): Int {
         val centre = midline.coerceIn(0, width - 1)
 
         // The midline pixel itself, or the nearest skin within a hole's width of it. A chain,
@@ -361,19 +453,19 @@ object BodyPartMap {
         // neck were covered. Anything further away than a hole is not the neck.
         val column = (0..MAX_HOLE_PIXELS)
             .flatMap { listOf(centre - it, centre + it) }
-            .firstOrNull { it in 0 until width && labels[row * width + it].toInt() == BODY_SKIN }
+            .firstOrNull { it in 0 until width && labels[row * width + it].toInt() in classes }
             ?: return -1
 
         var start = column
         while (start > 0) {
             val next = start - 1
-            if (labels[row * width + next].toInt() == BODY_SKIN) {
+            if (labels[row * width + next].toInt() in classes) {
                 start = next
                 continue
             }
             // Bridge a short defect: keep walking if skin resumes within the hole allowance.
             val resumed = (next - MAX_HOLE_PIXELS..next - 1)
-                .lastOrNull { it >= 0 && labels[row * width + it].toInt() == BODY_SKIN }
+                .lastOrNull { it >= 0 && labels[row * width + it].toInt() in classes }
                 ?: break
             start = resumed
         }
@@ -381,12 +473,12 @@ object BodyPartMap {
         var end = column
         while (end < width - 1) {
             val next = end + 1
-            if (labels[row * width + next].toInt() == BODY_SKIN) {
+            if (labels[row * width + next].toInt() in classes) {
                 end = next
                 continue
             }
             val resumed = (next + 1..next + MAX_HOLE_PIXELS)
-                .firstOrNull { it < width && labels[row * width + it].toInt() == BODY_SKIN }
+                .firstOrNull { it < width && labels[row * width + it].toInt() in classes }
                 ?: break
             end = resumed
         }

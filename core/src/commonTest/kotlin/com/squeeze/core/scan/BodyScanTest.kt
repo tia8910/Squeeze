@@ -469,6 +469,91 @@ class AutomaticScanBuilderTest {
     }
 
     @Test
+    fun `the neck arrives on the same ruler as the waist it is subtracted from`() {
+        // **Why a ratio carries over and not a fraction.** The neck is measured on the part
+        // mask and the waist on the silhouette, and the Navy equation subtracts one from the
+        // other. Two masks are two coordinate spaces — resolution, aspect, letterboxing — and
+        // nothing downstream can detect a mismatch, because both numbers are individually
+        // plausible.
+        //
+        // Here the part mask is half the silhouette's scale: it saw the waist at 0.075 where
+        // the silhouette sees 0.15. The neck it read as 0.036 is therefore 0.072 in the
+        // silhouette's space, not 0.036 — and 0.036 would have been a neck half the size it
+        // should be, silently.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.036,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.04,
+                waistWidthFraction = 0.075,
+            ),
+        )
+
+        val neck = markers.first { it.site == ScanSite.NECK }
+        val waist = markers.first { it.site == ScanSite.WAIST }
+
+        assertEquals(0.15, waist.slice.frontWidthFraction, 1e-9)
+        // 0.15 * (0.036 / 0.075)
+        assertEquals(0.072, neck.slice.frontWidthFraction, 1e-9)
+        // And the ratio the model saw is exactly preserved.
+        assertEquals(
+            0.036 / 0.075,
+            neck.slice.frontWidthFraction / waist.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `two masks that already agree leave the neck untouched`() {
+        // The calibration must be a no-op when there is nothing to calibrate, which is the
+        // ordinary case. A correction that fires when both masks agree would be a new source
+        // of error rather than a fix for one.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.05,
+                waistWidthFraction = 0.15,
+            ),
+        )
+
+        assertEquals(
+            0.045,
+            markers.first { it.site == ScanSite.NECK }.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `without a waist from the model the neck is used as it came`() {
+        // Previous behaviour, kept: no waist to calibrate against is not a reason to refuse a
+        // neck the model did find.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.05,
+                waistWidthFraction = null,
+            ),
+        )
+
+        assertEquals(
+            0.045,
+            markers.first { it.site == ScanSite.NECK }.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
     fun `a position measured on another mask lands in this profile's rows`() {
         // The part segmenter emits 256 square whatever the photograph was, so its rows are
         // not this profile's rows. Fractions are what cross that boundary; treating one

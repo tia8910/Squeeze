@@ -274,6 +274,47 @@ class BodyPartMapTest {
     }
 
     @Test
+    fun `the waist is read from the same mask as the neck`() {
+        // Not to display — the silhouette's waist keeps that job, with the trunk bound behind
+        // it. This exists so the pair can be compared inside one coordinate space, because
+        // the Navy equation subtracts one from the other and two masks are two rulers.
+        //
+        // Skin and clothing together: a waistband is at the waist, and the question is where
+        // the body's outline is, not what is covering it.
+        // A torso 45 wide that narrows to 25 across rows 45..55, the narrow part covered by
+        // shorts. The reading has to be the 25, and cloth must not change it: a first version
+        // of this test put cloth over half a full-width torso and expected a narrower answer,
+        // which is not what a waistband does to anybody's outline.
+        val clothed = standing().apply {
+            fill(45..55, 10..54, BodyPartMap.BACKGROUND)
+            fill(45..55, 20..44, BodyPartMap.CLOTHES)
+        }
+
+        val waist = BodyPartMap.readWaist(clothed, dim, dim, shoulderRow = 35, hipRow = 60)
+
+        assertNotNull(waist)
+        assertEquals(25.0 / 64.0, waist, 1e-9)
+
+        // And the same body bare reads the same width.
+        val bare = standing().apply {
+            fill(45..55, 10..54, BodyPartMap.BACKGROUND)
+            fill(45..55, 20..44, BodyPartMap.BODY_SKIN)
+        }
+        assertEquals(
+            waist,
+            BodyPartMap.readWaist(bare, dim, dim, shoulderRow = 35, hipRow = 60)!!,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `a waist band with nothing in it reports nothing`() {
+        assertNull(BodyPartMap.readWaist(blank(), dim, dim, shoulderRow = 35, hipRow = 60))
+        // Degenerate band: the hips at or above the shoulders is a broken pose, not a waist.
+        assertNull(BodyPartMap.readWaist(standing(), dim, dim, shoulderRow = 40, hipRow = 40))
+    }
+
+    @Test
     fun `an empty or undersized buffer returns nothing`() {
         assertNull(BodyPartMap.readNeck(ByteArray(0), dim, dim, 35))
         assertNull(BodyPartMap.readNeck(standing(), 0, dim, 35))
