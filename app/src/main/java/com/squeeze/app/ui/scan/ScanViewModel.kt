@@ -32,6 +32,7 @@ import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
 import com.squeeze.core.scan.LandmarkStature
+import com.squeeze.core.scan.NeckReading
 import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanFraming
@@ -190,6 +191,17 @@ data class ScanUiState(
      * the outline method's constant while saying "not resolved by the photo" underneath.
      */
     val neckFromModel: Boolean = false,
+    /**
+     * Exactly what the part model made of the neck, for the result screen to print.
+     *
+     * Here because two releases were spent inferring the model's behaviour from a single
+     * centimetre figure on a screenshot, and guessing wrong both times. The ratio to the face
+     * says outright whether it found a neck or the top of a trapezius, and whether the model
+     * ran at all is a separate fact from whether it found one.
+     */
+    val neckReading: NeckReading? = null,
+    /** Whether a part mask was produced at all, as distinct from it finding a neck. */
+    val partMaskRead: Boolean = false,
     /**
      * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
      *
@@ -645,6 +657,8 @@ class ScanViewModel @Inject constructor(
                 ?.score
                 ?.takeIf { (front.bareAbdomenFraction ?: 1.0) >= BodyPartMap.MIN_BARE_ABDOMEN },
             neckFromModel = front.neck != null,
+            neckReading = front.neck,
+            partMaskRead = front.partMaskRead,
             bareAbdomenFraction = front.bareAbdomenFraction,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.

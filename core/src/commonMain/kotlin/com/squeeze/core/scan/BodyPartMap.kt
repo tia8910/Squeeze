@@ -20,6 +20,16 @@ data class NeckReading(
     val heightFraction: Double,
     val widthFraction: Double,
     val bandCoverage: Double,
+    /**
+     * Width of the widest bare-face row, in the same units, which is what the neck was judged
+     * against.
+     *
+     * Carried so the result screen can print the pair. Two rounds were spent inferring from a
+     * single centimetre figure whether the model had picked the neck or the top of a
+     * trapezius, and the ratio answers it outright: a neck comes out near 0.9 of the face,
+     * and anything approaching 1.3 is shoulder.
+     */
+    val faceWidthFraction: Double,
 )
 
 /**
@@ -143,6 +153,27 @@ object BodyPartMap {
     const val MIN_NECK_TO_FACE_WIDTH = 0.45
 
     /**
+     * How far a row may rise above the narrowest yet seen before the search stops.
+     *
+     * **Why the search stops rather than simply taking a minimum over the whole band.** A
+     * minimum searches everywhere, and everywhere includes the shoulders. The band's lower
+     * bound is a pose landmark, and a landmark placed a few rows low admits the top of the
+     * trapezius — which is wider than the neck but not wildly so, so a width guard tuned to
+     * reject a whole trapezius lets the top of one through. That is how a scan whose neck rows
+     * were plainly in the mask still reported 51.8 cm.
+     *
+     * Walking down from the chin removes the question. The profile of a human neck goes one
+     * way: narrow at the jaw, then widening into the shoulders, monotonically. So the first
+     * substantial rise *is* the shoulder line, located from the body rather than from a
+     * landmark, and everything below it is not a candidate at any width.
+     *
+     * Half again is well past the few per cent a neck varies over its own length and well
+     * inside the jump into a deltoid, which on the photograph that prompted this went from 57
+     * pixels to 220 in one row.
+     */
+    const val NECK_RISE = 1.5
+
+    /**
      * Share of the midsection that must be bare skin before a definition score means anything.
      *
      * [AbdominalDefinition] measures the contrast of shadow across an abdomen. Fabric has
@@ -220,19 +251,23 @@ object BodyPartMap {
         val coverage = covered.toDouble() / runWidths.size.toDouble()
         if (coverage < MIN_BAND_COVERAGE) return null
 
-        // **The narrowest row that is the size a neck is.**
+        // **Walked down from the chin, not searched.**
         //
-        // Both ends of the bound do real work and both catch a failure this app has actually
-        // shipped. Above it is a trapezius or a pair of raised arms merged with the neck, read
-        // as a 54.3 cm neck and thrown out downstream as impossible. Below it is a
-        // segmentation notch, which a plain minimum would take every time because a minimum is
-        // decided by the single worst row in the band.
+        // A neck narrows to the jaw and then widens into the shoulders, in that order and
+        // without reversing, so the reading is the narrowest run met before the profile turns
+        // — and the turn is the shoulder line, read off the body instead of taken from a pose
+        // landmark that may sit a few rows low. See [NECK_RISE] for what a landmark a few rows
+        // low costs: a 51.8 cm neck measured across the top of a trapezius, on a photograph
+        // whose real neck rows were in the mask the whole time.
         //
-        // Judging each row on its own against the face means the neck may be one row tall,
-        // which on a front-double-biceps photograph is exactly what it is. The rule the
-        // smoothing replaced could not survive that; see [MIN_NECK_TO_FACE_WIDTH].
-        val narrowestAllowed = widestFaceRow * MIN_NECK_TO_FACE_WIDTH
-        val widestAllowed = widestFaceRow * MAX_NECK_TO_FACE_WIDTH
+        // The floor is the other half of it. A segmentation notch is a fraction of a neck and
+        // would win any minimum; a neck is not a fraction of a face, so the ratio separates
+        // them — see [MIN_NECK_TO_FACE_WIDTH] — and it judges each row alone, which is what
+        // lets the neck be a single row tall.
+        val minimumWidth = maxOf(
+            MIN_NECK_PIXELS.toDouble(),
+            if (widestFaceRow > 0) widestFaceRow * MIN_NECK_TO_FACE_WIDTH else 0.0,
+        )
 
         var bestRow = -1
         var bestWidth = Int.MAX_VALUE
@@ -240,10 +275,14 @@ object BodyPartMap {
             // Named for what it is rather than `width`, which is this function's image width
             // and would be shadowed here — the return below divides by that one.
             val runWidth = runWidths[index]
-            if (runWidth < MIN_NECK_PIXELS) continue
-            if (widestFaceRow > 0 && (runWidth < narrowestAllowed || runWidth > widestAllowed)) {
-                continue
-            }
+
+            // Not skin on the midline, or too thin to be anatomy. Skipped rather than ending
+            // the walk: a defect mid-neck must not be read as the shoulders.
+            if (runWidth < minimumWidth) continue
+
+            // The profile has turned. Everything below this is shoulder, at any width.
+            if (bestWidth != Int.MAX_VALUE && runWidth > bestWidth * NECK_RISE) break
+
             if (runWidth < bestWidth) {
                 bestWidth = runWidth
                 bestRow = bandStart + index
@@ -252,10 +291,16 @@ object BodyPartMap {
 
         if (bestRow < 0 || bestWidth == Int.MAX_VALUE) return null
 
+        // A last sanity check on the answer, for the photograph with no neck in it at all —
+        // shoulders directly under the face, so the walk never meets a rise and settles on a
+        // trapezius that was the first thing it saw.
+        if (widestFaceRow > 0 && bestWidth > widestFaceRow * MAX_NECK_TO_FACE_WIDTH) return null
+
         return NeckReading(
             heightFraction = (bestRow + 0.5) / height.toDouble(),
             widthFraction = bestWidth.toDouble() / width.toDouble(),
             bandCoverage = coverage,
+            faceWidthFraction = widestFaceRow.toDouble() / width.toDouble(),
         )
     }
 

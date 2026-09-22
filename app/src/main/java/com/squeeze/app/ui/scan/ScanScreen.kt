@@ -798,6 +798,50 @@ private fun AnalysingStep() {
     }
 }
 
+/**
+ * What the part model actually did, in one sentence, appended to a neck failure.
+ *
+ * **Why this is on a user's screen at all.** The neck is the one measurement that decides
+ * whether this app produces a reading or prints a constant, and it has now failed three times
+ * for three different reasons that were indistinguishable from the outside: the model refused,
+ * the model was overruled by the silhouette, and the model measured the top of a trapezius.
+ * Each time the only evidence was a single centimetre figure, and each time a diagnosis was
+ * made from it that turned out to be wrong.
+ *
+ * The ratio to the face settles it in one glance. A neck measures about nine tenths of bare
+ * face width — 0.92 and 0.83 on the two readings taken from a real photograph through this
+ * pipeline. A figure near or above 1.3 is shoulder. And "no mask" is a different failure from
+ * "a mask that found nothing", which no wording of the sentence above could distinguish.
+ */
+private fun neckProvenance(state: ScanUiState): String {
+    val reading = state.neckReading
+    return when {
+        !state.partMaskRead ->
+            " The part model did not run on this photo, so that figure came from your " +
+                "outline, which cannot tell a neck from the hair and shoulders around it."
+
+        reading == null ->
+            " The part model ran and found no bare neck between your chin and your shoulders."
+
+        else ->
+            (
+                " The part model read it at %.3f of the frame against a face of %.3f — a " +
+                    "ratio of %.2f, where a neck is about 0.9 — and %.0f%% of the band was " +
+                    "bare skin."
+                )
+                .format(
+                    reading.widthFraction,
+                    reading.faceWidthFraction,
+                    if (reading.faceWidthFraction > 0.0) {
+                        reading.widthFraction / reading.faceWidthFraction
+                    } else {
+                        0.0
+                    },
+                    reading.bandCoverage * 100.0,
+                )
+    }
+}
+
 @Composable
 private fun ResultStep(
     state: ScanUiState,
@@ -965,18 +1009,19 @@ private fun ResultStep(
                                         "%.1f cm, which is outside the range a neck can be " +
                                         "on your frame — so it was thrown out rather than " +
                                         "used, and the tape equation needs both.")
-                                        .format(waist, rejectedNeckCm)
+                                        .format(waist, rejectedNeckCm) + neckProvenance(state)
 
                                 neck == null && !state.neckFromModel ->
                                     ("Your waist measured %.1f cm but no bare neck was " +
                                         "visible between your chin and your shoulders, so " +
                                         "there is nothing for the tape equation to measure " +
                                         "against. A collar, a hood or a head out of frame " +
-                                        "will all do it.").format(waist)
+                                        "will all do it.").format(waist) + neckProvenance(state)
 
                                 neck == null ->
                                     "Your waist measured %.1f cm but your neck could not ".format(waist) +
-                                        "be measured, and the tape equation needs both."
+                                        "be measured, and the tape equation needs both." +
+                                        neckProvenance(state)
 
                                 else ->
                                     "Your waist measured %.1f cm and your neck %.1f cm. "

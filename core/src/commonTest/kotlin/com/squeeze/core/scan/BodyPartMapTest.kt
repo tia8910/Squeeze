@@ -187,6 +187,47 @@ class BodyPartMapTest {
     }
 
     @Test
+    fun `the walk stops at the shoulders instead of searching past them`() {
+        // **The 51.8 cm reading.** The pose model's shoulder landmark can sit a few rows below
+        // the acromion, which puts the top of the trapezius inside the band. It is wider than
+        // the neck but not wildly so, so a width guard tuned to reject a whole trapezius lets
+        // it through — and a minimum over the whole band takes it whenever it happens to be
+        // narrower than the neck rows are wide, which it never is here, but it is close enough
+        // that the margin is luck rather than design.
+        //
+        // Walking down and stopping at the first substantial rise removes the luck: the turn
+        // in the profile is the shoulder line, read off the body rather than from a landmark.
+        val creeping = blank().apply {
+            fill(0..9, 24..40, BodyPartMap.HAIR)
+            fill(10..24, 24..40, BodyPartMap.HAIR)
+            fill(10..24, 26..38, BodyPartMap.FACE_SKIN)
+            fill(25..27, 29..35, BodyPartMap.BODY_SKIN)   // neck, 7 wide
+            fill(28..30, 24..40, BodyPartMap.BODY_SKIN)   // trapezius, 17 wide
+            fill(31..63, 10..54, BodyPartMap.BODY_SKIN)   // shoulders and arms
+        }
+
+        val reading = BodyPartMap.readNeck(creeping, dim, dim, shoulderRow = 35)
+
+        assertNotNull(reading)
+        assertEquals(7.0 / 64.0, reading.widthFraction, 1e-9, "the trapezius must not be reached")
+    }
+
+    @Test
+    fun `the face it was judged against comes back with the reading`() {
+        // So the result screen can print the pair. A neck is about nine tenths of bare face
+        // width — 0.92 and 0.83 measured on a real photograph — and anything near 1.3 is
+        // shoulder. Three separate neck failures were indistinguishable from a single
+        // centimetre figure; the ratio tells them apart at a glance.
+        val reading = BodyPartMap.readNeck(standing(), dim, dim, shoulderRow = 35)
+
+        assertNotNull(reading)
+        assertEquals(13.0 / 64.0, reading.faceWidthFraction, 1e-9)
+        assertTrue(
+            reading.widthFraction / reading.faceWidthFraction < BodyPartMap.MAX_NECK_TO_FACE_WIDTH,
+        )
+    }
+
+    @Test
     fun `no face means no neck`() {
         // The top of the band is the bottom of the face. Without a face there is no band, and
         // guessing one from the trunk span is how the search used to land on the trapezius.

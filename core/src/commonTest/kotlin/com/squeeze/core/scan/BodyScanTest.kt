@@ -363,7 +363,12 @@ class AutomaticScanBuilderTest {
         val withModel = AutomaticScanBuilder.build(
             necklessFigure(),
             anchors(),
-            neck = NeckReading(heightFraction = 0.125, widthFraction = 0.045, bandCoverage = 1.0),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
         )
 
         val neck = withModel.firstOrNull { it.site == ScanSite.NECK }
@@ -384,7 +389,12 @@ class AutomaticScanBuilderTest {
         val replaced = AutomaticScanBuilder.build(
             figure(80),
             anchors(),
-            neck = NeckReading(heightFraction = 0.125, widthFraction = 0.045, bandCoverage = 1.0),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
         ).first { it.site == ScanSite.NECK }
 
         assertEquals(0.045, replaced.slice.frontWidthFraction, 1e-9)
@@ -401,7 +411,12 @@ class AutomaticScanBuilderTest {
         val markers = AutomaticScanBuilder.build(
             frontProfile = figure(80), frontAnchors = anchors(),
             backProfile = back, backAnchors = anchors(),
-            neck = NeckReading(heightFraction = 0.125, widthFraction = 0.045, bandCoverage = 1.0),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
         )
 
         assertEquals(
