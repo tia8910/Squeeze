@@ -11,6 +11,7 @@ import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
 import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.scan.BodyDetector
+import com.squeeze.app.scan.ClipAppearance
 import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
@@ -25,6 +26,7 @@ import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AnatomicalLevelFinder
+import com.squeeze.core.scan.AppearanceEstimator
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
@@ -216,6 +218,19 @@ data class ScanUiState(
     /** Why the part model found no neck, when it ran and found none. */
     val neckRefusal: NeckRefusal? = null,
     /**
+     * Body fat as the on-device vision-language model reads it from how the body looks.
+     *
+     * The one reading in this scan taken from inside the outline: whether the abdominal
+     * muscles show through the skin, which is what separates a lean body from a very lean one
+     * and what every width-based method throws away. See AppearanceEstimator for what it was
+     * tested against and how far that goes.
+     *
+     * Null for women, whose reference descriptions do not exist yet — the ones that do
+     * describe men, and the same visible leanness sits eight to ten points higher on a woman.
+     * Null too when the model is missing from a build or cannot load.
+     */
+    val appearance: BodyFatEstimate? = null,
+    /**
      * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
      *
      * Null when no part mask was produced. Below [BodyPartMap.MIN_BARE_ABDOMEN] the definition
@@ -264,6 +279,7 @@ data class ScanUiState(
 class ScanViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val detector: BodyDetector,
+    private val appearanceModel: ClipAppearance,
     private val measurementDao: MeasurementDao,
     private val profileDao: ProfileDao,
     private val photoStore: ScanPhotoStore,
@@ -623,8 +639,22 @@ class ScanViewModel @Inject constructor(
                 ?.let { ScanWarning.ScaleFromLandmarks(it) },
         )
 
+        // The on-device vision-language model, off the main thread: a first run copies an 88 MB
+        // model out of the APK, and every run is a ViT forward pass on the CPU.
+        val appearance = frontBitmap
+            ?.takeIf { Sex.valueOf(profile.sex) == Sex.MALE }
+            ?.let { bitmap -> withContext(Dispatchers.Default) { appearanceModel.estimate(bitmap) } }
+            ?.let {
+                BodyFatEstimate(
+                    percent = it,
+                    method = EstimationMethod.VISUAL_ASSESSMENT,
+                    standardErrorPercent = AppearanceEstimator.STANDARD_ERROR_PERCENT,
+                )
+            }
+
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,
+            appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
             // Ratios divide two measurements from the same photograph, so scale error

@@ -919,7 +919,15 @@ private fun ResultStep(
         // and the match goes back to being a cross-check further down.
         // The tape reading leads whenever the photograph produced one: it is measured from
         // this body's own girths rather than bounded by the method's limits.
-        val headline = state.tape ?: if (bounded) visual ?: shape else shape
+        // **The on-device vision-language model**, reading what the outline cannot: whether
+        // the muscle shows through the skin. It answers where the outline could only give a
+        // floor, below the tape equation (which measured this body's girths) and below a band
+        // the user picked on the ladder themselves (which is their own call on their own
+        // body). Where the outline did resolve, the outline leads and this does not.
+        val ai = state.appearance
+        val headline = state.tape
+            ?: if (bounded) visual ?: ai ?: shape else shape ?: ai
+        val fromAi = ai != null && headline === ai
 
         headline?.let {
             ShapeHeadline(
@@ -927,8 +935,9 @@ private fun ResultStep(
                 indices = state.shapeIndices,
                 // Non-null only when the appearance match has replaced a bound, so the copy
                 // can say what the outline managed on its own before being superseded.
-                supersededBound = shape.takeIf { _ -> bounded && visual != null },
+                supersededBound = shape.takeIf { _ -> bounded && (visual != null || fromAi) },
                 fromTape = state.tape != null,
+                fromAi = fromAi,
                 scaleInferred = state.scaleFromTrunk,
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
@@ -1183,7 +1192,18 @@ private fun ResultStep(
         AccuracyDisclaimer()
 
         Button(
-            onClick = { onSave(c, weight.toCm(), visualPercent, knownPercent.toCm()) },
+            // The AI's reading is stored in the appearance column when the user has not
+            // picked a band: it is an appearance reading, it carries the same ±5, and the
+            // repository already folds that column into the saved figure. A band the user
+            // picked wins, because it is their own call on their own body.
+            onClick = {
+                onSave(
+                    c,
+                    weight.toCm(),
+                    visualPercent ?: state.appearance?.percent,
+                    knownPercent.toCm(),
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Save")
@@ -1604,6 +1624,8 @@ private fun ShapeHeadline(
     fromTape: Boolean = false,
     /** True when those girths rest on a stature worked out from the trunk, not measured. */
     scaleInferred: Boolean = false,
+    /** True when [estimate] is the on-device vision-language model's reading of the photo. */
+    fromAi: Boolean = false,
     /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
      *
@@ -1619,7 +1641,7 @@ private fun ShapeHeadline(
     // what is printed under it.
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
     // The outline gave up and the appearance ladder answered in its place.
-    val fromAppearance = supersededBound != null
+    val fromAppearance = supersededBound != null && !fromAi
     // The interval starts where the method's knowledge starts. A bounded reading has ruled
     // out everything below its floor — the copy under this number says so in words — so
     // drawing the range down to 3% contradicted the card's own sentence, and made the leanest
@@ -1643,6 +1665,7 @@ private fun ShapeHeadline(
             // what is left is the outline's own floor, which is a bound and says so.
             label = when {
                 fromTape -> "Measured from your waist and neck"
+                fromAi -> "Read by on-device AI from how you look"
                 fromAppearance -> "From how you look"
                 bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
@@ -1661,6 +1684,7 @@ private fun ShapeHeadline(
                 // Said because it is the thing that was untrue for a long time and is now
                 // true: the girths came off this photograph and the figure came off them.
                 fromTape -> "Read from your photo"
+                fromAi -> "Read from your photo · on-device AI"
                 fromAppearance -> "Your appearance, not your outline"
                 else -> null
             },
@@ -1684,6 +1708,24 @@ private fun ShapeHeadline(
                         } else {
                             ""
                         }
+
+                // The model read it. Said plainly what it is, what it looked at, what it was
+                // tested on and that nothing left the phone — and the outline's floor is
+                // printed beside it, because the two are independent and can disagree.
+                fromAi ->
+                    "An AI model running on this phone looked at your photo the way a coach " +
+                        "would — at whether your abdominal muscles show through the skin, " +
+                        "which your outline cannot see — and compared it with descriptions " +
+                        "of bodies from stage-lean to overweight. Nothing left your phone. " +
+                        (
+                            supersededBound?.let {
+                                "Your outline on its own only got as far as \"no leaner " +
+                                    "than %.1f%%\". ".format(it.floorPercent ?: it.percent)
+                            } ?: ""
+                            ) +
+                        "It has been checked on only a handful of photos, so it carries five " +
+                        "points either side; picking your band below overrides it, and a " +
+                        "tape at your navel and neck settles it better than either."
 
                 // The outline bounded it and the ladder answered. Both numbers are printed,
                 // because a user who places himself well under what his own outline would

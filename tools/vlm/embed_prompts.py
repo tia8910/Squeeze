@@ -1,0 +1,68 @@
+"""Writes app/src/main/assets/clip_prompts.json: the text side of the on-device model.
+
+The prompts are fixed, so their embeddings are computed once, here, and shipped as numbers.
+The phone then needs only the image encoder — the text encoder is 254 MB and would do the
+same arithmetic on the same fifteen sentences every time.
+
+    pip install onnxruntime open_clip_torch
+    python tools/vlm/embed_prompts.py
+"""
+import hashlib
+import json
+import pathlib
+import sys
+import urllib.request
+
+import numpy as np
+import onnxruntime as ort
+import open_clip
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from prompts import PROMPT_SETS  # noqa: E402
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+URL = ("https://clip-as-service.s3.us-east-2.amazonaws.com/"
+       "models-436c69702d61732d53657276696365/onnx/ViT-B-32/textual.onnx")
+SHA256 = "0af04c287a3be2570eaef7a1ef896d81c1989602df67a8905941afed589e545e"
+CACHE = pathlib.Path.home() / ".cache" / "squeeze" / "clip_vitb32_textual.onnx"
+
+
+def fetch():
+    if CACHE.exists() and hashlib.sha256(CACHE.read_bytes()).hexdigest() == SHA256:
+        return CACHE
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(URL, CACHE)
+    actual = hashlib.sha256(CACHE.read_bytes()).hexdigest()
+    if actual != SHA256:
+        CACHE.unlink()
+        sys.exit(f"checksum mismatch for the text encoder: {actual}")
+    return CACHE
+
+
+def main():
+    session = ort.InferenceSession(str(fetch()))
+    tokenizer = open_clip.get_tokenizer("ViT-B-32")
+    sets = []
+    for prompt_set in PROMPT_SETS:
+        texts = [p for _, p in prompt_set]
+        ids = tokenizer(texts).numpy().astype(np.int32)
+        out = session.run(None, {"input_ids": ids, "attention_mask": (ids != 0).astype(np.int32)})[0]
+        out = out / np.linalg.norm(out, axis=1, keepdims=True)
+        sets.append({
+            "anchors": [float(v) for v, _ in prompt_set],
+            "prompts": texts,
+            "embeddings": [[round(float(x), 6) for x in row] for row in out],
+        })
+    doc = {
+        "model": "OpenAI CLIP ViT-B/32 (MIT), ONNX export from Jina clip-as-service",
+        "logitScale": 100.0,
+        "sets": sets,
+    }
+    target = ROOT / "app" / "src" / "main" / "assets" / "clip_prompts.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(doc, separators=(",", ":")) + "\n")
+    print(f"wrote {target} ({target.stat().st_size} bytes)")
+
+
+if __name__ == "__main__":
+    main()

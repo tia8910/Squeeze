@@ -18,3 +18,6 @@ keystore.properties
 app/src/main/assets/*.task
 app/src/main/assets/*.tflite
 walletlens-app
+# The on-device CLIP image encoder is fetched and quantised by tools/vlm/prepare_clip.py.
+app/src/main/assets/*.onnx
+__pycache__/

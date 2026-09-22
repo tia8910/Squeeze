@@ -138,6 +138,7 @@ dependencies {
     implementation(libs.health.connect)
 
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.onnxruntime.android)
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
