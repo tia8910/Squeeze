@@ -23,11 +23,30 @@ are computed here instead of on every phone.
 ## How it reads
 
 The photo is padded to a square, resized to 224 and embedded. Each of three phrasings of
-five bodies (stage-lean 5% … overweight 28%) turns the similarities into a probability;
+five bodies turns the similarities into a probability;
 the reading is the expected body fat, averaged over the three phrasings. See
 `AppearanceEstimator` in `:core`.
 
-## What it was tested on — and what that does not show
+## The scale is the app's own ladder
+
+The five reference bodies are valued exactly as the app's appearance ladder values them:
+stage condition 5%, abs clearly visible relaxed 8%, soft layer over the lower stomach 15%,
+no visible abs 20%, clearly rounded stomach 30%. The first version used 10% and 28% for two
+of them, which put the AI on a different scale from the ladder printed under its reading.
+Re-anchoring changed no model and no text, only what the answers are worth:
+
+| | target | anchors 5/10/15/20/28 | **anchors 5/8/15/20/30 (shipped)** |
+|---|---|---|---|
+| stage-lean bodybuilder | 7% | 7.7 | **7.3** |
+| lean man, abs visible relaxed | 8% | 10.8 | **9.1** |
+| softer man, day 1 | 16% | 16.8 | **16.7** |
+| softer man, day 2 | 16% | 15.5 | **15.1** |
+| average error | | 1.2 | **0.8** |
+
+Tuning further to force every photo onto its target would be fitting four photographs, and
+would make the next one worse.
+
+## Which model, and why
 
 Four photographs, all run locally; no photograph went through CI or anywhere else.
 

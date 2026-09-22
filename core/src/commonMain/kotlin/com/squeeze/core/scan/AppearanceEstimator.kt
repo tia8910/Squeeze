@@ -38,10 +38,15 @@ class PromptSet(
  * are averaged, so the answer does not rest on one guess about how the model reads
  * language.
  *
- * **What it was tested against, stated plainly.** Four photographs: a stage-lean
- * bodybuilder (about 5%), a lean man with his abdominals visible relaxed (about 10%), and two
- * of a man with a soft lower stomach (about 16%). The shipped model reads them 7.7%, 10.8%,
- * 16.8% and 15.5% — right order, within about two points, unmoved by mirroring. That is
+ * **Its scale is the app's own ladder** — see VisualAssessment. The reference bodies are
+ * valued at stage condition 5%, abs visible relaxed 8%, a soft lower stomach 15%, no visible
+ * abs 20%, a rounded stomach 30%, so the AI and the ladder printed beneath it agree on what
+ * a body that looks like this is worth.
+ *
+ * **What it was tested against, stated plainly.** Four photographs, against the owner's own
+ * targets: a stage-lean bodybuilder (7%), a lean man with his abdominals visible relaxed
+ * (8%), and two of a man with a soft lower stomach (16%). The shipped model reads them 7.3%,
+ * 9.1%, 16.7% and 15.1% — right order, within about a point, unmoved by mirroring. That is
  * enough to trust the ordering and nowhere near enough to call it validated, which is why
  * [STANDARD_ERROR_PERCENT] is wide.
  *
@@ -61,7 +66,7 @@ object AppearanceEstimator {
      * The interval this reading is printed with, in body-fat points.
      *
      * Set to match the appearance ladder rather than earned from a validation set, because
-     * there is no validation set: three photographs is a check that it works, not a measure
+     * there is no validation set: four photographs is a check that it works, not a measure
      * of how well.
      */
     const val STANDARD_ERROR_PERCENT = 5.0
