@@ -107,18 +107,40 @@ object BodyPartMap {
     const val MIN_BAND_COVERAGE = 0.5
 
     /**
-     * How much wider than the face's own skin a neck run may be before it is disbelieved.
+     * How wide a neck run may be, against the face's own bare skin, before it is disbelieved.
      *
      * A neck is narrower than a head, but not by as much as it looks: bare face skin is
      * cheekbone to cheekbone, hair and ears excluded, and a beard or a fringe takes more of
-     * it away. On a clean-shaven man the two widths are within a few centimetres of each
-     * other, so a guard set at parity would throw away good necks.
+     * it away. Measured on a real photograph through this pipeline the two came out at 23 and
+     * 25 pixels — a ratio of 0.92 — so a guard set at parity would throw away good necks.
      *
-     * Set where it only catches the failure it is for. A band that has bled into the
-     * shoulders measures a trapezius, which is roughly twice a neck; thirty per cent over the
-     * face leaves every real neck alone and rejects that one outright.
+     * Set where it only catches the failure it is for. A run that has taken in the shoulders
+     * is a trapezius, and the same photograph measured 88 to 148 pixels across one row below
+     * the jaw. Thirty per cent over the face leaves every real neck alone and rejects that.
      */
     const val MAX_NECK_TO_FACE_WIDTH = 1.3
+
+    /**
+     * And how narrow, which is the guard that replaced smoothing.
+     *
+     * **This used to be a three-row median.** Each row's width was replaced by the median of
+     * itself and its neighbours before the minimum was taken, so that one segmentation notch
+     * could not decide the reading. It is a reasonable defence against a notch and it encodes
+     * an assumption that is simply false: that a neck is at least three rows tall.
+     *
+     * On a front-double-biceps photograph it is one row tall. The arms come in beside the head
+     * immediately below the jaw, so the rows under the chin measured 23, 88, 148, 147 — neck,
+     * then arms — and the median turned the 23 into 88, which the guard above then rejected as
+     * a trapezius. The app fell back to the silhouette, read 54.3 cm, threw that out as
+     * impossible, and printed its constant. The one correct measurement in the photograph was
+     * destroyed by the step protecting it.
+     *
+     * A ratio bound does the same job without the assumption, because it is a fact about
+     * bodies rather than about how many rows a body occupies: a notch is a fraction of a neck,
+     * and a neck is not a fraction of a face. Forty-five per cent is far below any real
+     * ratio — the measured one was 0.92 — which is what a guard against artefacts should be.
+     */
+    const val MIN_NECK_TO_FACE_WIDTH = 0.45
 
     /**
      * Share of the midsection that must be bare skin before a definition score means anything.
@@ -198,31 +220,37 @@ object BodyPartMap {
         val coverage = covered.toDouble() / runWidths.size.toDouble()
         if (coverage < MIN_BAND_COVERAGE) return null
 
-        // **Smoothed over three rows before the minimum is taken.**
+        // **The narrowest row that is the size a neck is.**
         //
-        // The neck genuinely narrows towards the jaw, so a minimum is the right selector —
-        // but a minimum over raw rows is decided by the single worst row in the band, and one
-        // row is exactly what a segmentation notch costs. Replacing each row by the median of
-        // itself and its neighbours leaves a real narrowing untouched and cannot be moved by
-        // a one-row defect at all.
+        // Both ends of the bound do real work and both catch a failure this app has actually
+        // shipped. Above it is a trapezius or a pair of raised arms merged with the neck, read
+        // as a 54.3 cm neck and thrown out downstream as impossible. Below it is a
+        // segmentation notch, which a plain minimum would take every time because a minimum is
+        // decided by the single worst row in the band.
+        //
+        // Judging each row on its own against the face means the neck may be one row tall,
+        // which on a front-double-biceps photograph is exactly what it is. The rule the
+        // smoothing replaced could not survive that; see [MIN_NECK_TO_FACE_WIDTH].
+        val narrowestAllowed = widestFaceRow * MIN_NECK_TO_FACE_WIDTH
+        val widestAllowed = widestFaceRow * MAX_NECK_TO_FACE_WIDTH
+
         var bestRow = -1
         var bestWidth = Int.MAX_VALUE
         for (index in runWidths.indices) {
-            if (runWidths[index] < MIN_NECK_PIXELS) continue
-            val smoothed = medianOfNeighbours(runWidths, index) ?: continue
-            if (smoothed < bestWidth) {
-                bestWidth = smoothed
+            // Named for what it is rather than `width`, which is this function's image width
+            // and would be shadowed here — the return below divides by that one.
+            val runWidth = runWidths[index]
+            if (runWidth < MIN_NECK_PIXELS) continue
+            if (widestFaceRow > 0 && (runWidth < narrowestAllowed || runWidth > widestAllowed)) {
+                continue
+            }
+            if (runWidth < bestWidth) {
+                bestWidth = runWidth
                 bestRow = bandStart + index
             }
         }
 
         if (bestRow < 0 || bestWidth == Int.MAX_VALUE) return null
-
-        // A neck is narrower than the head above it. When it is not, the band has bled into
-        // the shoulders — a shoulder landmark placed low, or a subject leaning back — and the
-        // run being measured is a trapezius. That reading is what drove the equation to a
-        // negative body fat before any of this existed.
-        if (widestFaceRow > 0 && bestWidth > widestFaceRow * MAX_NECK_TO_FACE_WIDTH) return null
 
         return NeckReading(
             heightFraction = (bestRow + 0.5) / height.toDouble(),
@@ -321,11 +349,4 @@ object BodyPartMap {
         return end - start + 1
     }
 
-    /** Median of this row's width and its present neighbours', or null if the row is absent. */
-    private fun medianOfNeighbours(widths: IntArray, index: Int): Int? {
-        val window = (index - 1..index + 1)
-            .mapNotNull { widths.getOrNull(it)?.takeIf { w -> w >= MIN_NECK_PIXELS } }
-            .sorted()
-        return if (window.isEmpty()) null else window[window.size / 2]
-    }
 }

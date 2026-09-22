@@ -417,6 +417,43 @@ class AutomaticScanBuilderTest {
     }
 
     @Test
+    fun `when the model says there is no neck, the silhouette does not answer instead`() {
+        // **What a fallback cost on a real photograph.** The part model refused a
+        // front-double-biceps pose, the builder fell through to the silhouette, and the
+        // silhouette's narrowest chin-to-shoulder row was a trapezius between two raised arms:
+        // 54.3 cm, discarded downstream as impossible, leaving the scan exactly where it had
+        // been. A refusal the model made deliberately must not be filled in by the measurement
+        // it was brought in to replace.
+        val silhouetteAnswers = AutomaticScanBuilder.build(figure(80), anchors())
+        assertTrue(silhouetteAnswers.any { it.site == ScanSite.NECK })
+
+        val modelRefused = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = null,
+            partMaskRead = true,
+        )
+
+        assertTrue(
+            modelRefused.none { it.site == ScanSite.NECK },
+            "a refused neck must stay refused",
+        )
+        // Only the neck. Every other site is still the silhouette's to measure.
+        assertTrue(modelRefused.any { it.site == ScanSite.WAIST })
+        assertTrue(modelRefused.any { it.site == ScanSite.HIP })
+    }
+
+    @Test
+    fun `no part mask at all leaves the silhouette's neck where it was`() {
+        // The flag distinguishes "the model says no" from "there was no model". On a device
+        // where the part segmenter failed to load, the scan must behave exactly as it did
+        // before the model existed rather than lose a site.
+        val noModel = AutomaticScanBuilder.build(figure(80), anchors(), partMaskRead = false)
+
+        assertTrue(noModel.any { it.site == ScanSite.NECK })
+    }
+
+    @Test
     fun `a position measured on another mask lands in this profile's rows`() {
         // The part segmenter emits 256 square whatever the photograph was, so its rows are
         // not this profile's rows. Fractions are what cross that boundary; treating one

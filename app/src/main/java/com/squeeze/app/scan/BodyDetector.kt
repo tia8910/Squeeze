@@ -79,6 +79,16 @@ data class DetectedBody(
      * man in a t-shirt. This is what lets the caller know that number is fabric.
      */
     val bareAbdomenFraction: Double? = null,
+    /**
+     * Whether the part model ran and produced a mask at all.
+     *
+     * A different fact from [neck] being non-null, and the distinction matters: a mask that
+     * was read and found no neck is the model's answer, and the silhouette's neck is not a
+     * fallback for it. Without this flag the pipeline cannot tell "no model" from "the model
+     * says there is no neck in this photograph", and on the second it went on to measure a
+     * trapezius.
+     */
+    val partMaskRead: Boolean = false,
 )
 
 /** Why a photo could not be measured. Each maps to advice the user can act on. */
@@ -426,6 +436,7 @@ class BodyDetector @Inject constructor(
                     framing = ScanFraming.FULL_BODY,
                     neck = parts?.first,
                     bareAbdomenFraction = parts?.second,
+                    partMaskRead = parts != null,
                 ),
             )
         }
@@ -481,6 +492,7 @@ class BodyDetector @Inject constructor(
                     framing = ScanFraming.TORSO,
                     neck = parts?.first,
                     bareAbdomenFraction = parts?.second,
+                    partMaskRead = parts != null,
                 ),
             )
         }
@@ -509,6 +521,7 @@ class BodyDetector @Inject constructor(
                     framing = ScanFraming.UPPER_BODY,
                     neck = parts?.first,
                     bareAbdomenFraction = parts?.second,
+                    partMaskRead = parts != null,
                 ),
             )
         }

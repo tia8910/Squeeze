@@ -226,6 +226,13 @@ object AutomaticScanBuilder {
      *   the narrowest row of head-plus-hair-plus-collar and the model's is bare neck skin.
      *   Averaging a measurement with a quantity that is not the measurement is how a pipeline
      *   ends up confidently between two answers, neither of them right.
+     * @param partMaskRead whether a part mask was produced at all, which is a different fact
+     *   from whether it found a neck. When it was read and [neck] is still null, the model
+     *   looked at the chin-to-shoulder band and found no neck in it — and the silhouette's
+     *   neck is then **dropped rather than used as a fallback**, for the same reason it is not
+     *   averaged: it is not a weaker reading of the same thing. On the photograph that
+     *   prompted this, falling back produced a 54.3 cm neck, which is a trapezius with a pair
+     *   of raised arms attached to it.
      * @return markers for every site the available views support. A site needing a width
      *   that was not found is dropped rather than guessed.
      */
@@ -238,6 +245,7 @@ object AutomaticScanBuilder {
         backAnchors: PoseAnchors? = null,
         hipsInFrame: Boolean = true,
         neck: NeckReading? = null,
+        partMaskRead: Boolean = false,
     ): List<ScanMarker> {
         val detected = AnatomicalLevelFinder.detectSites(
             frontProfile, frontAnchors, hipsInFrame = hipsInFrame,
@@ -247,9 +255,19 @@ object AutomaticScanBuilder {
         // reading at all.** A neck the model located is added even when the silhouette search
         // returned nothing, which is the usual case and was the whole failure: no neck, no
         // `waist − neck`, no Navy estimate, and a constant printed in its place.
-        val frontSites = when (neck) {
-            null -> detected
-            else -> detected + (ScanSite.NECK to frontProfile.rowAt(neck.heightFraction))
+        //
+        // And when the model was asked and said there is no neck here, the silhouette does not
+        // get to answer instead. Falling through to it is how a photograph with the model
+        // running still reported a 54.3 cm neck — the outline of a trapezius between two
+        // raised arms — which the plausibility ranges then discarded, leaving the scan exactly
+        // where it was before any of this was built.
+        val frontSites = when {
+            neck != null ->
+                detected + (ScanSite.NECK to frontProfile.rowAt(neck.heightFraction))
+
+            partMaskRead -> detected - ScanSite.NECK
+
+            else -> detected
         }
         val sideSites = if (sideProfile != null && sideAnchors != null) {
             AnatomicalLevelFinder.detectSites(

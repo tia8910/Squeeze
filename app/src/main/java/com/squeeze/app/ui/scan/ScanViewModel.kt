@@ -451,6 +451,10 @@ class ScanViewModel @Inject constructor(
             // Null here is still null downstream — a covered neck is refused rather than
             // guessed — but it is now refused for a reason the app can name.
             neck = front.neck,
+            // Separate from the neck itself. When the mask was read and found nothing, the
+            // silhouette's neck is dropped rather than substituted — see the parameter's
+            // documentation for the 54.3 cm reading that fallback produced.
+            partMaskRead = front.partMaskRead,
         )
 
         // Centimetres only where the photograph can support them. A trunk-framed shot has

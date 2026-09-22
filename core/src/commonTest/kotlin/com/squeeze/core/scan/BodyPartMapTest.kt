@@ -109,8 +109,10 @@ class BodyPartMapTest {
 
     @Test
     fun `one bad row cannot decide the neck`() {
-        // A three-pixel notch at row 30. A plain minimum would take it and report a neck
-        // under half the real width; the three-row median leaves the answer where it was.
+        // A three-pixel notch at row 30, which a plain minimum would take and report as a neck
+        // under half the real width. Three pixels is 0.23 of the face's thirteen, well under
+        // the 0.45 a neck has to reach, so the row is not eligible and the answer does not
+        // move.
         val labels = standing().apply {
             fill(30..30, 29..35, BodyPartMap.HAIR)
             fill(30..30, 31..33, BodyPartMap.BODY_SKIN)
@@ -120,6 +122,54 @@ class BodyPartMapTest {
 
         assertNotNull(reading)
         assertEquals(7.0 / 64.0, reading.widthFraction, 1e-9)
+    }
+
+    /**
+     * The photograph that broke the first version of this, at the proportions the model
+     * actually returned for it.
+     *
+     * A front-double-biceps pose: arms up, so they close in beside the head immediately below
+     * the jaw. Running the shipped model over that photograph gave a bare face 25 pixels wide
+     * and, in the rows under the chin, midline skin runs of **23, 88, 148, 147** — one row of
+     * neck and then arms. Scaled to this 64-square grid: face 13, neck 12, arms 45.
+     */
+    private fun armsRaised() = blank().apply {
+        fill(0..9, 24..40, BodyPartMap.HAIR)
+        fill(10..24, 24..40, BodyPartMap.HAIR)
+        fill(10..24, 26..38, BodyPartMap.FACE_SKIN)
+        // One row of neck, and that is all there is.
+        fill(25..25, 26..37, BodyPartMap.BODY_SKIN)
+        // Arms merged with the shoulders from here down.
+        fill(26..63, 10..54, BodyPartMap.BODY_SKIN)
+    }
+
+    @Test
+    fun `a neck one row tall is still a neck`() {
+        // **The regression.** The rule this replaced smoothed each row against its neighbours
+        // before taking the minimum, which assumed a neck is at least three rows tall. Here it
+        // is one row tall, so the median turned twelve into forty-five, the width guard read
+        // that as a trapezius and refused — and the app fell back to the silhouette, measured
+        // 54.3 cm across a trapezius and two raised arms, threw that out as impossible, and
+        // printed its constant to a competition bodybuilder.
+        val reading = BodyPartMap.readNeck(armsRaised(), dim, dim, shoulderRow = 35)
+
+        assertNotNull(reading)
+        assertEquals(12.0 / 64.0, reading.widthFraction, 1e-9)
+        assertEquals((25.5) / 64.0, reading.heightFraction, 1e-9)
+    }
+
+    @Test
+    fun `where the shoulder landmark lands does not move a one row neck`() {
+        // The corollary, and why a bound on width beats a bound on rows: every row below the
+        // neck is out of range on its own, so adding more of them changes nothing. On the real
+        // photograph the reading was identical for every shoulder row from 59 to 80.
+        val readings = listOf(28, 35, 45, 60, 63).map {
+            BodyPartMap.readNeck(armsRaised(), dim, dim, shoulderRow = it)
+        }
+
+        readings.forEach { assertNotNull(it) }
+        assertEquals(1, readings.map { it!!.widthFraction }.distinct().size, "$readings")
+        assertEquals(12.0 / 64.0, readings.first()!!.widthFraction, 1e-9)
     }
 
     @Test
