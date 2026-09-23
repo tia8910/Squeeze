@@ -78,6 +78,20 @@ interface WorkoutDao {
     @Insert
     suspend fun insert(set: LoggedSetEntity): Long
 
+    @Query("SELECT * FROM logged_sets WHERE epochDay >= :sinceEpochDay ORDER BY epochDay ASC, id ASC")
+    suspend fun since(sinceEpochDay: Long): List<LoggedSetEntity>
+
+    /** The sets of [exerciseName] from the last day it was logged before [beforeEpochDay]. */
+    @Query(
+        """
+        SELECT * FROM logged_sets WHERE exerciseName = :exerciseName AND epochDay = (
+            SELECT MAX(epochDay) FROM logged_sets
+            WHERE exerciseName = :exerciseName AND epochDay < :beforeEpochDay
+        ) ORDER BY id ASC
+        """,
+    )
+    suspend fun lastSession(exerciseName: String, beforeEpochDay: Long): List<LoggedSetEntity>
+
     @Delete
     suspend fun delete(set: LoggedSetEntity)
 
@@ -149,4 +163,36 @@ interface DefinitionLabelDao {
 
     @Query("DELETE FROM definition_labels")
     suspend fun deleteAll()
+}
+
+@Dao
+interface PhysiqueDao {
+
+    @Query("SELECT * FROM physique_reads ORDER BY epochDay DESC LIMIT 1")
+    suspend fun latest(): PhysiqueReadEntity?
+
+    @Query("SELECT * FROM physique_reads WHERE epochDay = :epochDay")
+    suspend fun on(epochDay: Long): PhysiqueReadEntity?
+
+    @Query("SELECT * FROM physique_reads WHERE epochDay < :epochDay ORDER BY epochDay DESC LIMIT 1")
+    suspend fun before(epochDay: Long): PhysiqueReadEntity?
+
+    @Upsert
+    suspend fun upsert(read: PhysiqueReadEntity)
+
+    @Query("DELETE FROM physique_reads")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface ActivityDao {
+
+    @Query("SELECT * FROM activity_sessions WHERE epochDay >= :sinceEpochDay ORDER BY epochDay DESC, id DESC")
+    suspend fun since(sinceEpochDay: Long): List<ActivitySessionEntity>
+
+    @Insert
+    suspend fun insert(session: ActivitySessionEntity): Long
+
+    @Delete
+    suspend fun delete(session: ActivitySessionEntity)
 }

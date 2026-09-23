@@ -155,6 +155,11 @@ object LeanMassPlausibility {
         return estimate.copy(
             percent = estimate.percent.coerceIn(range),
             standardErrorPercent = maxOf(estimate.standardErrorPercent, BOUND_ERROR_PERCENT),
+            // The gate has just said the method's own reading was physically impossible, so
+            // the method's floor is no longer what constrains the answer — height and weight
+            // are. Carrying it forward would let an interval start above the figure it
+            // belongs to, which is how a card ends up reading "most likely 16-14%".
+            floorPercent = null,
         )
     }
 }

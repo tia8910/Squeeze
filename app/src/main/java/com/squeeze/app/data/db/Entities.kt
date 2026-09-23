@@ -128,6 +128,16 @@ data class ProfileEntity(
     /** A bodyweight to arrive at. Null when the goal is not about weight. */
     val targetWeightKg: Double? = null,
     val targetEpochDay: Long? = null,
+    /**
+     * Sessions a week, as the training programme was last generated with. Read by the
+     * nutrition plan for its activity factor, so the two cannot disagree about how hard the
+     * user trains. Null until a programme has been generated.
+     */
+    val trainingDaysPerWeek: Int? = null,
+    /** The sports the user trains, comma-separated `Discipline` names; null until chosen. */
+    val disciplines: String? = null,
+    /** Favourite foods, `|`-separated names from the food library; null until chosen. */
+    val favouriteFoods: String? = null,
 )
 
 /**
@@ -159,4 +169,42 @@ data class DefinitionLabelEntity(
     val unusable: Boolean,
     /** When the judgement was made, so a revision can be told from an original. */
     val labelledEpochDay: Long,
+)
+
+/**
+ * One AI physique read: how developed each muscle group looked on a saved scan's front photo.
+ *
+ * Kept so the rest of the app can act on it — the training programme prioritises the weak
+ * groups, the nutrition plan explains itself in terms of them, and the next scan can show
+ * what moved. One row per day; a second scan on the same day replaces the first.
+ *
+ * @param scores `GROUP=score` pairs separated by commas, e.g. `CHEST=0.42,ARMS=0.31`
+ * @param goal the goal the read was ranked against
+ */
+@Entity(tableName = "physique_reads")
+data class PhysiqueReadEntity(
+    @PrimaryKey val epochDay: Long,
+    val goal: String,
+    val scores: String,
+)
+
+/**
+ * One logged session of any sport — a run, a Pilates class, a match, a gym session.
+ *
+ * Strength sets are logged set by set in [LoggedSetEntity]; this row carries the session's
+ * duration and energy so the nutrition plan can count what was actually done.
+ *
+ * @param sport a `Sport` name
+ * @param netKcal calories above rest, worked out at logging time from the bodyweight then
+ */
+@Entity(tableName = "activity_sessions")
+data class ActivitySessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val sport: String,
+    val title: String,
+    val minutes: Int,
+    val intensity: String,
+    val distanceKm: Double?,
+    val netKcal: Int,
 )

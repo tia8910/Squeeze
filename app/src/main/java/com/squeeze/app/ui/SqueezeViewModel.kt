@@ -51,6 +51,8 @@ data class SqueezeUiState(
      * target, and the day it is read on changes the answer.
      */
     val goalProgress: GoalProgress? = null,
+    /** The journey and a line from every feature, for the top of the dashboard. */
+    val summary: com.squeeze.app.data.DashboardSummary? = null,
     val loading: Boolean = true,
 )
 
@@ -62,6 +64,7 @@ class SqueezeViewModel @Inject constructor(
     private val securitySettings: SecuritySettings,
     private val uiSettings: UiSettings,
     private val photoStore: ScanPhotoStore,
+    private val coach: com.squeeze.app.data.CoachRepository,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
@@ -123,6 +126,9 @@ class SqueezeViewModel @Inject constructor(
                         ?: existing?.targetBodyFatPercent,
                     targetWeightKg = targetWeightKg ?: existing?.targetWeightKg,
                     targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
+                    trainingDaysPerWeek = existing?.trainingDaysPerWeek,
+                    disciplines = existing?.disciplines,
+                    favouriteFoods = existing?.favouriteFoods,
                 ),
             )
             refresh()
@@ -173,6 +179,27 @@ class SqueezeViewModel @Inject constructor(
         refresh()
     }
 
+    /** The AI physique analysis saved with [entry]'s scan, merged with its measurements. */
+    suspend fun physiqueFor(entry: MeasurementEntity): com.squeeze.core.scan.PhysiqueReport? {
+        val read = coach.physiqueOn(entry.epochDay) ?: return null
+        return coach.physiqueReport(
+            read,
+            com.squeeze.core.model.Circumferences(
+                neckCm = entry.neckCm, waistCm = entry.waistCm, hipCm = entry.hipCm,
+                chestCm = entry.chestCm, thighCm = entry.thighCm, armCm = entry.armCm,
+                calfCm = entry.calfCm,
+            ),
+        )
+    }
+
+    /** Opens today's planned session in the log, then [then] navigates there. */
+    fun startTodaysSession(then: () -> Unit) {
+        viewModelScope.launch {
+            coach.prepareTodaysSession()
+            then()
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             // History is loaded before the profile check: measurements a user entered
@@ -196,6 +223,7 @@ class SqueezeViewModel @Inject constructor(
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
                 goalProgress = goalProgress(profile, snapshot, measurements),
+                summary = coach.dashboard(),
                 loading = false,
             )
         }

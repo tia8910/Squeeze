@@ -9,26 +9,44 @@ import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
+import com.squeeze.app.data.CoachRepository
 import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.scan.BodyDetector
+import com.squeeze.app.scan.ClipAppearance
 import com.squeeze.app.scan.DetectedBody
 import com.squeeze.app.scan.DetectionFailure
 import com.squeeze.app.scan.DetectionResult
 import com.squeeze.app.scan.PhotoLoader
+import com.squeeze.core.bodycomp.BodyFatCalculator
 import com.squeeze.core.bodycomp.LeanMassPlausibility
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
+import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.MeasurementSource
 import com.squeeze.core.model.Profile
 import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AbdominalProfile
+import com.squeeze.core.scan.AnatomicalLevelFinder
+import com.squeeze.core.scan.AppearanceEstimator
+import com.squeeze.core.scan.AppearanceReading
+import com.squeeze.core.scan.CropRegion
+import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.MuscleGroup
+import com.squeeze.core.scan.PhysiqueAnalysis
+import com.squeeze.core.bodycomp.MeasuredParts
+import com.squeeze.core.scan.PhysiqueRegions
+import com.squeeze.core.scan.PhysiqueReport
+import com.squeeze.core.model.Goal
 import com.squeeze.core.scan.AutomaticScanBuilder
+import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
 import com.squeeze.core.scan.BodyScanAnalyser
-import com.squeeze.core.scan.PlateauCorroboration
 import com.squeeze.core.scan.PostureAnalysis
 import com.squeeze.core.scan.PostureFinding
 import com.squeeze.core.scan.Proportion
+import com.squeeze.core.scan.LandmarkStature
+import com.squeeze.core.scan.NeckReading
+import com.squeeze.core.scan.NeckRefusal
 import com.squeeze.core.scan.ScaleRecovery
 import com.squeeze.core.scan.ScaleSource
 import com.squeeze.core.scan.ScanFraming
@@ -42,6 +60,7 @@ import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,6 +77,39 @@ import javax.inject.Inject
  * for a second width reading.
  */
 enum class ScanStep { WEIGHT, FRONT, OPTIONAL_EXTRAS, SIDE, BACK, ANALYSING, RESULT }
+
+/**
+ * Where the on-device models are in reading a photograph, in the order they run.
+ *
+ * Each stage is entered when that work actually starts and left when it finishes. The screen
+ * shows what is really happening, not an animation timed to look busy.
+ */
+enum class ScannerStage { FINDING_BODY, BODY_FOUND, MEASURING, AI_READING, MUSCLES, DONE }
+
+/**
+ * The photograph being scanned, and what the models have found in it so far.
+ *
+ * @param photo the photograph, the same way up as [landmarks] were measured on it
+ * @param landmarks the pose model's shoulders, hips, ankles and face, once it has run
+ * @param aiRegion the part of the photograph the vision-language model is shown
+ * @param reading what that model concluded, once it has
+ * @param muscleRegions where each muscle group is, as the model is shown it
+ * @param activeGroup the group the model is judging right now
+ * @param muscleScores each group's score, filled in as the model reaches it
+ * @param aiRuns whether the vision-language model will run on this scan at all, so the
+ *   screen does not promise a stage that is not coming
+ */
+data class AiScanner(
+    val photo: Bitmap,
+    val stage: ScannerStage,
+    val landmarks: FrontPoseGeometry? = null,
+    val aiRegion: CropRegion? = null,
+    val reading: AppearanceReading? = null,
+    val aiRuns: Boolean = true,
+    val muscleRegions: Map<MuscleGroup, List<CropRegion>> = emptyMap(),
+    val activeGroup: MuscleGroup? = null,
+    val muscleScores: Map<MuscleGroup, Double> = emptyMap(),
+)
 
 data class ScanUiState(
     val step: ScanStep = ScanStep.WEIGHT,
@@ -149,24 +201,95 @@ data class ScanUiState(
      */
     val framing: ScanFraming = ScanFraming.FULL_BODY,
     /**
+     * True when the scan's centimetres rest on a stature inferred from the trunk, because the
+     * feet were outside the frame.
+     *
+     * Recorded so the saved row can say so and be weighted accordingly. Without it a scan
+     * scaled from a soft ruler would be stored as though its girths were measured, and a
+     * scale error multiplies every one of them together.
+     */
+    val scaleFromTrunk: Boolean = false,
+    /**
+     * What the tape equation made of the girths this photograph produced.
+     *
+     * **Here because the result card could not report it.** That card has only ever shown
+     * [shape] — the outline's own reading — so a scan that measured a waist, a neck and a
+     * chest still printed the outline's constant under the words "not resolved by the photo".
+     * The photograph had resolved it; the card had nowhere to say so.
+     *
+     * Null when the scan produced no usable girths, which is the honest case the copy was
+     * written for.
+     */
+    val tape: BodyFatEstimate? = null,
+    /**
      * How much abdominal structure the front photograph showed, in arbitrary units.
      *
-     * Null when the crop was too dark or too small. Not a percentage and not comparable
-     * between people — a model's sharper abdomen measured 21.9 against another man's soft one
-     * at 16.5 — which is why it corroborates a reading rather than producing one.
+     * Null when the crop was too dark, too small or too evenly lit. Not a percentage and not
+     * comparable between people, which is why nothing on the result screen is decided by it:
+     * it is kept so one user's own scans can be compared with each other, and for no other
+     * purpose. A release that let it settle a reading is described in the view model.
      */
     val definitionScore: Double? = null,
-    /** What that reading said about the surface, and so what the scan may claim. */
-    val definitionVerdict: PlateauCorroboration.Verdict =
-        PlateauCorroboration.Verdict.UNCERTAIN,
     /**
-     * True when the outline landed on its plateau and the abdomen settled it.
+     * True when the neck in [tape] came from the part-segmentation model rather than being
+     * absent.
      *
-     * Recorded rather than inferred on the screen: from the figure alone the screen cannot
-     * tell a corroborated plateau reading from one the outline resolved by itself, and
-     * guessing would need the sex and the floor and would still be a guess.
+     * Surfaced because the difference is the whole scan. Without it there is no `waist − neck`
+     * and no tape reading at all, and the result screen has spent several releases printing
+     * the outline method's constant while saying "not resolved by the photo" underneath.
      */
-    val settledByAbdomen: Boolean = false,
+    val neckFromModel: Boolean = false,
+    /**
+     * Exactly what the part model made of the neck, for the result screen to print.
+     *
+     * Here because two releases were spent inferring the model's behaviour from a single
+     * centimetre figure on a screenshot, and guessing wrong both times. The ratio to the face
+     * says outright whether it found a neck or the top of a trapezius, and whether the model
+     * ran at all is a separate fact from whether it found one.
+     */
+    val neckReading: NeckReading? = null,
+    /** Whether a part mask was produced at all, as distinct from it finding a neck. */
+    val partMaskRead: Boolean = false,
+    /**
+     * The waist as the silhouette measured it, as a fraction of frame width.
+     *
+     * Printed beside the part model's own waist so the two masks can be compared directly
+     * rather than inferred from a centimetre figure. Inferring it is how a diagnosis of "two
+     * coordinate spaces, a factor of 1.34" was reached from a waist row measured in the wrong
+     * place; the two numbers side by side settle it in one glance.
+     */
+    val silhouetteWaistFraction: Double? = null,
+    /** Why the part model found no neck, when it ran and found none. */
+    val neckRefusal: NeckRefusal? = null,
+    /**
+     * Body fat as the on-device vision-language model reads it from how the body looks.
+     *
+     * The one reading in this scan taken from inside the outline: whether the abdominal
+     * muscles show through the skin, which is what separates a lean body from a very lean one
+     * and what every width-based method throws away. See AppearanceEstimator for what it was
+     * tested against and how far that goes.
+     *
+     * Null for women, whose reference descriptions do not exist yet — the ones that do
+     * describe men, and the same visible leanness sits eight to ten points higher on a woman.
+     * Null too when the model is missing from a build or cannot load.
+     */
+    val appearance: BodyFatEstimate? = null,
+    /**
+     * Share of the midsection the part model found to be bare skin, 0.0 to 1.0.
+     *
+     * Null when no part mask was produced. Below [BodyPartMap.MIN_BARE_ABDOMEN] the definition
+     * score is withheld rather than shown, because at that point it is measuring cloth.
+     */
+    val bareAbdomenFraction: Double? = null,
+    /**
+     * The on-device model's read of each muscle group, and what it means for the user's goal.
+     * Null when the model did not run — see [appearance] for when that is.
+     */
+    val physique: PhysiqueReport? = null,
+    /** The last saved physique read before today, and its day, for "since last scan". */
+    val previousPhysique: Pair<Long, Map<MuscleGroup, Double>>? = null,
+    /** What the scanner screen draws while the models run; null outside [ScanStep.ANALYSING]. */
+    val scanner: AiScanner? = null,
 ) {
     /**
      * What the photograph supports, and nothing else.
@@ -209,9 +332,11 @@ data class ScanUiState(
 class ScanViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val detector: BodyDetector,
+    private val appearanceModel: ClipAppearance,
     private val measurementDao: MeasurementDao,
     private val profileDao: ProfileDao,
     private val photoStore: ScanPhotoStore,
+    private val coach: CoachRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScanUiState())
@@ -341,11 +466,18 @@ class ScanViewModel @Inject constructor(
         _state.value.step in setOf(ScanStep.FRONT, ScanStep.SIDE, ScanStep.BACK)
 
     private fun fail(reason: DetectionFailure) {
-        _state.value = _state.value.copy(step = capturing, failure = reason)
+        _state.value = _state.value.copy(step = capturing, failure = reason, scanner = null)
+    }
+
+    private fun showScanner(scanner: AiScanner) {
+        if (_state.value.step == ScanStep.ANALYSING) {
+            _state.value = _state.value.copy(scanner = scanner)
+        }
     }
 
     private suspend fun process(bitmap: Bitmap) {
         val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+        showScanner(AiScanner(photo = bitmap, stage = ScannerStage.FINDING_BODY))
 
         // Inference is heavy and synchronous; off the main thread or the UI freezes.
         val detection = withContext(Dispatchers.Default) { detector.detect(bitmap) }
@@ -378,10 +510,22 @@ class ScanViewModel @Inject constructor(
                     }
                 }
 
+                // Held on screen long enough to be seen: the landmarks the pose model just
+                // placed, over the photograph they were placed on.
+                showScanner(
+                    AiScanner(
+                        photo = frontBitmap?.takeIf { capturing == ScanStep.FRONT } ?: bitmap,
+                        stage = ScannerStage.BODY_FOUND,
+                        landmarks = detection.body.geometry.takeIf { capturing == ScanStep.FRONT },
+                    ),
+                )
+                delay(BODY_FOUND_DWELL_MS)
+
                 // Always return to the decision point. The user chooses when they have
                 // given the scan enough; nothing forces a second photograph.
                 _state.value = _state.value.copy(
                     step = ScanStep.OPTIONAL_EXTRAS,
+                    scanner = null,
                     failure = null,
                     hasSide = sideBody != null,
                     hasBack = backBody != null,
@@ -402,6 +546,19 @@ class ScanViewModel @Inject constructor(
             return
         }
 
+        val isMale = Sex.valueOf(profile.sex) == Sex.MALE
+        val aiRegion = front.geometry?.let(AppearanceEstimator::region)
+        val scanner = frontBitmap?.let { photo ->
+            AiScanner(
+                photo = photo,
+                stage = ScannerStage.MEASURING,
+                landmarks = front.geometry,
+                aiRegion = aiRegion,
+                aiRuns = isMale,
+            )
+        }
+        scanner?.let(::showScanner)
+
         val markers = AutomaticScanBuilder.build(
             frontProfile = front.profile,
             frontAnchors = front.anchors,
@@ -410,6 +567,21 @@ class ScanViewModel @Inject constructor(
             backProfile = back?.profile,
             backAnchors = back?.anchors,
             hipsInFrame = front.framing.hipsInShot,
+            // **The neck the part model found, and the whole reason the tape path can run.**
+            //
+            // The silhouette search that used to supply this looked for the narrowest row
+            // between the chin and the shoulders in a one-bit mask, where neck, hair, collar
+            // and trapezius are all the same colour. On real photographs it returned nothing
+            // at all, which meant no `waist − neck`, no Navy estimate, and the outline
+            // method's constant printed under the words "not resolved by the photo".
+            //
+            // Null here is still null downstream — a covered neck is refused rather than
+            // guessed — but it is now refused for a reason the app can name.
+            neck = front.neck,
+            // Separate from the neck itself. When the mask was read and found nothing, the
+            // silhouette's neck is dropped rather than substituted — see the parameter's
+            // documentation for the 54.3 cm reading that fallback produced.
+            partMaskRead = front.partMaskRead,
         )
 
         // Centimetres only where the photograph can support them. A trunk-framed shot has
@@ -417,17 +589,44 @@ class ScanViewModel @Inject constructor(
         // a fabricated stature does not produce a slightly wrong scan, it produces a
         // confidently wrong one — every girth is multiplied by the same bad number.
         val result = front.scale?.let { scale ->
-            BodyScanAnalyser(
-                scale = ScaleRecovery(
-                    heightCm = profile.heightCm,
-                    // The cross-checked figure, not the silhouette's own extent. Detection
-                    // has already compared the outline against the pose landmarks and, where
-                    // they disagreed, dropped back to the reference that cannot pick up a
-                    // mirror frame — see ScaleCrossCheck.
-                    bodyHeightFraction = scale.bodyHeightFraction,
-                ),
-                imageAspectRatio = frontAspectRatio,
-            ).analyse(markers)
+            // **The trunk-scaled path degrades instead of dying, and only that path.**
+            //
+            // Enabling it turned a scan that produced no centimetres into one that produces
+            // them, which put a photograph through code it had never reached. The first
+            // attempt crashed the app on the measure button. A second bug of the same shape
+            // would do it again, and a user staring at "Squeeze.fit closed because this app
+            // has a bug" has lost the whole scan — including the shape figure, which never
+            // needed a scale at all.
+            //
+            // So a failure here falls back to exactly what this photograph did before the
+            // trunk span existed: no centimetres, the shape reading intact. That is a real
+            // outcome the app already knows how to present, not a swallowed error.
+            //
+            // Deliberately not extended to a measured scale. A full-body scan throwing is a
+            // bug in code that has always run, and hiding it would cost the evidence.
+            val measureInCentimetres: () -> ScanResult = {
+                BodyScanAnalyser(
+                    scale = ScaleRecovery(
+                        heightCm = profile.heightCm,
+                        // The cross-checked figure, not the silhouette's own extent.
+                        // Detection has already compared the outline against the pose
+                        // landmarks and, where they disagreed, dropped back to the reference
+                        // that cannot pick up a mirror frame — see ScaleCrossCheck.
+                        bodyHeightFraction = scale.bodyHeightFraction,
+                        // A trunk-framed scan's stature was worked out from the nose-to-hip
+                        // span rather than measured, so it may exceed the frame — which is a
+                        // legitimate reading and used to be an uncaught exception.
+                        statureInferred = scale.source == ScaleSource.TRUNK_SPAN,
+                    ),
+                    imageAspectRatio = frontAspectRatio,
+                ).analyse(markers)
+            }
+
+            if (scale.source == ScaleSource.TRUNK_SPAN) {
+                runCatching(measureInCentimetres).getOrNull()
+            } else {
+                measureInCentimetres()
+            }
         } ?: ScanResult(
             circumferences = Circumferences(),
             warnings = emptyList(),
@@ -464,22 +663,18 @@ class ScanViewModel @Inject constructor(
         // difference between eight per cent and fifteen.
         val definition = frontBitmap?.let { AbdomenCrop.measure(it, front.geometry) }
 
-        val outlineOnly = shapeIndices
+        // The outline's reading, and the only one. A previous release let the definition score
+        // above corroborate a reading the outline could not resolve — a lean outline over a
+        // defined abdomen being two independent signals agreeing — and the argument was sound
+        // while the measurement was not. That score had no zero: a patch of blank painted wall
+        // in a real scan photograph read 21.3 against a threshold of 20, and the smooth
+        // abdomen it was asked about read 37.9, the highest figure this project has recorded.
+        // It was reading the camera's noise, so the app printed "Read from your photo" over
+        // the plateau's own constant. See AbdominalDefinition, which now has a measured zero
+        // and still has no threshold, because having a zero is not the same as being
+        // calibrated against other people's bodies.
+        val shapeEstimate = shapeIndices
             ?.let { SilhouetteBodyFat.estimate(it, Sex.valueOf(profile.sex)) }
-
-        // Two photo-derived signals that fail independently. Every way an outline is
-        // corrupted makes a denominator wider and the reading leaner; none of them puts
-        // grooves on a stomach. So a lean outline over a defined abdomen is agreement, and a
-        // plateau reading stops being "not resolved by the photo" — the photograph resolved
-        // it, just not with its border.
-        val shapeEstimate = PlateauCorroboration.apply(outlineOnly, definition)
-
-        // Whether that is what happened, decided here rather than re-derived on the screen
-        // from the figure and the sex. The screen would have to guess; this knows.
-        val settledByAbdomen = outlineOnly != null &&
-            shapeEstimate != null &&
-            outlineOnly.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT &&
-            shapeEstimate.standardErrorPercent < SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
 
         // Fetched here so the headline has a build to fall back on before the user types
         // anything. Without it a plateau reading has nothing to resolve against and prints
@@ -530,8 +725,76 @@ class ScanViewModel @Inject constructor(
                 ?.let { ScanWarning.ScaleFromLandmarks(it) },
         )
 
+        // The on-device vision-language model, off the main thread: a first run copies an 88 MB
+        // model out of the APK, and every run is a ViT forward pass on the CPU.
+        //
+        // Shown the torso rather than the whole frame — see AppearanceEstimator.region.
+        scanner?.let { showScanner(it.copy(stage = ScannerStage.AI_READING)) }
+        val reading = frontBitmap
+            ?.takeIf { isMale }
+            ?.let { bitmap ->
+                withContext(Dispatchers.Default) { appearanceModel.read(bitmap, aiRegion) }
+            }
+        val appearance = reading?.let {
+            BodyFatEstimate(
+                percent = it.percent,
+                method = EstimationMethod.VISUAL_ASSESSMENT,
+                standardErrorPercent = AppearanceEstimator.STANDARD_ERROR_PERCENT,
+            )
+        }
+
+        // Then each muscle group on a crop of its own, read against the goal the user set.
+        // The scanner follows along: the group being judged is outlined on the photograph,
+        // and its score appears the moment it is known.
+        // Only groups the photo actually shows: a region that is mostly clothing, by the part
+        // model's reading, is skipped rather than judged — thighs in shorts are the shorts.
+        val allRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
+        val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys)
+        val muscleRegions = allRegions - hidden
+        var live = scanner?.copy(
+            stage = ScannerStage.MUSCLES,
+            reading = reading,
+            muscleRegions = muscleRegions,
+        )
+        val physique = frontBitmap
+            ?.takeIf { isMale && reading != null && muscleRegions.isNotEmpty() }
+            ?.let { bitmap ->
+                live?.let(::showScanner)
+                val scores = withContext(Dispatchers.Default) {
+                    appearanceModel.readMuscles(
+                        bitmap,
+                        muscleRegions,
+                        onGroup = { group ->
+                            live = live?.copy(activeGroup = group)
+                            live?.let(::showScanner)
+                        },
+                        onScored = { group, score ->
+                            live = live?.copy(muscleScores = live?.muscleScores.orEmpty() + (group to score))
+                            live?.let(::showScanner)
+                        },
+                    )
+                }
+                val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
+                val (measuredStrong, measuredWeak) =
+                    MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
+                PhysiqueAnalysis.report(scores, goal, hidden, measuredStrong, measuredWeak)
+            }
+
+        // The verdict stays up for a moment, beside the bodies it was weighed against,
+        // before the result card replaces it.
+        if (scanner != null) {
+            showScanner(
+                (live ?: scanner).copy(stage = ScannerStage.DONE, reading = reading, activeGroup = null),
+            )
+            delay(if (reading != null) VERDICT_DWELL_MS else BODY_FOUND_DWELL_MS)
+        }
+
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,
+            scanner = null,
+            physique = physique,
+            previousPhysique = physique?.let { coach.physiqueBefore(LocalDate.now().toEpochDay()) },
+            appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
             // Ratios divide two measurements from the same photograph, so scale error
@@ -541,12 +804,50 @@ class ScanViewModel @Inject constructor(
             shapeIndices = shapeIndices,
             knownWeightKg = knownWeight,
             framing = front.framing,
+            scaleFromTrunk = front.scale?.source == ScaleSource.TRUNK_SPAN,
+            // The tape equation on the girths this photograph produced, carrying the same
+            // widened interval the saved row will get, so the card and the record agree
+            // rather than quietly differing by a couple of points.
+            tape = BodyFatCalculator.navy(profile.toScanProfile(), result.circumferences)
+                ?.let { navy ->
+                    val fromScale = if (front.scale?.source == ScaleSource.TRUNK_SPAN) {
+                        BodyFatCalculator.navyScaleSensitivityPercent(
+                            profile.toScanProfile(),
+                            result.circumferences,
+                            LandmarkStature.TRUNK_SPAN_SCALE_ERROR,
+                        ) ?: 0.0
+                    } else {
+                        0.0
+                    }
+                    val base = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent
+                    navy.copy(
+                        method = EstimationMethod.PHOTO_FRONT_ONLY,
+                        standardErrorPercent = kotlin.math.sqrt(
+                            base * base + fromScale * fromScale,
+                        ),
+                    )
+                },
             abdominalBodyFatPercent = abdominal,
             poseAdvice = ArmClearance.verdict(front.profile, front.anchors),
             lightingAdvice = lighting?.advice,
-            definitionScore = definition?.takeIf { it.usable }?.score,
-            definitionVerdict = PlateauCorroboration.verdict(definition),
-            settledByAbdomen = settledByAbdomen,
+            // Withheld over clothing. The metric reads shadow contrast across the midsection
+            // and a shirt supplies plenty of it — harder-edged than skin, in fact, because a
+            // fold casts a line that no amount of body fat does. Until the part model existed
+            // there was no way to tell the two apart, so a clothed scan produced a score in
+            // the same units and the same range as a bare one and nothing said which it was.
+            definitionScore = definition
+                ?.takeIf { it.usable }
+                ?.score
+                ?.takeIf { (front.bareAbdomenFraction ?: 1.0) >= BodyPartMap.MIN_BARE_ABDOMEN },
+            neckFromModel = front.neck != null,
+            neckReading = front.neck,
+            partMaskRead = front.partMaskRead,
+            neckRefusal = front.neckRefusal,
+            silhouetteWaistFraction = AnatomicalLevelFinder
+                .narrowestBetween(front.profile, front.anchors.shoulderRow, front.anchors.hipRow)
+                ?.let { front.profile.torsoWidthAt(it) }
+                ?.takeIf { it > 0.0 },
+            bareAbdomenFraction = front.bareAbdomenFraction,
             // Shoulder level always; hip level only when the hips were in the picture. An
             // inferred hip line is level because the prior is level, not because the body is.
             posture = front.geometry
@@ -594,10 +895,15 @@ class ScanViewModel @Inject constructor(
                     // A front-only scan assumed its depth, so it is stored as a distinct
                     // source and weighted by its own wider error rather than passed off as
                     // a full two-photo measurement.
-                    source = if (result.depthAssumed) {
-                        MeasurementSource.PHOTO_FRONT_ONLY.name
-                    } else {
-                        MeasurementSource.PHOTO.name
+                    // A trunk-scaled scan is named first, because its inference sits further
+                    // upstream than the assumed depth: depth affects one axis of each girth,
+                    // an inferred scale multiplies all of them at once.
+                    source = when {
+                        _state.value.scaleFromTrunk ->
+                            MeasurementSource.PHOTO_TRUNK_SCALED.name
+
+                        result.depthAssumed -> MeasurementSource.PHOTO_FRONT_ONLY.name
+                        else -> MeasurementSource.PHOTO.name
                     },
                     weightKg = weight,
                     neckCm = c.neckCm,
@@ -630,6 +936,15 @@ class ScanViewModel @Inject constructor(
             )
 
             frontBitmap = null
+            // The AI's physique read goes where training and nutrition can use it.
+            _state.value.physique?.let { report ->
+                coach.savePhysique(
+                    epochDay = LocalDate.now().toEpochDay(),
+                    goal = report.goal,
+                    scores = report.scores.associate { it.group to it.score },
+                    hidden = report.hidden.toSet(),
+                )
+            }
             _state.value = _state.value.copy(saved = true)
         }
     }
@@ -668,3 +983,9 @@ private fun ProfileEntity.toScanProfile() = Profile(
     birthYear = birthYear,
     sex = Sex.valueOf(sex),
 )
+
+/** How long the landmarks the pose model found stay on screen before moving on. */
+private const val BODY_FOUND_DWELL_MS = 900L
+
+/** How long the AI's verdict stays beside its reasoning before the result replaces it. */
+private const val VERDICT_DWELL_MS = 1_800L

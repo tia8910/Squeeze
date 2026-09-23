@@ -27,6 +27,33 @@ data class FrontPoseGeometry(
      * to check the silhouette's idea of the subject's height against a second opinion.
      */
     val nose: PosePoint? = null,
+    /**
+     * Midpoint of the mouth landmarks, which is what the neck band is measured down from.
+     *
+     * Here because a trunk-framed scan had to invent it and invented it wrong. [TorsoFraming]
+     * placed the chin a quarter of the trunk span above the shoulders, which on a real
+     * photograph landed *below* the jaw and put the neck search on the trapezius. The neck
+     * then measured wider than it is, `waist − neck` collapsed, and the Navy equation returned
+     * nothing — so a scan that had measured a waist and a chest still reported the outline's
+     * constant and told its user the photograph could not resolve him.
+     *
+     * [AnatomicalLevelFinder]'s own comment predicted it: the trapezius flare "is how a 175 cm
+     * man ends up with a 52 cm neck, which drives the Navy equation to a negative body fat and
+     * so produces no estimate at all". The full-body path always used this landmark. The trunk
+     * path could not reach it.
+     */
+    val mouth: PosePoint? = null,
+    /**
+     * Elbows, wrists and knees, for [PhysiqueRegions]: the arms and legs are judged on crops
+     * of their own, and a crop of an arm needs to know where the arm is. Null when the pose
+     * model did not report them.
+     */
+    val elbowLeft: PosePoint? = null,
+    val elbowRight: PosePoint? = null,
+    val wristLeft: PosePoint? = null,
+    val wristRight: PosePoint? = null,
+    val kneeLeft: PosePoint? = null,
+    val kneeRight: PosePoint? = null,
 )
 
 /** One postural observation, in degrees, with the reading that makes it usable. */

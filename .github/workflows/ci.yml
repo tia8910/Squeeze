@@ -110,6 +110,24 @@ jobs:
           echo "VERSION_NAME=0.3.0-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
           echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
 
+      # The on-device vision-language model: fetched from a pinned URL, checksum-verified
+      # and compressed to 48.5 MB. See tools/vlm/prepare_clip.py.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache the on-device CLIP model
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/assets/clip_vitb32_laion_q4.onnx
+          key: clip-vitb32-laion-q4-81148049
+
+      - name: Prepare the on-device CLIP model
+        run: |
+          pip install --quiet onnx==1.17.0 onnxruntime==1.20.1
+          python tools/vlm/prepare_clip.py
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 

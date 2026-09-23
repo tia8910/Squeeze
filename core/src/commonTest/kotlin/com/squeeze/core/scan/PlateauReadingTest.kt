@@ -1,9 +1,12 @@
 package com.squeeze.core.scan
 
+import com.squeeze.core.bodycomp.VisualAssessment
+import com.squeeze.core.model.EstimationMethod
 import com.squeeze.core.model.Sex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -51,6 +54,106 @@ class PlateauReadingTest {
                 estimate.percent <= ceiling + 1e-9,
                 "ratio $ratio gave ${estimate.percent}, above the ceiling $ceiling",
             )
+        }
+    }
+
+    @Test
+    fun `a bounded reading carries the floor it was clamped to`() {
+        // So the card can draw an interval that starts where the method's knowledge starts.
+        // It used to draw "most likely 3-21%" beneath a sentence promising the reader was no
+        // leaner than 11.6 — the lower half of that range being a region the method had
+        // already ruled out, under a figure that was the boundary of the exclusion.
+        Sex.entries.forEach { sex ->
+            val estimate = SilhouetteBodyFat.estimate(ShapeIndices(0.65, null), sex)
+
+            assertNotNull(estimate, "$sex")
+            val floor = estimate.floorPercent
+            assertNotNull(floor, "$sex lost its floor")
+            assertEquals(SilhouetteBodyFat.leanestClaimable(sex), floor, 1e-9, "$sex")
+            assertTrue(
+                estimate.percent - estimate.standardErrorPercent < floor,
+                "$sex: the floor must be doing work, not sitting below the interval",
+            )
+        }
+    }
+
+    @Test
+    fun `the appearance ladder is the better instrument on a bounded reading`() {
+        // The scan result screen is ordered on this and nothing else. When the outline gives
+        // a bound, the visual match moves out of the footer and directly under the headline,
+        // and its figure leads. That is only right while it is the more precise of the two.
+        //
+        // It was in the footer, marked "optional", introduced as a check on the figure above
+        // it — six cards below a constant it beats by four points of standard error. If the
+        // two ever cross, the screen ordering is wrong and this fails rather than the user
+        // finding out.
+        assertTrue(
+            EstimationMethod.VISUAL_ASSESSMENT.standardErrorPercent <
+                SilhouetteBodyFat.PLATEAU_ERROR_PERCENT,
+            "visual ${EstimationMethod.VISUAL_ASSESSMENT.standardErrorPercent} vs " +
+                "plateau ${SilhouetteBodyFat.PLATEAU_ERROR_PERCENT}",
+        )
+
+        // And it must stay a genuinely different instrument rather than a second opinion on
+        // the same measurement: the outline reads the border, this reads what is inside it.
+        val bound = SilhouetteBodyFat.estimate(ShapeIndices(0.65, null), Sex.MALE)
+        assertNotNull(bound)
+        val fromAppearance = VisualAssessment.estimate(15.0, Sex.MALE)
+        assertNotNull(fromAppearance)
+        assertTrue(fromAppearance.standardErrorPercent < bound.standardErrorPercent)
+    }
+
+    @Test
+    fun `a resolved reading has no floor, because nothing was clamped`() {
+        val estimate = SilhouetteBodyFat.estimate(ShapeIndices(0.90, null), Sex.MALE)
+
+        assertNotNull(estimate)
+        assertNull(estimate.floorPercent)
+    }
+
+    @Test
+    fun `a softening body never reads leaner, across the whole range of ratios`() {
+        // **The assertion that reverted a change to this file.** Reporting the floor is a
+        // systematic understatement — a man whose midsection a coach reads near sixteen is
+        // shown 11.6 — so the figure was moved to the middle of the range the method admits.
+        // The floor truncates hard, so lifting only the truncated readings made the function
+        // fall exactly where it has to rise: on the hip path, 0.853 read 16.1% and 0.860 read
+        // 12.2%, a body 3.9 points leaner for having got softer.
+        //
+        // A bias is systematic and cancels when someone compares themselves against
+        // themselves. This does not. It is precision rather than accuracy, and precision is
+        // what this app is for, so the understatement stays until something can actually read
+        // the surface.
+        //
+        // Asserted in fine steps and on both denominators, because the failure lived in a
+        // hundredth of a ratio at the edge of the plateau and the coarse sweeps elsewhere in
+        // this file stepped straight over it.
+        Sex.entries.forEach { sex ->
+            var previous = 0.0
+            var ratio = 0.56
+            while (ratio <= 1.39) {
+                val shoulderOnly = SilhouetteBodyFat.estimate(ShapeIndices(ratio, null), sex)
+                assertNotNull(shoulderOnly, "$sex shoulder $ratio")
+                assertTrue(
+                    shoulderOnly.percent >= previous - 1e-9,
+                    "$sex: shoulder ratio $ratio read ${shoulderOnly.percent} after $previous",
+                )
+                previous = shoulderOnly.percent
+                ratio += 0.005
+            }
+
+            previous = 0.0
+            var hip = 0.56
+            while (hip <= 1.44) {
+                val withHip = SilhouetteBodyFat.estimate(ShapeIndices(0.80, hip), sex)
+                assertNotNull(withHip, "$sex hip $hip")
+                assertTrue(
+                    withHip.percent >= previous - 1e-9,
+                    "$sex: hip ratio $hip read ${withHip.percent} after $previous",
+                )
+                previous = withHip.percent
+                hip += 0.005
+            }
         }
     }
 

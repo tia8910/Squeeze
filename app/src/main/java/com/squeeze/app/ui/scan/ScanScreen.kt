@@ -90,8 +90,11 @@ import com.squeeze.app.ui.components.PrimaryButton
 import com.squeeze.core.model.BodyFatEstimate
 import com.squeeze.core.model.Circumferences
 import com.squeeze.core.model.Sex
-import com.squeeze.core.scan.PlateauCorroboration
+import com.squeeze.core.scan.BodyPartMap
+import com.squeeze.core.scan.NeckRefusal
 import com.squeeze.core.scan.ScanFraming
+import com.squeeze.core.scan.ScanSite
+import com.squeeze.core.scan.ScanWarning
 import com.squeeze.core.scan.ShapeIndices
 import com.squeeze.core.scan.SilhouetteBodyFat
 import com.google.common.util.concurrent.ListenableFuture
@@ -157,7 +160,7 @@ fun ScanScreen(
             onCheckFraming = viewModel::checkFraming,
         )
 
-        ScanStep.ANALYSING -> AnalysingStep()
+        ScanStep.ANALYSING -> state.scanner?.let { AiScannerView(it) } ?: AnalysingStep()
 
         ScanStep.RESULT -> ResultStep(
             state = state,
@@ -457,6 +460,7 @@ private fun CaptureStep(
             )
 
             CaptureGuideOverlay()
+            if (autoDetect && countdown == 0) LiveScanSweep()
             if (countdown > 0) CountdownOverlay(countdown)
         } else {
             CameraPermissionRequired(onRequest = onRequestCamera)
@@ -528,7 +532,7 @@ private fun CaptureStep(
                 // auto-capture is armed, because otherwise it is a running commentary on a
                 // photo the user has not asked to take.
                 if (autoDetect) {
-                    InfoCard(framingHint ?: "Framing looks good — hold still.")
+                    AiLiveBadge(framingHint)
                 }
 
                 Row(
@@ -796,6 +800,52 @@ private fun AnalysingStep() {
     }
 }
 
+/**
+ * What the part model actually did, in one sentence, appended to a neck failure.
+ *
+ * **Why this is on a user's screen at all.** The neck is the one measurement that decides
+ * whether this app produces a reading or prints a constant, and it has now failed three times
+ * for three different reasons that were indistinguishable from the outside: the model refused,
+ * the model was overruled by the silhouette, and the model measured the top of a trapezius.
+ * Each time the only evidence was a single centimetre figure, and each time a diagnosis was
+ * made from it that turned out to be wrong.
+ *
+ * The ratio to the face settles it in one glance. A neck measures about nine tenths of bare
+ * face width — 0.92 and 0.83 on the two readings taken from a real photograph through this
+ * pipeline. A figure near or above 1.3 is shoulder. And "no mask" is a different failure from
+ * "a mask that found nothing", which no wording of the sentence above could distinguish.
+ */
+private fun neckProvenance(state: ScanUiState): String {
+    val reading = state.neckReading
+    return when {
+        !state.partMaskRead ->
+            " The part model did not run on this photo, so that figure came from your " +
+                "outline, which cannot tell a neck from the hair and shoulders around it."
+
+        reading == null ->
+            " The part model ran and found no bare neck between your chin and your shoulders."
+
+        else ->
+            (
+                " The part model read it at %.3f of the frame against a face of %.3f — a " +
+                    "ratio of %.2f, where a neck is about 0.9 — and %.0f%% of the band was " +
+                    "bare skin. Waist: %s of the frame by the outline, %s by the part model."
+                )
+                .format(
+                    reading.widthFraction,
+                    reading.faceWidthFraction,
+                    if (reading.faceWidthFraction > 0.0) {
+                        reading.widthFraction / reading.faceWidthFraction
+                    } else {
+                        0.0
+                    },
+                    reading.bandCoverage * 100.0,
+                    state.silhouetteWaistFraction?.let { "%.3f".format(it) } ?: "none",
+                    reading.waistWidthFraction?.let { "%.3f".format(it) } ?: "none",
+                )
+    }
+}
+
 @Composable
 private fun ResultStep(
     state: ScanUiState,
@@ -842,27 +892,219 @@ private fun ResultStep(
 
         val shape = state.resolvedShape(weight.toCm())
 
-        shape?.let {
+        // Whether the outline gave up. Computed here rather than inside the headline because
+        // it decides the order of this whole screen, not just one card's wording.
+        // Whether the outline gave up *and* nothing else in the photograph answered. The
+        // second half is new: a trunk-framed scan measures a waist and a neck, so the tape
+        // equation runs, and the card was still printing the outline's constant over the
+        // words "not resolved by the photo" while a real measurement sat unused beside it.
+        val bounded = shape != null &&
+            shape.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT &&
+            state.tape == null
+
+        // The appearance match, as an estimate rather than a number, so it carries its own
+        // error alongside it.
+        val visual = state.profile?.let { profile ->
+            visualPercent?.let { VisualAssessment.estimate(it, profile.sex) }
+        }
+
+        // **What the card leads with when the outline could not answer.**
+        //
+        // A bounded reading is the method's own constant — 11.6% for every man who lands on
+        // the plateau — carrying ±9. The appearance match carries ±5 and is measured on the
+        // one thing the outline throws away: whether the muscle is visible through the skin.
+        // On an unresolved scan it is strictly the better instrument, and it was sitting six
+        // cards below the figure it outperforms, under the word "optional".
+        //
+        // Off the plateau the outline measured this body, so the headline stays the outline's
+        // and the match goes back to being a cross-check further down.
+        // The tape reading leads whenever the photograph produced one: it is measured from
+        // this body's own girths rather than bounded by the method's limits.
+        // **The on-device vision-language model**, reading what the outline cannot: whether
+        // the muscle shows through the skin. It answers where the outline could only give a
+        // floor, below the tape equation (which measured this body's girths) and below a band
+        // the user picked on the ladder themselves (which is their own call on their own
+        // body). Where the outline did resolve, the outline leads and this does not.
+        //
+        // It leads every photograph it could read, above the tape equation too. The tape
+        // runs on girths converted from pixels through a scale, and on the photographs this
+        // was checked against those girths read small: one scan put a man the model read at
+        // about 15% on 10.3%. A band the user picks on the ladder still overrides it, because
+        // that is their own call on their own body.
+        val ai = state.appearance
+        val headline = visual.takeIf { bounded } ?: ai ?: state.tape ?: shape
+        val fromAi = ai != null && headline === ai
+
+        headline?.let {
             ShapeHeadline(
                 estimate = it,
                 indices = state.shapeIndices,
-                definitionVerdict = state.definitionVerdict,
-                corroborated = state.settledByAbdomen,
+                // Non-null only when the appearance match has replaced a bound, so the copy
+                // can say what the outline managed on its own before being superseded.
+                supersededBound = shape.takeIf { _ -> bounded && (visual != null || fromAi) },
+                fromTape = state.tape != null && headline === state.tape,
+                fromAi = fromAi,
+                scaleInferred = state.scaleFromTrunk,
                 // Ordered by how much each one costs. Light first: it is the only one that
                 // can destroy the abdominal shading outright, and the only one whose damage
                 // no later step can undo.
+                // **Each of these is wrapped, and that is a fix rather than a style.**
+                //
+                // `+` binds looser than `.takeIf`, so `"a" + "b".takeIf { false }` is not null
+                // — it is the string "anull". Both entries below were written that way, which
+                // meant the hip blocker showed on every scan whatever the framing, ending in
+                // the word "null". A user photographed with his hips plainly in shot was told
+                // "your waist was read against your shoulders ... because your arms null".
                 blockers = listOfNotNull(
                     state.lightingAdvice,
                     state.poseAdvice,
-                    "Your hips were not in shot, so your waist was read against your " +
-                        "shoulders — the weaker of the two denominators, because your arms " +
-                        "attach there."
-                        .takeIf { _ -> state.framing == ScanFraming.UPPER_BODY },
-                    "No side photo, so the axis abdominal fat actually moves along was " +
-                        "never measured."
-                        .takeIf { _ -> state.abdominalBodyFatPercent == null },
+                    (
+                        "Your hips were not in shot, so your waist was read against your " +
+                            "shoulders — the weaker of the two denominators, because your " +
+                            "arms attach there."
+                        ).takeIf { state.framing == ScanFraming.UPPER_BODY },
+                    (
+                        "No side photo, so the axis abdominal fat actually moves along was " +
+                            "never measured."
+                        ).takeIf { state.abdominalBodyFatPercent == null },
+                    // **Something the app could not see until it had a part model.**
+                    //
+                    // Every width in this scan is the outline of whatever was in the
+                    // photograph, and over a loose shirt that outline is the shirt. The error
+                    // is not small and it is not random: fabric only ever adds width, so a
+                    // covered midsection reports a larger waist, and a larger waist reports
+                    // more body fat, on every scan taken that way. Nothing in a one-bit mask
+                    // distinguishes that from a wider person.
+                    state.bareAbdomenFraction
+                        ?.takeIf { it < BodyPartMap.MIN_BARE_ABDOMEN }
+                        ?.let { bare ->
+                            ("Only %.0f%% of your midsection was bare skin — the rest was " +
+                                "clothing, and the waist above is the outline of the " +
+                                "clothing. Fabric can only add width, so this reading is " +
+                                "too high rather than uncertain. Retake it bare-midriff.")
+                                .format(bare * 100.0)
+                        },
+                    // **The failure that used to be silent.**
+                    //
+                    // The tape equation needs a waist and a neck and a gap between them. When
+                    // the neck is mis-measured the gap collapses, the equation goes under two
+                    // per cent, and it returns null — so a scan that had measured both sites
+                    // printed the outline's constant and said nothing about why. A
+                    // competition-lean bodybuilder and a soft-midsectioned man both came back
+                    // at 11.6% with a waist in hand.
+                    //
+                    // Now it prints the two numbers it could not use. They are the diagnosis:
+                    // a neck near half the waist is a neck, and a neck much above that is a
+                    // trapezius.
+                    (
+                        state.result?.let { scan ->
+                            val c = scan.circumferences
+                            val neck = c.neckCm
+                            val waist = c.waistCm
+
+                            // The number the scan measured and then discarded. It has always
+                            // been carried in the warnings and has never reached a screen, so
+                            // a neck rejected at 52 cm and a neck never found at all produced
+                            // the same sentence.
+                            val rejectedNeckCm = scan.warnings
+                                .filterIsInstance<ScanWarning.ImplausibleMeasurement>()
+                                .firstOrNull { it.site == ScanSite.NECK }
+                                ?.centimetres
+
+                            when {
+                                waist == null ->
+                                    "Your waist was not measured, so the tape equation had " +
+                                        "nothing to run on."
+
+                                // **Two different failures that read identically until the
+                                // part model existed.** Either nothing found a neck at all,
+                                // or one was measured and thrown out for being outside human
+                                // limits — and the app used to discard the rejected value
+                                // without showing it, so there was no way to tell which had
+                                // happened or by how much it had missed.
+                                neck == null && rejectedNeckCm != null ->
+                                    ("Your waist measured %.1f cm and your neck came out at " +
+                                        "%.1f cm, which is outside the range a neck can be " +
+                                        "on your frame — so it was thrown out rather than " +
+                                        "used, and the tape equation needs both.")
+                                        .format(waist, rejectedNeckCm) + neckProvenance(state)
+
+                                // Named by what the model actually saw, because each reason
+                                // needs a different retake — and the commonest, a chin resting
+                                // on flexed shoulders, was being measured as a 54 cm neck.
+                                neck == null && state.neckRefusal == NeckRefusal.HIDDEN ->
+                                    ("Your waist measured %.1f cm, but your neck isn't " +
+                                        "visible in this photo: your chin sits down on your " +
+                                        "shoulders and traps, so what's under your jaw is " +
+                                        "trapezius, not neck. Flexed poses and a camera held " +
+                                        "below chest height both do this. For a reading, " +
+                                        "stand relaxed with your arms a little away from your " +
+                                        "sides, chin level, camera at chest height.")
+                                        .format(waist)
+
+                                neck == null && state.neckRefusal == NeckRefusal.COVERED ->
+                                    ("Your waist measured %.1f cm, but your neck is covered " +
+                                        "— a collar, hood or scarf — so it can't be measured. " +
+                                        "Retake it with your neck bare.").format(waist)
+
+                                neck == null && state.neckRefusal == NeckRefusal.NO_FACE ->
+                                    ("Your waist measured %.1f cm, but your face wasn't " +
+                                        "found, and the neck is located from the chin. Keep " +
+                                        "your head in the frame, facing the camera.")
+                                        .format(waist)
+
+                                neck == null && !state.neckFromModel ->
+                                    ("Your waist measured %.1f cm but no bare neck was " +
+                                        "visible between your chin and your shoulders, so " +
+                                        "there is nothing for the tape equation to measure " +
+                                        "against. A collar, a hood or a head out of frame " +
+                                        "will all do it.").format(waist) + neckProvenance(state)
+
+                                neck == null ->
+                                    "Your waist measured %.1f cm but your neck could not ".format(waist) +
+                                        "be measured, and the tape equation needs both." +
+                                        neckProvenance(state)
+
+                                else ->
+                                    "Your waist measured %.1f cm and your neck %.1f cm. "
+                                        .format(waist, neck) +
+                                        "The tape equation works on the gap between them " +
+                                        "and this one is too small to give a sane answer — " +
+                                        "a neck reading much over half the waist is the " +
+                                        "trapezius, not the neck."
+                            }
+                        }
+                        ).takeIf { state.tape == null },
                 ),
             )
+        }
+
+        // What the AI made of each muscle group, read against the user's goal. Straight after
+        // the figure because it is the other half of the same look at the photograph.
+        state.physique?.let { PhysiqueCard(it, previous = state.previousPhysique) }
+
+        // **Directly under the headline, and only when the outline could not answer.**
+        //
+        // This section spent its life at the foot of the screen, after the weight field,
+        // labelled "optional" and introduced as something that "checks the rest". On a scan
+        // that resolved, that is exactly right. On a scan that did not, it was the app
+        // offering its most accurate remaining instrument as a footnote to its least: ±5
+        // against a ±9 bound that is the same constant for every body that reaches it.
+        //
+        // The user reading that screen saw a figure in display type, the words "not resolved
+        // by the photo" beneath it, and six cards of advice before reaching the one question
+        // that would have resolved it. Position was the whole of the problem; the instrument
+        // was already built, already fused into the saved record, and already better.
+        if (bounded) {
+            state.profile?.let { profile ->
+                VisualMatchSection(
+                    sex = profile.sex,
+                    selected = visualPercent,
+                    onSelect = { visualPercent = if (visualPercent == it) null else it },
+                    measured = null,
+                    resolving = true,
+                )
+            }
         }
 
         // Said before the advice, because it changes what the advice is for. A trunk scan is
@@ -870,11 +1112,30 @@ private fun ResultStep(
         // and the only thing it gives up is a set of centimetres the figure never used.
         if (state.framing == ScanFraming.TORSO) {
             InfoCard(
-                "Measured from your trunk. Your waist, shoulders and hips were all in " +
-                    "shot, which is everything the shape reading needs — and closer " +
-                    "framing puts far more detail on your midsection. Tape measurements " +
-                    "in centimetres need your full height in the picture, so this scan " +
-                    "does not produce them.",
+                if (state.scaleFromTrunk) {
+                    // It used to end "so this scan does not produce them", and that refusal
+                    // cost the whole measurement: no centimetres meant no waist, no waist
+                    // meant the tape equation never ran, and what was left was the outline's
+                    // bound — a constant, printed under the words "not resolved by the
+                    // photo" on a photograph that had the waist and the neck in it.
+                    "Measured from your trunk. Your waist, shoulders and hips were all " +
+                        "in shot, which is everything the shape reading needs, and closer " +
+                        "framing puts far more detail on your midsection. Your feet were " +
+                        "not in shot, so your height in the picture was worked out from " +
+                        "your own proportions rather than measured. That is good enough " +
+                        "for the body-fat figure, which reads one girth difference against " +
+                        "your height and barely moves when the scale is a few per cent " +
+                        "out — the range above already includes it. Treat the centimetres " +
+                        "in your history as softer than a tape: a scale worked out this " +
+                        "way moves every one of them together, which is why the scan is " +
+                        "saved under its own name rather than as a measured one."
+                } else {
+                    "Measured from your trunk. Your waist, shoulders and hips were all in " +
+                        "shot, which is everything the shape reading needs — and closer " +
+                        "framing puts far more detail on your midsection. Tape " +
+                        "measurements in centimetres need your full height in the " +
+                        "picture, so this scan does not produce them."
+                },
             )
         }
 
@@ -924,19 +1185,35 @@ private fun ResultStep(
 
         KnownBodyFatCard(knownPercent) { knownPercent = it }
 
-        state.profile?.let { profile ->
-            VisualMatchSection(
-                sex = profile.sex,
-                selected = visualPercent,
-                onSelect = { visualPercent = if (visualPercent == it) null else it },
-                measured = shape?.percent,
-            )
+        // The cross-check position, for a scan the outline did resolve. When it did not, this
+        // has already appeared directly under the headline instead.
+        if (!bounded) {
+            state.profile?.let { profile ->
+                VisualMatchSection(
+                    sex = profile.sex,
+                    selected = visualPercent,
+                    onSelect = { visualPercent = if (visualPercent == it) null else it },
+                    measured = shape?.percent,
+                    resolving = false,
+                )
+            }
         }
 
         AccuracyDisclaimer()
 
         Button(
-            onClick = { onSave(c, weight.toCm(), visualPercent, knownPercent.toCm()) },
+            // The AI's reading is stored in the appearance column when the user has not
+            // picked a band: it is an appearance reading, it carries the same ±5, and the
+            // repository already folds that column into the saved figure. A band the user
+            // picked wins, because it is their own call on their own body.
+            onClick = {
+                onSave(
+                    c,
+                    weight.toCm(),
+                    visualPercent ?: state.appearance?.percent,
+                    knownPercent.toCm(),
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Save")
@@ -1187,6 +1464,12 @@ private fun VisualMatchSection(
     selected: Double?,
     onSelect: (Double) -> Unit,
     measured: Double?,
+    /**
+     * True when the outline landed on its plateau, so this is not a cross-check on an answer
+     * — it is the answer. The wording changes with it, because "optional, and it checks the
+     * rest" is actively misleading on a screen where there is nothing above it to check.
+     */
+    resolving: Boolean,
 ) {
     val bands = VisualAssessment.bandsFor(sex)
 
@@ -1197,11 +1480,28 @@ private fun VisualMatchSection(
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Which describes you? — optional", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "Everything above was worked out from your measurements. This is the " +
-                    "one thing the tape cannot see, so it checks the rest rather than " +
-                    "repeating it.",
+                text = if (resolving) {
+                    "Which describes you? — this is what settles it"
+                } else {
+                    "Which describes you? — optional"
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = if (resolving) {
+                    // Said in the terms the person can act on rather than as an apology.
+                    "Your outline could not separate lean from very lean — it knows your " +
+                        "edge and nothing inside it, and what separates those bodies is " +
+                        "entirely inside. Look at your own midsection and pick the line " +
+                        "that matches. It is worth more here than the figure above: five " +
+                        "points either side against nine, and it reads the one thing a " +
+                        "silhouette throws away."
+                } else {
+                    "Everything above was worked out from your measurements. This is the " +
+                        "one thing the tape cannot see, so it checks the rest rather than " +
+                        "repeating it."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1316,12 +1616,26 @@ private fun ShapeHeadline(
     estimate: BodyFatEstimate,
     indices: ShapeIndices? = null,
     /**
-     * What the abdomen's surface said, which is the only thing that can settle a plateau
-     * reading from a photograph alone. Changes what this card claims, never the figure.
+     * The outline's own bound, when the appearance match has taken over the headline from it.
+     *
+     * Non-null means [estimate] is no longer the outline's — the outline gave a floor, the
+     * user placed themselves on the appearance ladder, and that carries ±5 against the
+     * floor's ±9. The bound is still worth printing, because it is a genuine second opinion
+     * and because a user who picks a band well under it should be told the two disagree.
      */
-    definitionVerdict: PlateauCorroboration.Verdict = PlateauCorroboration.Verdict.UNCERTAIN,
-    /** True when the outline was on its plateau and the abdomen's surface settled it. */
-    corroborated: Boolean = false,
+    supersededBound: BodyFatEstimate? = null,
+    /**
+     * True when [estimate] is the tape equation run on the girths this photograph produced,
+     * rather than the outline's reading of its border.
+     *
+     * The card had no way to express this, which is why a scan that measured a waist, a neck
+     * and a chest still printed the outline's constant under "not resolved by the photo".
+     */
+    fromTape: Boolean = false,
+    /** True when those girths rest on a stature worked out from the trunk, not measured. */
+    scaleInferred: Boolean = false,
+    /** True when [estimate] is the on-device vision-language model's reading of the photo. */
+    fromAi: Boolean = false,
     /**
      * The specific things this photograph got wrong, in the order they cost accuracy.
      *
@@ -1336,11 +1650,17 @@ private fun ShapeHeadline(
     // has to say the same thing, because a number in display type reads as certain no matter
     // what is printed under it.
     val bounded = estimate.standardErrorPercent >= SilhouetteBodyFat.PLATEAU_ERROR_PERCENT
-    // Whether the abdomen is what settled this. By the time the card sees it `bounded` is
-    // already false — PlateauCorroboration narrowed the interval upstream — so the flag comes
-    // from the view model, which knows what the outline said before the surface was consulted.
-    val contradicted = bounded && definitionVerdict == PlateauCorroboration.Verdict.SMOOTH
-    val low = (estimate.percent - estimate.standardErrorPercent).coerceAtLeast(3.0)
+    // The outline gave up and the appearance ladder answered in its place.
+    val fromAppearance = supersededBound != null && !fromAi
+    // The interval starts where the method's knowledge starts. A bounded reading has ruled
+    // out everything below its floor — the copy under this number says so in words — so
+    // drawing the range down to 3% contradicted the card's own sentence, and made the leanest
+    // thing on screen a figure the method had already excluded.
+    val low = (estimate.percent - estimate.standardErrorPercent)
+        .coerceAtLeast(estimate.floorPercent ?: 3.0)
+        // An interval cannot begin above the figure it belongs to, whatever any upstream
+        // clamp did to one and not the other.
+        .coerceAtMost(estimate.percent)
     val high = estimate.percent + estimate.standardErrorPercent
     val dark = LocalIsDarkTheme.current
 
@@ -1354,7 +1674,9 @@ private fun ShapeHeadline(
             // visible abdominal separation — all returned 17.3%. That substitution is gone;
             // what is left is the outline's own floor, which is a bound and says so.
             label = when {
-                !bounded && corroborated -> "From your shape and your abdomen"
+                fromTape -> "Measured from your waist and neck"
+                fromAi -> "Read by on-device AI from how you look"
+                fromAppearance -> "From how you look"
                 bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
             },
@@ -1362,48 +1684,80 @@ private fun ShapeHeadline(
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
             interval = "most likely %.0f–%.0f%%".format(low, high),
+            // "Read from your photo" used to appear here whenever the abdomen's definition
+            // score cleared a threshold. It is gone, and the reason is worth keeping: that
+            // score had no zero, so a patch of blank wall cleared the threshold too, and the
+            // band was asserting a photographic reading over the plateau's own constant. A
+            // false claim of precision is worse than the honest refusal it replaced.
             band = when {
                 bounded -> "Not resolved by the photo"
-                // Said plainly because it is the thing the user has been waiting to see: the
-                // photograph settled it, using the surface the outline throws away.
-                corroborated -> "Read from your photo"
+                // Said because it is the thing that was untrue for a long time and is now
+                // true: the girths came off this photograph and the figure came off them.
+                fromTape -> "Read from your photo"
+                fromAi -> "Read from your photo · on-device AI"
+                fromAppearance -> "Your appearance, not your outline"
                 else -> null
             },
         )
 
         Text(
             text = when {
-                // The outline landed on its plateau and the abdomen in the same photograph
-                // showed visible structure. Those two fail in different ways — everything
-                // that corrupts an outline makes a denominator wider and the reading leaner,
-                // and none of it puts grooves on a stomach — so the pair is a measurement
-                // where either alone was not.
-                corroborated ->
-                    "Settled from the photo itself. Your outline put you in the lean " +
-                        "range and could not say where in it — a silhouette knows your " +
-                        "edge and nothing inside it. So the scan read the surface too, " +
-                        "and your abdomen showed visible separation. Those two can fail " +
-                        "in opposite directions and they agreed, which is what makes this " +
-                        "a reading of you rather than a floor. Nothing here came from " +
-                        "your height or your weight."
+                // The scan measured this body rather than bounding it. Worth saying what it
+                // measured, because "read from your photo" has been claimed before on the
+                // strength of something that turned out to be reading the camera's noise.
+                fromTape ->
+                    "Your waist and your neck were measured off this photograph and put " +
+                        "through the tape equation — the same one a fabric tape feeds, on " +
+                        "girths the picture supplied instead of your hands. Nothing here " +
+                        "is the method's own floor and nothing came from your weight." +
+                        if (scaleInferred) {
+                            " Your feet were out of frame, so your height in the picture " +
+                                "was worked out from your proportions rather than measured. " +
+                                "That softens the scale, and the range above is already " +
+                                "widened for it."
+                        } else {
+                            ""
+                        }
 
-                // A lean outline over a smooth abdomen. The exact shape of every wrong
-                // answer this app has shipped, and the user is told rather than floored
-                // quietly.
-                contradicted ->
-                    "Your outline read lean, and your abdomen did not. Those disagree, and " +
-                        "when they do it is almost always the outline that is wrong: " +
-                        "anything it picked up beside you — an arm against your side, " +
-                        "trousers at the hip, your thighs together — widens a denominator " +
-                        "and makes the reading leaner. So this stays a floor rather than a " +
-                        "reading. Arms a hand's width clear, hips in shot, and scan again."
+                // The model read it. Said plainly what it is, what it looked at, what it was
+                // tested on and that nothing left the phone — and the outline's floor is
+                // printed beside it, because the two are independent and can disagree.
+                fromAi ->
+                    "An AI model running on this phone looked at your photo the way a coach " +
+                        "would — at whether your abdominal muscles show through the skin, " +
+                        "which your outline cannot see — and compared it with descriptions " +
+                        "of bodies from stage-lean to overweight. Nothing left your phone. " +
+                        (
+                            supersededBound?.let {
+                                "Your outline on its own only got as far as \"no leaner " +
+                                    "than %.1f%%\". ".format(it.floorPercent ?: it.percent)
+                            } ?: ""
+                            ) +
+                        "It has been checked on only a handful of photos, so it carries five " +
+                        "points either side; picking your band below overrides it, and a " +
+                        "tape at your navel and neck settles it better than either."
+
+                // The outline bounded it and the ladder answered. Both numbers are printed,
+                // because a user who places himself well under what his own outline would
+                // allow has told the app something it should not quietly average away.
+                fromAppearance ->
+                    "Read from how you look, which is the one thing a silhouette cannot " +
+                        "see. Your outline only got as far as \"no leaner than " +
+                        "%.1f%%\"".format(
+                            supersededBound?.floorPercent ?: supersededBound?.percent ?: 0.0,
+                        ) +
+                        " — it knows your edge and nothing inside it, and what separates a " +
+                        "lean body from a very lean one is entirely inside. This carries " +
+                        "five points either side against the outline's nine, so it leads. " +
+                        "The saved record combines the two."
 
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
                         "throws that away — it knows your edge and nothing inside it. So " +
                         "this is a floor, not a reading of you: you are no leaner than " +
-                        "this, and the outline cannot say how much softer. The app used " +
+                        "this, and the outline cannot say how much softer — which is why " +
+                        "the range above starts here and runs upwards only. The app used " +
                         "to fill the gap from your height and weight, which gave every " +
                         "photo at your weight the same answer whatever your body looked " +
                         "like. It no longer does that. A side photo settles it from a " +
@@ -1435,7 +1789,10 @@ private fun ShapeHeadline(
         // abdominal definition was gone before the file was written, so no amount of work on
         // the estimator recovers it — but "step out of direct light" recovers it entirely,
         // and that sentence was three cards down.
-        if (bounded && blockers.isNotEmpty()) {
+        // Shown on an appearance-led reading too: the outline still failed, the reasons are
+        // still the ones the user can act on, and a better photograph next time is what stops
+        // this needing a self-assessment at all.
+        if ((bounded || fromAppearance) && blockers.isNotEmpty()) {
             Column(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),

@@ -90,6 +90,12 @@ fun CompositionScreen(
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
+    /** The journey's next step and a line from every feature; null until first loaded. */
+    summary: com.squeeze.app.data.DashboardSummary? = null,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
+    onStep: (com.squeeze.core.coach.StepId) -> Unit = {},
+    onOpenNutrition: () -> Unit = {},
+    onOpenTraining: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -101,6 +107,19 @@ fun CompositionScreen(
     ) {
         val latest = trend.lastOrNull()
 
+        // First on the screen, before any figure: the one next step, and a line from every
+        // feature. The dashboard is the way into everything, and each finished step here
+        // knocks over the next.
+        summary?.let {
+            com.squeeze.app.ui.components.JourneyCard(
+                summary = it,
+                onStep = onStep,
+                onOpenTraining = onOpenTraining,
+                onOpenNutrition = onOpenNutrition,
+                onOpenScan = onStartScan,
+            )
+        }
+
         if (latest == null) {
             EmptyState(
                 onStartScan = onStartScan,
@@ -110,7 +129,7 @@ fun CompositionScreen(
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
             }
             return@Column
         }
@@ -159,44 +178,28 @@ fun CompositionScreen(
             muscle = leanMassTrend,
         )
 
-        StatRow {
-            StatTile(
-                value = measurements.size.toString(),
-                label = if (measurements.size == 1) "Entry" else "Entries",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = daysTracked(measurements).toString(),
-                label = "Days tracked",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = lastEntryLabel(measurements),
-                label = "Last entry",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
+        // One action: the scan, which also takes the weight. Tape measurements stay
+        // available for people who use a tape, but as a quiet link rather than a second
+        // button of equal weight.
         PrimaryButton(
-            text = "Scan",
+            text = "Scan check-in",
             onClick = onStartScan,
             leading = {
                 Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
             },
         )
-        SecondaryButton(
-            text = "Enter",
-            onClick = onAddMeasurement,
-            leading = {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
+        androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.material3.Text(
+                "Enter tape measurements instead · ${measurements.size} " +
+                    (if (measurements.size == 1) "entry" else "entries") + " so far",
+            )
+        }
 
         // The full analysis lives inside each history entry rather than here. On the
         // dashboard it described whichever fields happened to be newest across different
         // sessions, which is a fine answer to "where am I now" and a poor thing to call an
         // analysis, because no single measurement ever produced that combination.
-        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
 
         repeatability?.let { RepeatabilityCard(it) }
     }
@@ -394,6 +397,7 @@ private fun HistorySection(
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onDelete: (MeasurementEntity) -> Unit,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
 ) {
     if (measurements.isEmpty()) return
 
@@ -470,6 +474,7 @@ private fun HistorySection(
                 selected = null
             },
             onDismiss = { selected = null },
+            physiqueFor = physiqueFor,
         )
     }
 }

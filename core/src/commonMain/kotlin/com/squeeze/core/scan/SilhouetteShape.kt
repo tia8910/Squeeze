@@ -101,6 +101,29 @@ object SilhouetteBodyFat {
      * A trained male at single-digit body fat runs a waist around seven-tenths of his
      * shoulder width. Women hold more of their fat on the hips and thighs and less on the
      * waist, so the same ratio sits lower on the body-fat scale for them.
+     *
+     * **This anchor is measurably too high, and the evidence is in this file twice over.**
+     *
+     * [LEAN_PLATEAU_RATIO] below cites the ratio read off labelled reference charts: 0.586 at
+     * eight per cent, 0.592 at twelve, 0.580 at fifteen. That is the same quantity this
+     * constant sets to 0.72 — a gap of 23%, with the measured figure on one side and "around
+     * seven-tenths" on the other.
+     *
+     * Segmenting a real user's full-body photograph settles which is closer. Deltoid-to-
+     * deltoid span 528 px, trunk run at the navel band 295 px, arms clear of the body and
+     * excluded: **waist-to-shoulder 0.559**, on a man a coach reads at sixteen or seventeen
+     * per cent. Against this anchor he maps below eight and is floored. Against the chart
+     * figures he maps below eight and is floored. Both, on a body that is not lean.
+     *
+     * **The reason is that this ratio does not measure adiposity.** The denominator is the
+     * shoulder span, which on a trained man is deltoid, and deltoid is muscle. A wide-
+     * shouldered man with a soft abdomen produces the same ratio as a narrow-shouldered lean
+     * one, and this pairing cannot tell them apart in either direction. That — not the
+     * silhouette's blindness to surface detail — is the larger part of why the "plateau"
+     * exists at all: a ratio whose denominator grows with training cannot be a fat scale.
+     *
+     * So re-anchoring does not fix it. The shoulder path needs replacing, not recalibrating,
+     * and what replaces it is the hip below — pelvic breadth, which training does not move.
      */
     private const val MALE_LEAN_RATIO = 0.72
     private const val MALE_LEAN_PERCENT = 8.0
@@ -120,6 +143,21 @@ object SilhouetteBodyFat {
      * limb can be counted into it; and read by exactly the same torso-run rule as the waist,
      * so numerator and denominator mean the same thing. None of those is true of the
      * shoulder.
+     *
+     * **This lean anchor is also too low, measured the same way.** The photograph described
+     * under [MALE_LEAN_RATIO] reads a hip of about 359 px against its 295 px waist —
+     * waist-to-hip **0.82** — and that hip is measured through loose shorts, so the body's own
+     * ratio is higher still. This constant assigns 0.80 to eight per cent, so a man at sixteen
+     * maps to roughly eight before the observed offset and lands on the floor.
+     *
+     * Both lean anchors therefore sit outside the range real bodies occupy on this measurement
+     * convention, which is why almost every scan falls below them and is clamped to one
+     * constant. The floor is not manufacturing that behaviour — it is the only thing standing
+     * between the user and a single-digit figure.
+     *
+     * Fixing it needs bodies whose composition is known, measured through this exact pipeline.
+     * Moving the anchors by reasoning would be the same mistake in a new place, and this file
+     * already records what that costs.
      */
     private const val MALE_LEAN_HIP_RATIO = 0.80
     private const val MALE_HIGH_HIP_RATIO = 1.06
@@ -369,6 +407,44 @@ object SilhouetteBodyFat {
     /** What the interval widens to once the outline has stopped distinguishing anything. */
     const val PLATEAU_ERROR_PERCENT = 9.0
 
+    // **Why a bounded reading reports its floor and not the middle of its range — which was
+    // tried, and had to be taken out again.**
+    //
+    // The complaint behind it is real and the diagnosis was right. A plateau scan knows two
+    // things: this body is no leaner than `leanestClaimable`, and the outline cannot say how
+    // much softer. That is a range starting at the floor, and the app publishes its lowest
+    // point. Of every value the method admits, the one printed in display type is the leanest,
+    // on every plateau scan ever taken. The user who noticed was shown 11.6% over a midsection
+    // a coach would read near sixteen.
+    //
+    // So the figure was moved to the middle of the admitted range — the floor plus half the
+    // declared interval, 16.1 for a man — and a test caught what that does at the edge of the
+    // plateau. The floor truncates hard, so lifting only the truncated readings makes the
+    // function fall where it has to rise:
+    //
+    //     hip ratio 0.853 -> 16.1%
+    //     hip ratio 0.860 -> 12.2%
+    //     hip ratio 0.870 -> 13.3%
+    //
+    // A body that got softer read 3.9 points leaner, on the hip path, which is the denominator
+    // most scans actually use. WaistSiteTest asserts the property directly — a belly that grows
+    // must move the answer up — and it failed.
+    //
+    // A figure that moves the wrong way when the body changes is worse than one that is
+    // biased. A bias is systematic and cancels when someone compares themselves against
+    // themselves; this does not. It is precision rather than accuracy, and precision is what
+    // this app is for.
+    //
+    // Making it continuous would mean lifting the resolved readings too, by up to four and a
+    // half points, and there is no evidence for that. The anchors are what they are.
+    //
+    // What survived is `BodyFatEstimate.floorPercent`: the bound travels with the reading, so
+    // the interval starts where the method's knowledge starts instead of nine points below it.
+    // The card used to print "most likely 3-21%" under a sentence promising the reader was no
+    // leaner than 11.6 — a range whose lower half the method had already ruled out. That
+    // contradiction is gone. The figure is not, and will not be until something reads the
+    // surface rather than the border.
+
     /**
      * The highest percentage a plateau reading can produce, for a given sex.
      *
@@ -493,17 +569,19 @@ object SilhouetteBodyFat {
             // The plateau is why the shoulder path cannot resolve leanness. The floor is why
             // no path may claim it. Those are two different statements and only the first one
             // is about the shoulder.
+            val hipHitFloor = fromHip < leanestClaimable(sex)
             return BodyFatEstimate(
                 percent = floored(fromHip, sex),
                 method = EstimationMethod.PHOTO_SHAPE,
                 // A floored reading is a bound rather than a measurement, and carries the
                 // interval that says so — which is also the signature PlateauPrior recognises
                 // a bound by.
-                standardErrorPercent = if (fromHip < leanestClaimable(sex)) {
+                standardErrorPercent = if (hipHitFloor) {
                     PLATEAU_ERROR_PERCENT
                 } else {
                     EstimationMethod.PHOTO_SHAPE.standardErrorPercent
                 },
+                floorPercent = if (hipHitFloor) leanestClaimable(sex) else null,
             )
         }
 
@@ -550,6 +628,7 @@ object SilhouetteBodyFat {
             percent = percent.coerceIn(MIN_PERCENT, MAX_PERCENT),
             method = EstimationMethod.PHOTO_SHAPE,
             standardErrorPercent = error,
+            floorPercent = if (onPlateau || hitFloor) leanestClaimable(sex) else null,
         )
     }
 
