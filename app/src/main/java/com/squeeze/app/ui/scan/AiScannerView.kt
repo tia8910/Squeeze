@@ -55,7 +55,12 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squeeze.core.model.Goal
 import com.squeeze.core.scan.CropRegion
+import com.squeeze.core.scan.PhysiqueReport
+import com.squeeze.core.scan.Development
+import com.squeeze.core.scan.MuscleGroup
+import com.squeeze.core.scan.PhysiqueAnalysis
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.PosePoint
 
@@ -84,6 +89,9 @@ fun AiScannerView(scanner: AiScanner, modifier: Modifier = Modifier) {
         ScannedPhoto(scanner)
         StageList(scanner)
         if (scanner.aiRuns && scanner.stage >= ScannerStage.AI_READING) AiVerdict(scanner)
+        if (scanner.muscleRegions.isNotEmpty() && scanner.stage >= ScannerStage.MUSCLES) {
+            MuscleProgress(scanner)
+        }
     }
 }
 
@@ -149,7 +157,7 @@ private fun ScannedPhoto(scanner: AiScanner) {
         label = "landmarks",
     )
     val focusIn by animateFloatAsState(
-        targetValue = if (scanner.aiRegion != null && scanner.stage >= ScannerStage.AI_READING) 1f else 0f,
+        targetValue = if (scanner.aiRegion != null && scanner.stage == ScannerStage.AI_READING) 1f else 0f,
         animationSpec = tween(700, easing = FastOutSlowInEasing),
         label = "focus",
     )
@@ -173,16 +181,37 @@ private fun ScannedPhoto(scanner: AiScanner) {
                 modifier = Modifier.fillMaxSize(),
             )
             Canvas(Modifier.fillMaxSize()) {
-                val region = scanner.aiRegion?.takeIf { scanner.stage >= ScannerStage.AI_READING }
+                val region = scanner.aiRegion?.takeIf { scanner.stage == ScannerStage.AI_READING }
                 val focus = region?.toRect(size)
+                val active = scanner.activeGroup
+                    ?.takeIf { scanner.stage == ScannerStage.MUSCLES }
+                    ?.let { scanner.muscleRegions[it] }
+                    ?.map { it.toRect(size) }
 
                 if (focus != null) dimOutside(focus, 0.55f * focusIn)
 
                 // The sweep runs until the last model has answered, then stops: a line still
                 // moving over a finished scan would say work is happening that is not.
                 if (scanner.stage != ScannerStage.DONE && scanner.stage != ScannerStage.BODY_FOUND) {
-                    val band = focus ?: Rect(Offset.Zero, size)
-                    sweepLine(band, sweep, accent)
+                    val bands = active ?: listOf(focus ?: Rect(Offset.Zero, size))
+                    bands.forEach { sweepLine(it, sweep, accent) }
+                }
+
+                // Groups already judged stay faintly outlined; the one being judged now is
+                // bracketed, so the user can watch the model move around the body.
+                if (scanner.stage >= ScannerStage.MUSCLES) {
+                    scanner.muscleScores.keys.forEach { group ->
+                        scanner.muscleRegions[group]?.forEach { box ->
+                            val r = box.toRect(size)
+                            drawRect(
+                                color = Color.White.copy(alpha = 0.35f),
+                                topLeft = r.topLeft,
+                                size = r.size,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+                            )
+                        }
+                    }
+                    active?.forEach { corners(it, accent.copy(alpha = breathe)) }
                 }
 
                 scanner.landmarks?.let { skeleton(it, accent, landmarksIn) }
@@ -310,6 +339,18 @@ private fun StageList(scanner: AiScanner) {
                         ScannerStage.AI_READING,
                     ),
                 )
+                if (scanner.muscleRegions.isNotEmpty()) {
+                    add(
+                        StageLine(
+                            "AI judging each muscle group",
+                            scanner.activeGroup
+                                ?.takeIf { scanner.stage == ScannerStage.MUSCLES }
+                                ?.let { "Looking at your ${it.label.lowercase()}…" }
+                                ?: "Shoulders, chest, arms, abs, back width and legs",
+                            ScannerStage.MUSCLES,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -532,5 +573,137 @@ fun LiveScanSweep(modifier: Modifier = Modifier) {
     )
     Canvas(modifier.fillMaxSize()) {
         sweepLine(Rect(Offset.Zero, size), sweep, accent.copy(alpha = 0.8f))
+    }
+}
+
+/** Each group's score as the model reaches it, with the group being read marked. */
+@Composable
+private fun MuscleProgress(scanner: AiScanner) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Muscle groups", style = MaterialTheme.typography.titleSmall)
+            MuscleGroup.entries.filter { it in scanner.muscleRegions }.forEach { group ->
+                val score = scanner.muscleScores[group]
+                val reading = group == scanner.activeGroup && scanner.stage == ScannerStage.MUSCLES
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        WeightBar(
+                            label = group.label,
+                            weight = (score ?: 0.0).toFloat(),
+                            strongest = score != null &&
+                                PhysiqueAnalysis.development(score) == Development.DEVELOPED,
+                        )
+                    }
+                    Box(Modifier.size(20.dp).padding(start = 4.dp), contentAlignment = Alignment.Center) {
+                        if (reading && score == null) {
+                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun goalName(goal: Goal): String = when (goal) {
+    Goal.HYPERTROPHY -> "Build muscle"
+    Goal.STRENGTH -> "Get stronger"
+    Goal.CUT -> "Lose fat"
+    Goal.RECOMP -> "Recomposition"
+    Goal.MAKE_WEIGHT -> "Make weight"
+}
+
+/**
+ * The AI's physique analysis on the result screen: every group it judged, the strengths and
+ * weak points for the user's goal, and what to do about each weak point.
+ */
+@Composable
+fun PhysiqueCard(report: PhysiqueReport, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PulsingDot(active = false)
+                Text(
+                    "AI physique analysis",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
+            Text(
+                "Goal: ${goalName(report.goal)} · ${report.summary}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            report.scores.forEach { score ->
+                Column {
+                    WeightBar(
+                        label = score.group.label,
+                        weight = score.score.toFloat(),
+                        strongest = score.development == Development.DEVELOPED,
+                    )
+                    Text(
+                        score.development.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = when (score.development) {
+                            Development.DEVELOPED -> MaterialTheme.colorScheme.primary
+                            Development.AVERAGE -> MaterialTheme.colorScheme.onSurfaceVariant
+                            Development.LAGGING -> MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
+                }
+            }
+
+            Text("Strengths", style = MaterialTheme.typography.titleSmall)
+            Text(
+                report.strengths.takeIf { it.isNotEmpty() }
+                    ?.joinToString { it.label }
+                    ?: "None stands out yet — that is normal early on, and it is what training fixes.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Text("Weak points for your goal", style = MaterialTheme.typography.titleSmall)
+            if (report.focus.isEmpty()) {
+                Text(
+                    "Nothing is lagging for this goal. Keep every group progressing.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            report.focus.forEachIndexed { index, advice ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "${index + 1}. ${advice.group.label}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(advice.why, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        advice.how,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Text(
+                "The on-device model's impression of one front photograph, the way a coach " +
+                    "sizes you up at a glance — not a measurement. Flexing, a pump or harsh " +
+                    "light make a group look bigger, and it cannot see your back. Change your " +
+                    "goal in Settings to re-prioritise.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

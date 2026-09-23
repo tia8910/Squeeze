@@ -601,6 +601,12 @@ class BodyDetector @Inject constructor(
             ankleLeft = point(LANDMARK_ANKLE_LEFT),
             ankleRight = point(LANDMARK_ANKLE_RIGHT),
             nose = point(LANDMARK_NOSE),
+            elbowLeft = point(LANDMARK_ELBOW_LEFT),
+            elbowRight = point(LANDMARK_ELBOW_RIGHT),
+            wristLeft = point(LANDMARK_WRIST_LEFT),
+            wristRight = point(LANDMARK_WRIST_RIGHT),
+            kneeLeft = point(LANDMARK_KNEE_LEFT),
+            kneeRight = point(LANDMARK_KNEE_RIGHT),
             // The same pair buildAnchors uses for the full-body chin row. Carried on the
             // geometry so a trunk-framed scan can reach it too, instead of synthesising a
             // chin from the trunk span and landing the neck search on the trapezius.
@@ -707,6 +713,10 @@ class BodyDetector @Inject constructor(
         const val LANDMARK_MOUTH_RIGHT = 10
         const val LANDMARK_SHOULDER_LEFT = 11
         const val LANDMARK_SHOULDER_RIGHT = 12
+        const val LANDMARK_ELBOW_LEFT = 13
+        const val LANDMARK_ELBOW_RIGHT = 14
+        const val LANDMARK_WRIST_LEFT = 15
+        const val LANDMARK_WRIST_RIGHT = 16
         const val LANDMARK_HIP_LEFT = 23
         const val LANDMARK_HIP_RIGHT = 24
         const val LANDMARK_KNEE_LEFT = 25

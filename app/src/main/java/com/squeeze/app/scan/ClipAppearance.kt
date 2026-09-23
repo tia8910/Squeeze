@@ -12,6 +12,9 @@ import android.graphics.Rect
 import com.squeeze.core.scan.AppearanceEstimator
 import com.squeeze.core.scan.AppearanceReading
 import com.squeeze.core.scan.CropRegion
+import com.squeeze.core.scan.MuscleGroup
+import com.squeeze.core.scan.MusclePromptPair
+import com.squeeze.core.scan.MuscleScorer
 import com.squeeze.core.scan.PromptSet
 import org.json.JSONObject
 import java.io.File
@@ -42,6 +45,7 @@ class ClipAppearance @Inject constructor(
 ) {
     private var session: OrtSession? = null
     private var prompts: List<PromptSet>? = null
+    private var musclePrompts: Map<MuscleGroup, List<MusclePromptPair>>? = null
     private var unavailable = false
 
     /**
@@ -64,6 +68,60 @@ class ClipAppearance @Inject constructor(
             } ?: return null
             AppearanceEstimator.read(embedding, sets)
         }.getOrNull()
+    }
+
+    /**
+     * How developed each muscle group looks, 0 to 1, judged on its own crop — see
+     * [com.squeeze.core.scan.PhysiqueRegions] and [com.squeeze.core.scan.PhysiqueAnalysis].
+     *
+     * @param onGroup called as each group starts, so the scanner can show which one the model
+     *   is looking at; runs on the caller's thread
+     * @param onScored called as each group's score is known
+     * @return the groups that could be read; empty when the model is unavailable
+     */
+    @Synchronized
+    fun readMuscles(
+        photo: Bitmap,
+        regions: Map<MuscleGroup, List<CropRegion>>,
+        onGroup: (MuscleGroup) -> Unit = {},
+        onScored: (MuscleGroup, Double) -> Unit = { _, _ -> },
+    ): Map<MuscleGroup, Double> {
+        if (unavailable) return emptyMap()
+        return runCatching {
+            val loaded = session ?: load() ?: return emptyMap()
+            val pairs = musclePrompts ?: readMusclePrompts().also { musclePrompts = it }
+            regions.mapNotNull { (group, boxes) ->
+                val wordings = pairs[group] ?: return@mapNotNull null
+                onGroup(group)
+                val embeddings = boxes.mapNotNull { box ->
+                    val input = crop(photo, box) ?: return@mapNotNull null
+                    try {
+                        embed(loaded, input)
+                    } finally {
+                        if (input !== photo) input.recycle()
+                    }
+                }
+                MuscleScorer.score(embeddings, wordings)?.let {
+                    onScored(group, it)
+                    group to it
+                }
+            }.toMap()
+        }.getOrElse { emptyMap() }
+    }
+
+    private fun readMusclePrompts(): Map<MuscleGroup, List<MusclePromptPair>> {
+        val json = context.assets.open(MUSCLES_ASSET).bufferedReader().use { it.readText() }
+        val groups = JSONObject(json).getJSONObject("groups")
+        return MuscleGroup.entries.mapNotNull { group ->
+            val pairs = groups.optJSONArray(group.name) ?: return@mapNotNull null
+            group to (0 until pairs.length()).map { i ->
+                val embeddings = pairs.getJSONObject(i).getJSONArray("embeddings")
+                fun row(r: Int) = embeddings.getJSONArray(r).let { values ->
+                    DoubleArray(values.length()) { values.getDouble(it) }
+                }
+                MusclePromptPair(developed = row(0), undeveloped = row(1))
+            }
+        }.toMap()
     }
 
     private fun crop(photo: Bitmap, region: CropRegion): Bitmap? {
@@ -198,6 +256,7 @@ class ClipAppearance @Inject constructor(
         /** Must change whenever the model does; tools/vlm/prepare_clip.py pins the same hash. */
         const val MODEL_COPY = "clip_vitb32_laion_q4-81148049.onnx"
         const val PROMPTS_ASSET = "clip_prompts.json"
+        const val MUSCLES_ASSET = "clip_muscles.json"
         const val INPUT_NAME = "pixel_values"
         const val SIZE = 224
         val MEAN = floatArrayOf(0.48145466f, 0.4578275f, 0.40821073f)

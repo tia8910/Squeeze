@@ -30,6 +30,11 @@ import com.squeeze.core.scan.AppearanceEstimator
 import com.squeeze.core.scan.AppearanceReading
 import com.squeeze.core.scan.CropRegion
 import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.MuscleGroup
+import com.squeeze.core.scan.PhysiqueAnalysis
+import com.squeeze.core.scan.PhysiqueRegions
+import com.squeeze.core.scan.PhysiqueReport
+import com.squeeze.core.model.Goal
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
@@ -77,7 +82,7 @@ enum class ScanStep { WEIGHT, FRONT, OPTIONAL_EXTRAS, SIDE, BACK, ANALYSING, RES
  * Each stage is entered when that work actually starts and left when it finishes. The screen
  * shows what is really happening, not an animation timed to look busy.
  */
-enum class ScannerStage { FINDING_BODY, BODY_FOUND, MEASURING, AI_READING, DONE }
+enum class ScannerStage { FINDING_BODY, BODY_FOUND, MEASURING, AI_READING, MUSCLES, DONE }
 
 /**
  * The photograph being scanned, and what the models have found in it so far.
@@ -86,6 +91,9 @@ enum class ScannerStage { FINDING_BODY, BODY_FOUND, MEASURING, AI_READING, DONE 
  * @param landmarks the pose model's shoulders, hips, ankles and face, once it has run
  * @param aiRegion the part of the photograph the vision-language model is shown
  * @param reading what that model concluded, once it has
+ * @param muscleRegions where each muscle group is, as the model is shown it
+ * @param activeGroup the group the model is judging right now
+ * @param muscleScores each group's score, filled in as the model reaches it
  * @param aiRuns whether the vision-language model will run on this scan at all, so the
  *   screen does not promise a stage that is not coming
  */
@@ -96,6 +104,9 @@ data class AiScanner(
     val aiRegion: CropRegion? = null,
     val reading: AppearanceReading? = null,
     val aiRuns: Boolean = true,
+    val muscleRegions: Map<MuscleGroup, List<CropRegion>> = emptyMap(),
+    val activeGroup: MuscleGroup? = null,
+    val muscleScores: Map<MuscleGroup, Double> = emptyMap(),
 )
 
 data class ScanUiState(
@@ -268,6 +279,11 @@ data class ScanUiState(
      * score is withheld rather than shown, because at that point it is measuring cloth.
      */
     val bareAbdomenFraction: Double? = null,
+    /**
+     * The on-device model's read of each muscle group, and what it means for the user's goal.
+     * Null when the model did not run — see [appearance] for when that is.
+     */
+    val physique: PhysiqueReport? = null,
     /** What the scanner screen draws while the models run; null outside [ScanStep.ANALYSING]. */
     val scanner: AiScanner? = null,
 ) {
@@ -722,16 +738,50 @@ class ScanViewModel @Inject constructor(
             )
         }
 
+        // Then each muscle group on a crop of its own, read against the goal the user set.
+        // The scanner follows along: the group being judged is outlined on the photograph,
+        // and its score appears the moment it is known.
+        val muscleRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
+        var live = scanner?.copy(
+            stage = ScannerStage.MUSCLES,
+            reading = reading,
+            muscleRegions = muscleRegions,
+        )
+        val physique = frontBitmap
+            ?.takeIf { isMale && reading != null && muscleRegions.isNotEmpty() }
+            ?.let { bitmap ->
+                live?.let(::showScanner)
+                val scores = withContext(Dispatchers.Default) {
+                    appearanceModel.readMuscles(
+                        bitmap,
+                        muscleRegions,
+                        onGroup = { group ->
+                            live = live?.copy(activeGroup = group)
+                            live?.let(::showScanner)
+                        },
+                        onScored = { group, score ->
+                            live = live?.copy(muscleScores = live?.muscleScores.orEmpty() + (group to score))
+                            live?.let(::showScanner)
+                        },
+                    )
+                }
+                val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
+                PhysiqueAnalysis.report(scores, goal)
+            }
+
         // The verdict stays up for a moment, beside the bodies it was weighed against,
         // before the result card replaces it.
         if (scanner != null) {
-            showScanner(scanner.copy(stage = ScannerStage.DONE, reading = reading))
+            showScanner(
+                (live ?: scanner).copy(stage = ScannerStage.DONE, reading = reading, activeGroup = null),
+            )
             delay(if (reading != null) VERDICT_DWELL_MS else BODY_FOUND_DWELL_MS)
         }
 
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,
             scanner = null,
+            physique = physique,
             appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),

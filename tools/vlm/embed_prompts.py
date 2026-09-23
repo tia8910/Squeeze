@@ -1,4 +1,5 @@
-"""Writes app/src/main/assets/clip_prompts.json: the text side of the on-device model.
+"""Writes app/src/main/assets/clip_prompts.json and clip_muscles.json: the text side of the
+on-device model.
 
 The prompts are fixed, so their embeddings are computed once, here, and shipped as numbers.
 The phone then needs only the image encoder — the text encoder is 254 MB and would do the
@@ -19,6 +20,7 @@ import open_clip
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from prompts import PROMPT_SETS  # noqa: E402
+from muscle_prompts import MUSCLE_PROMPTS  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 URL = ("https://clip-as-service.s3.us-east-2.amazonaws.com/"
@@ -37,6 +39,20 @@ def fetch():
         CACHE.unlink()
         sys.exit(f"checksum mismatch for the text encoder: {actual}")
     return CACHE
+
+
+def embed(session, tokenizer, texts):
+    ids = tokenizer(texts).numpy().astype(np.int32)
+    out = session.run(None, {"input_ids": ids, "attention_mask": (ids != 0).astype(np.int32)})[0]
+    out = out / np.linalg.norm(out, axis=1, keepdims=True)
+    return [[round(float(x), 6) for x in row] for row in out]
+
+
+def write(name, doc):
+    target = ROOT / "app" / "src" / "main" / "assets" / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(doc, separators=(",", ":")) + "\n")
+    print(f"wrote {target} ({target.stat().st_size} bytes)")
 
 
 def main():
@@ -58,10 +74,20 @@ def main():
         "logitScale": 100.0,
         "sets": sets,
     }
-    target = ROOT / "app" / "src" / "main" / "assets" / "clip_prompts.json"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(doc, separators=(",", ":")) + "\n")
-    print(f"wrote {target} ({target.stat().st_size} bytes)")
+    write("clip_prompts.json", doc)
+
+    groups = {}
+    for group, pairs in MUSCLE_PROMPTS.items():
+        groups[group] = [
+            {"developed": strong, "undeveloped": weak,
+             "embeddings": embed(session, tokenizer, [strong, weak])}
+            for strong, weak in pairs
+        ]
+    write("clip_muscles.json", {
+        "model": doc["model"],
+        "logitScale": 100.0,
+        "groups": groups,
+    })
 
 
 if __name__ == "__main__":

@@ -104,3 +104,26 @@ python tools/vlm/prepare_clip.py   # image encoder into app/src/main/assets
 pip install open_clip_torch
 python tools/vlm/embed_prompts.py  # after any change to prompts.py
 ```
+
+## Muscle groups
+
+The same image encoder also judges six muscle groups one at a time (`PhysiqueRegions` crops
+each from the pose landmarks). Each group is scored against pairs of sentences in
+`muscle_prompts.py` — developed against undeveloped — and the embeddings ship as
+`clip_muscles.json`, written by `embed_prompts.py` alongside `clip_prompts.json`. No new
+model, no extra megabytes beyond 165 KB of numbers.
+
+On the five test photographs (probability of "developed"):
+
+| | shoulders | chest | arms | abs | back width | legs |
+|---|---|---|---|---|---|---|
+| stage-lean bodybuilder | 0.47 | 0.74 | 0.51 | 0.98 | 0.84 | 0.67 |
+| lean man, waist-up | 0.38 | 0.55 | 0.75 | 0.98 | 0.46 | — |
+| lean man, full length | 0.37 | 0.35 | 0.57 | 0.98 | 0.52 | 0.51 |
+| softer man, day 1 | 0.27 | 0.22 | 0.32 | 0.47 | 0.30 | — |
+| softer man, day 2 | 0.32 | 0.40 | 0.30 | 0.49 | 0.34 | 0.20 |
+
+It separates the trained bodies from the untrained one on every group. It is not precise:
+the bodybuilder's shoulders read average because he is flexing with his arms up, and the
+same lean man's chest moves 0.2 between framings. The app shows it as a coach's impression,
+in three bands, not as a measurement.

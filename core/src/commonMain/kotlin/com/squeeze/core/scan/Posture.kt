@@ -43,6 +43,17 @@ data class FrontPoseGeometry(
      * path could not reach it.
      */
     val mouth: PosePoint? = null,
+    /**
+     * Elbows, wrists and knees, for [PhysiqueRegions]: the arms and legs are judged on crops
+     * of their own, and a crop of an arm needs to know where the arm is. Null when the pose
+     * model did not report them.
+     */
+    val elbowLeft: PosePoint? = null,
+    val elbowRight: PosePoint? = null,
+    val wristLeft: PosePoint? = null,
+    val wristRight: PosePoint? = null,
+    val kneeLeft: PosePoint? = null,
+    val kneeRight: PosePoint? = null,
 )
 
 /** One postural observation, in degrees, with the reading that makes it usable. */
