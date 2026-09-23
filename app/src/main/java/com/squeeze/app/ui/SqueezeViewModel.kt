@@ -53,6 +53,8 @@ data class SqueezeUiState(
     val goalProgress: GoalProgress? = null,
     /** One line of today's nutrition targets for the dashboard; null before a weight exists. */
     val nutritionToday: String? = null,
+    /** Today's sessions from the week across the user's sports; null when none are chosen. */
+    val trainingToday: String? = null,
     val loading: Boolean = true,
 )
 
@@ -127,6 +129,8 @@ class SqueezeViewModel @Inject constructor(
                     targetWeightKg = targetWeightKg ?: existing?.targetWeightKg,
                     targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
                     trainingDaysPerWeek = existing?.trainingDaysPerWeek,
+                    disciplines = existing?.disciplines,
+                    favouriteFoods = existing?.favouriteFoods,
                 ),
             )
             refresh()
@@ -204,6 +208,11 @@ class SqueezeViewModel @Inject constructor(
                     "%,d kcal · %d g protein · %d g carbs · %d g fat".format(
                         it.calories, it.proteinG, it.carbsG, it.fatG,
                     )
+                },
+                trainingToday = coach.week()?.let { week ->
+                    val today = week.days[LocalDate.now().dayOfWeek.value - 1]
+                    if (today.rest) "Rest day — recovery is part of the plan"
+                    else today.sessions.joinToString(" + ") { it.title }
                 },
                 loading = false,
             )

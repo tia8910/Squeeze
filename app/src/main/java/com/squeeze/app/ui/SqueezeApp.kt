@@ -66,6 +66,8 @@ import com.squeeze.core.model.Goal
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.training.TrainingScreen
 import com.squeeze.app.ui.nutrition.NutritionScreen
+import com.squeeze.app.ui.log.WorkoutLogScreen
+import com.squeeze.app.ui.machine.MachineScanScreen
 import java.time.LocalDate
 
 /**
@@ -75,6 +77,8 @@ import java.time.LocalDate
 private const val ROUTE_SCAN = "scan"
 private const val ROUTE_ADD_MEASUREMENT = "add_measurement"
 private const val ROUTE_CELEBRATION = "celebration"
+private const val ROUTE_LOG = "log"
+private const val ROUTE_MACHINE = "machine"
 
 private enum class Destination(
     val route: String,
@@ -149,7 +153,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     }
     val isFullScreenTask = currentRoute == ROUTE_SCAN ||
         currentRoute == ROUTE_ADD_MEASUREMENT ||
-        currentRoute == ROUTE_CELEBRATION
+        currentRoute == ROUTE_CELEBRATION ||
+        currentRoute == ROUTE_LOG ||
+        currentRoute == ROUTE_MACHINE
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -164,6 +170,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 title = {
                     when {
                         currentRoute == ROUTE_ADD_MEASUREMENT -> Text("New measurement")
+                        currentRoute == ROUTE_LOG -> Text("Log workout")
+                        currentRoute == ROUTE_MACHINE -> Text("Scan a machine")
                         // The wordmark is the title on the home tab; a text label there
                         // would waste the one place the brand is always visible.
                         activeTab == Destination.COMPOSITION ->
@@ -252,12 +260,39 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
                         nutritionToday = state.nutritionToday,
+                        trainingToday = state.trainingToday,
+                        onOpenTraining = { goToTab(Destination.TRAINING) },
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },
                     )
                 }
 
                 composable(Destination.TRAINING.route) {
-                    TrainingScreen(onOpenNutrition = { goToTab(Destination.NUTRITION) })
+                    TrainingScreen(
+                        onOpenNutrition = { goToTab(Destination.NUTRITION) },
+                        onLog = { navController.navigate(ROUTE_LOG) },
+                        onScanMachine = { navController.navigate(ROUTE_MACHINE) },
+                    )
+                }
+
+                composable(ROUTE_LOG) {
+                    WorkoutLogScreen(
+                        onScanMachine = { navController.navigate(ROUTE_MACHINE) },
+                        onDone = {
+                            viewModel.refresh()
+                            navController.popBackStack()
+                        },
+                    )
+                }
+
+                composable(ROUTE_MACHINE) {
+                    MachineScanScreen(
+                        onLog = {
+                            // A fresh log with the machine's exercise, whether or not a log was
+                            // already open underneath.
+                            navController.popBackStack(ROUTE_MACHINE, inclusive = true)
+                            navController.navigate(ROUTE_LOG) { popUpTo(ROUTE_LOG) { inclusive = true } }
+                        },
+                    )
                 }
 
                 composable(Destination.NUTRITION.route) {

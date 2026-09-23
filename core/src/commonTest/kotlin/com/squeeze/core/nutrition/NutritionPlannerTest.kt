@@ -137,4 +137,42 @@ class NutritionPlannerTest {
         assertTrue(hard.getValue(Micronutrient.POTASSIUM) > rest.getValue(Micronutrient.POTASSIUM))
         assertTrue(MicroTargets.sodiumMg(6) > MicroTargets.sodiumMg(0))
     }
+
+    @Test
+    fun `a vegetarian's favourites are never topped up with meat or fish`() {
+        val favourites = setOf("Tofu (firm)", "Lentils (cooked)", "Eggs", "Oats", "Quinoa (cooked)", "Banana", "Avocado")
+        val plan = NutritionPlanner.plan(base.copy(favouriteFoods = favourites))
+        val served = plan.week.flatMap { d -> d.meals.flatMap { m -> m.items.map { it.food } } }.toSet()
+        val animal = FoodLibrary.ALL
+            .filter { it.group == FoodGroup.MEAT_POULTRY || it.group == FoodGroup.FISH_SEAFOOD }
+            .map { it.name }
+        assertTrue(served.none { it in animal }, "served $served")
+        assertTrue("Tofu (firm)" in served || "Lentils (cooked)" in served)
+    }
+
+    @Test
+    fun `the week rotates favourites so days differ`() {
+        val favourites = setOf("Chicken breast", "Salmon", "Turkey breast", "Rice (cooked)", "Sweet potato")
+        val plan = NutritionPlanner.plan(base.copy(favouriteFoods = favourites))
+        assertEquals(7, plan.week.size)
+        val lunches = plan.week.map { d -> d.meals.first { it.name == "Lunch" }.items.first().food }.toSet()
+        assertTrue(lunches.size > 1, "lunches $lunches")
+    }
+
+    @Test
+    fun `every day of the week lands near its targets`() {
+        val plan = NutritionPlanner.plan(base.copy(favouriteFoods = setOf("Eggs", "Salmon", "Pasta", "Quinoa (cooked)")))
+        plan.week.forEach { day ->
+            val target = if ("training" in day.name) plan.trainingDay else plan.restDay
+            assertTrue(abs(day.macros.calories - target.calories) <= target.calories * 0.15, "${day.name}: ${day.macros} vs $target")
+        }
+    }
+
+    @Test
+    fun `logged sessions replace the planned training days`() {
+        val planned = NutritionPlanner.plan(base)
+        val active = NutritionPlanner.plan(base.copy(loggedExerciseKcalPerDay = 600.0, loggedSessions = 10))
+        assertTrue(active.maintenanceCalories > planned.maintenanceCalories)
+        assertTrue(active.reasoning.any { "logged 10 sessions" in it })
+    }
 }

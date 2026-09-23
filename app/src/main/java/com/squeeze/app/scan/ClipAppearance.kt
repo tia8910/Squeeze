@@ -124,6 +124,19 @@ class ClipAppearance @Inject constructor(
         }.toMap()
     }
 
+    /**
+     * The model's embedding of a whole photograph, for callers that compare it with their
+     * own descriptions — the machine scanner does. Null when the model is unavailable.
+     */
+    @Synchronized
+    fun embedImage(photo: Bitmap): DoubleArray? {
+        if (unavailable) return null
+        return runCatching {
+            val loaded = session ?: load() ?: return null
+            embed(loaded, photo)
+        }.getOrNull()
+    }
+
     private fun crop(photo: Bitmap, region: CropRegion): Bitmap? {
         val left = (region.left * photo.width).toInt().coerceIn(0, photo.width - 1)
         val top = (region.top * photo.height).toInt().coerceIn(0, photo.height - 1)

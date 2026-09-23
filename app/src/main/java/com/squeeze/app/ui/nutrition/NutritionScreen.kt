@@ -1,6 +1,7 @@
 package com.squeeze.app.ui.nutrition
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,8 @@ import com.squeeze.app.ui.components.SectionHeader
 import com.squeeze.app.ui.components.StatRow
 import com.squeeze.app.ui.components.StatTile
 import com.squeeze.core.model.Goal
+import com.squeeze.core.nutrition.FoodGroup
+import com.squeeze.core.nutrition.FoodLibrary
 import com.squeeze.core.nutrition.Macros
 import com.squeeze.core.nutrition.Meal
 import com.squeeze.core.nutrition.MicroCoverage
@@ -72,7 +75,12 @@ fun NutritionScreen(
         when {
             state.loading -> Unit
             context == null -> NeedsWeight(onLogWeight)
-            else -> Plan(context, state.showTrainingDay, viewModel::showTrainingDay, onLogWeight, onScan, onOpenTraining, onEditGoal)
+            else -> {
+                Plan(context, state.showTrainingDay, viewModel::showTrainingDay, onLogWeight, onScan, onOpenTraining, onEditGoal)
+                FavouritesSection(state, viewModel)
+                WeekSection(context, state.selectedDay, viewModel::selectDay)
+                SourcesSection(context, onLogWeight, onScan, onOpenTraining, onEditGoal)
+            }
         }
     }
 }
@@ -185,7 +193,7 @@ private fun Plan(
 
     SectionHeader(
         title = "Micronutrients",
-        caption = "What the sample day below supplies against your daily targets",
+        caption = "What an average day of your week of meals supplies against your daily targets",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -199,25 +207,6 @@ private fun Plan(
             }
         }
     }
-
-    SectionHeader(
-        title = "A training day, in food",
-        caption = "One way to hit the numbers — swap like for like",
-    )
-    plan.meals.forEach { MealCard(it) }
-
-    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
-    PrimaryButton(text = "Log today's weight", onClick = onLogWeight)
-    SecondaryButton(
-        text = if (context.hasPhysique) "Rescan with the AI" else "Scan with the AI for body fat & weak points",
-        onClick = onScan,
-    )
-    SecondaryButton(
-        text = "Training: ${context.trainingDaysPerWeek} days a week" +
-            if (context.trainingDaysFromProgramme) "" else " (set it in Training)",
-        onClick = onOpenTraining,
-    )
-    SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
 
     Text(
         "General guidance for healthy adults, not medical advice. If you have a medical " +
@@ -308,4 +297,90 @@ private fun MealCard(meal: Meal) {
             }
         }
     }
+}
+
+/** Favourite foods, grouped; the week of meals is built from these. */
+@Composable
+private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewModel) {
+    SectionHeader(
+        title = "Your favourite foods",
+        caption = "Tick what you like to eat — your week of meals is built from them",
+    )
+    BrandCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FoodGroup.entries.forEach { group ->
+                val foods = FoodLibrary.ALL.filter { it.group == group }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(group.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.TextButton(onClick = { viewModel.toggleGroup(foods.map { it.name }) }) {
+                        Text(if (foods.all { it.name in state.favourites }) "Clear" else "All")
+                    }
+                }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    foods.forEach { food ->
+                        FilterChip(
+                            selected = food.name in state.favourites,
+                            onClick = { viewModel.toggleFood(food.name) },
+                            label = { Text(food.name) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+    if (state.favouritesDirty) {
+        PrimaryButton(text = "Build my meals from these (${state.favourites.size})", onClick = viewModel::buildMeals)
+    }
+}
+
+/** The seven days of meals. */
+@Composable
+private fun WeekSection(context: NutritionContext, selected: Int, onSelect: (Int) -> Unit) {
+    val week = context.plan.week
+    SectionHeader(
+        title = "Your week of meals",
+        caption = if (context.favourites.isEmpty()) {
+            "Built from staple foods — tick favourites above to make it yours"
+        } else {
+            "Built from your favourites, rotated so the days differ"
+        },
+    )
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        week.forEachIndexed { i, day ->
+            FilterChip(selected = selected == i, onClick = { onSelect(i) }, label = { Text(day.name) })
+        }
+    }
+    week.getOrNull(selected)?.let { day ->
+        val m = day.macros
+        Text(
+            "${m.calories} kcal · ${m.proteinG} g protein · ${m.carbsG} g carbs · ${m.fatG} g fat",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        day.meals.forEach { MealCard(it) }
+    }
+}
+
+/** The links back to everything the plan is built from. */
+@Composable
+private fun SourcesSection(
+    context: NutritionContext,
+    onLogWeight: () -> Unit,
+    onScan: () -> Unit,
+    onOpenTraining: () -> Unit,
+    onEditGoal: () -> Unit,
+) {
+    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
+    PrimaryButton(text = "Log today's weight", onClick = onLogWeight)
+    SecondaryButton(
+        text = if (context.hasPhysique) "Rescan with the AI" else "Scan with the AI for body fat & weak points",
+        onClick = onScan,
+    )
+    SecondaryButton(text = "Training: ${context.trainingDaysPerWeek} days a week — your sports & log", onClick = onOpenTraining)
+    SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
 }

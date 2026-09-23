@@ -24,7 +24,7 @@ enum class Micronutrient(val label: String, val unit: String, val fixes: String)
     OMEGA_3("Omega-3 (EPA+DHA)", "mg", "salmon, sardines or mackerel twice a week, or a fish-oil capsule"),
 }
 
-/** A daily target, and what the sample day supplies against it. */
+/** A daily target, and what an average day of the meal programme supplies against it. */
 data class MicroCoverage(
     val nutrient: Micronutrient,
     val target: Double,
@@ -87,7 +87,7 @@ object MicroTargets {
     fun advice(coverage: List<MicroCoverage>, goal: Goal, sex: Sex, trainingDaysPerWeek: Int): List<String> =
         buildList {
             coverage.filter { it.short }.forEach { gap ->
-                add("${gap.nutrient.label} is at ${gap.percent}% on this day — add ${gap.nutrient.fixes}.")
+                add("${gap.nutrient.label} averages ${gap.percent}% across this week — add ${gap.nutrient.fixes}.")
             }
             if (goal == Goal.CUT || goal == Goal.MAKE_WEIGHT) {
                 add("A deficit means less food and so less of every micronutrient in it. Keep " +

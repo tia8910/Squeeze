@@ -28,14 +28,25 @@ import com.squeeze.core.program.Equipment
 import com.squeeze.core.program.WeakPoint
 import com.squeeze.core.program.WeakPointAnalysis
 import com.squeeze.core.program.Session
+import com.squeeze.app.data.VolumeRow
+import com.squeeze.core.workout.Discipline
+import com.squeeze.core.workout.HybridWeek
+import com.squeeze.core.workout.PlannedSession
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.width
 import com.squeeze.core.program.TrainingWeek
 
 @Composable
 fun TrainingScreen(
     viewModel: TrainingViewModel = hiltViewModel(),
     onOpenNutrition: () -> Unit = {},
+    onLog: () -> Unit = {},
+    onScanMachine: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Back from the log: this week's volume has changed.
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshWeek() }
 
     Column(
         modifier = Modifier
@@ -53,10 +64,41 @@ fun TrainingScreen(
             return@Column
         }
 
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onLog, modifier = Modifier.weight(1f)) { Text("Log a workout") }
+            androidx.compose.material3.OutlinedButton(onClick = onScanMachine, modifier = Modifier.weight(1f)) {
+                Text("Scan a machine")
+            }
+        }
+
+        SportsSection(state, viewModel)
         SetupSection(state, viewModel)
 
-        Button(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
-            Text(if (state.mesocycle == null) "Generate training block" else "Regenerate")
+        Button(onClick = viewModel::createWeek, modifier = Modifier.fillMaxWidth()) {
+            Text(if (state.week == null) "Create my week" else "Rebuild my week")
+        }
+
+        state.week?.let { week ->
+            HybridWeekView(week, onLogSession = { session -> viewModel.startLog(session); onLog() })
+            if (state.volume.isNotEmpty()) VolumeCard(state.volume)
+            androidx.compose.material3.OutlinedButton(onClick = onOpenNutrition, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Nutrition for this week" +
+                        (state.plannedKcalPerDay?.let { " · ~$it kcal/day of training" } ?: ""),
+                )
+            }
+        }
+
+        if (Discipline.GYM in state.disciplines || state.disciplines.isEmpty()) {
+            Text("Gym progression block", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Optional: a multi-week gym block with volume that climbs week to week and a deload, " +
+                    "built from the same goal and weak points.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            androidx.compose.material3.OutlinedButton(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
+                Text(if (state.mesocycle == null) "Generate gym block" else "Regenerate gym block")
+            }
         }
 
         state.adjustmentRationale?.let { rationale ->
@@ -72,14 +114,6 @@ fun TrainingScreen(
 
         // The block and the food are one plan: the days chosen here set the nutrition plan's
         // activity and carbohydrate split, so the link is offered as soon as a block exists.
-        if (state.mesocycle != null) {
-            androidx.compose.material3.OutlinedButton(
-                onClick = onOpenNutrition,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("See the nutrition plan for ${state.daysPerWeek} training days")
-            }
-        }
 
         state.mesocycle?.let { mesocycle ->
             Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)
@@ -121,7 +155,7 @@ private fun SetupSection(state: TrainingUiState, viewModel: TrainingViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Days per week", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (2..6).forEach { days ->
+            (1..7).forEach { days ->
                 FilterChip(
                     selected = state.daysPerWeek == days,
                     onClick = { viewModel.setDaysPerWeek(days) },
@@ -303,6 +337,116 @@ private fun WeakPointCard(weakPoints: List<WeakPoint>) {
                     Text(
                         text = point.prescription,
                         style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SportsSection(state: TrainingUiState, viewModel: TrainingViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Your sports — pick one or combine several", style = MaterialTheme.typography.titleSmall)
+        Discipline.entries.chunked(4).forEach { row ->
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                row.forEach { d ->
+                    FilterChip(
+                        selected = d in state.disciplines,
+                        onClick = { viewModel.toggleDiscipline(d) },
+                        label = { Text(d.label) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HybridWeekView(week: HybridWeek, onLogSession: (PlannedSession) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Your week", style = MaterialTheme.typography.titleLarge)
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("How it was built", style = MaterialTheme.typography.titleSmall)
+                week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+        week.days.forEach { day ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(day.name, style = MaterialTheme.typography.titleSmall)
+                    if (day.rest) {
+                        Text("Rest — recovery is where the training turns into results.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    day.sessions.forEach { session -> PlannedSessionView(session, onLogSession) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlannedSessionView(session: PlannedSession, onLog: (PlannedSession) -> Unit) {
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    session.title + if (session.addOn) " · add-on" else "",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    "${session.minutes} min · ${session.intensity.label.lowercase()}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            androidx.compose.material3.TextButton(onClick = { open = !open }) { Text(if (open) "Hide" else "Details") }
+        }
+        if (open) {
+            Text(session.why, style = MaterialTheme.typography.bodySmall)
+            session.items.forEach { item ->
+                Column(Modifier.padding(start = 8.dp)) {
+                    Text(
+                        item.name + if (item.weakPoint) "  ★ weak point" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(item.detail, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Button(onClick = { onLog(session) }, modifier = Modifier.fillMaxWidth()) { Text("Log this session") }
+        }
+    }
+}
+
+@Composable
+private fun VolumeCard(rows: List<VolumeRow>) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("This week's sets", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Logged since Monday against your plan. ★ marks the AI scan's weak points.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            rows.forEach { row ->
+                val target = row.planned.coerceAtLeast(1)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(
+                        (if (row.weakPoint) "★ " else "") + row.group.name.lowercase().replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.width(110.dp),
+                    )
+                    LinearProgressIndicator(
+                        progress = { (row.done.toFloat() / target).coerceIn(0f, 1f) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${row.done}/${row.planned}",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(start = 8.dp),
                     )
                 }
             }

@@ -93,6 +93,8 @@ fun CompositionScreen(
     /** Today's targets from the nutrition plan, one line; null before a weight is logged. */
     nutritionToday: String? = null,
     onOpenNutrition: () -> Unit = {},
+    trainingToday: String? = null,
+    onOpenTraining: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -124,6 +126,27 @@ fun CompositionScreen(
         // answers "so what": the number says where you are, this says whether that is
         // enough and what to change if it is not.
         goalProgress?.let { GoalCard(it, onEditGoal) }
+
+        // What to do today, from the week built across the user's sports.
+        trainingToday?.let { today ->
+            com.squeeze.app.ui.components.BrandRow(onClick = onOpenTraining) {
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text(
+                        "Today's training",
+                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                    )
+                    androidx.compose.material3.Text(
+                        today,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    )
+                }
+                androidx.compose.material3.Text(
+                    "Train ›",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
 
         // What to eat to get there, from the same trend the card above just judged.
         nutritionToday?.let { today ->

@@ -44,6 +44,22 @@ data class NutritionInputs(
     val targetBodyFatPercent: Double? = null,
     val daysToDeadline: Long? = null,
     val priorityGroups: List<String> = emptyList(),
+    /** Foods the user picked on the nutrition page; the meal programme is built from them. */
+    val favouriteFoods: Set<String> = emptySet(),
+    /**
+     * Exercise calories above resting, per day, averaged over the logged sessions of the last
+     * two weeks. Null when too little has been logged to trust over the planned days.
+     */
+    val loggedExerciseKcalPerDay: Double? = null,
+    /** Sessions logged in the last two weeks, across every sport. */
+    val loggedSessions: Int = 0,
+    /**
+     * Exercise calories above rest per day that the user's planned week of sports costs —
+     * used until there is enough logged to replace it.
+     */
+    val plannedExerciseKcalPerDay: Double? = null,
+    /** The planned week in a few words, e.g. "Gym ×3, Running ×2", for the explanation. */
+    val plannedSummary: String? = null,
 )
 
 data class Macros(val calories: Int, val proteinG: Int, val carbsG: Int, val fatG: Int)
@@ -80,6 +96,8 @@ data class NutritionPlan(
     val fiberG: Int,
     val waterLitres: Double,
     val meals: List<Meal>,
+    /** Seven days of meals from the user's favourite foods; [meals] is its first training day. */
+    val week: List<DayPlan>,
     val micros: List<MicroCoverage>,
     val microAdvice: List<String>,
     val sodiumMg: Int,
@@ -128,6 +146,12 @@ object NutritionPlanner {
     /** The most one check-in moves calories, so a bad fortnight cannot swing the plan. */
     private const val MAX_ADJUSTMENT_KCAL = 300
 
+    /** Daily life without exercise, as a multiple of resting burn. */
+    private const val BASE_ACTIVITY = 1.35
+
+    /** Fewer logged sessions than this in two weeks, and the plan trusts the programme instead. */
+    private const val MIN_LOGGED_SESSIONS = 3
+
     fun plan(input: NutritionInputs): NutritionPlan {
         val reasoning = mutableListOf<String>()
         val warnings = mutableListOf<String>()
@@ -161,12 +185,35 @@ object NutritionPlanner {
             10 * w + 6.25 * input.heightCm - 5 * input.ageYears + if (female) -161 else 5
         }
 
-        val days = input.trainingDaysPerWeek.coerceIn(0, 7)
-        val activity = 1.35 + 0.05 * days
-        val maintenance = bmr * activity
-        reasoning += "$days training days a week" +
-            (if (input.trainingDaysFromProgramme) " (from your programme)" else "") +
-            " → activity ×${activity.fixed(2)}, maintenance about ${maintenance.roundToInt()} kcal."
+        // What the user actually did beats what the programme planned, once there is enough
+        // of it: two weeks of logged sessions, across every sport, in place of an activity
+        // factor that assumes every training day burns the same.
+        val logged = input.loggedExerciseKcalPerDay?.takeIf { input.loggedSessions >= MIN_LOGGED_SESSIONS }
+        val days = if (logged != null) {
+            ((input.loggedSessions / 2.0).roundToInt()).coerceIn(0, 7)
+        } else {
+            input.trainingDaysPerWeek.coerceIn(0, 7)
+        }
+        val maintenance = if (logged != null) {
+            reasoning += "You logged ${input.loggedSessions} sessions in the last two weeks, " +
+                "burning about ${logged.roundToInt()} kcal a day above rest → maintenance about " +
+                "${(bmr * BASE_ACTIVITY + logged).roundToInt()} kcal."
+            bmr * BASE_ACTIVITY + logged
+        } else if (input.plannedExerciseKcalPerDay != null) {
+            val planned = input.plannedExerciseKcalPerDay
+            reasoning += "Your week" + (input.plannedSummary?.let { " ($it)" } ?: "") +
+                " plans about ${planned.roundToInt()} kcal a day of exercise above rest → maintenance " +
+                "about ${(bmr * BASE_ACTIVITY + planned).roundToInt()} kcal. Log your sessions and it " +
+                "switches to what you actually did."
+            bmr * BASE_ACTIVITY + planned
+        } else {
+            val activity = BASE_ACTIVITY + 0.05 * days
+            reasoning += "$days training days a week" +
+                (if (input.trainingDaysFromProgramme) " (from your programme)" else "") +
+                " → activity ×${activity.fixed(2)}, maintenance about ${(bmr * activity).roundToInt()} kcal." +
+                " Log your workouts and this switches to what you actually burn."
+            bmr * activity
+        }
 
         // ── What the goal asks for ───────────────────────────────────────────────────────
         val intended = intendedRate(input, leanMass, reasoning, warnings)
@@ -254,11 +301,21 @@ object NutritionPlanner {
                 "stay prioritised in training so the deficit takes fat, not muscle, from them."
         }
 
-        // Micronutrients: the targets for this user, against what the sample day supplies.
-        val meals = MealBuilder.build(trainingDay)
+        // The week's meals, from the user's favourite foods, and the micronutrients they
+        // supply on an average day of it.
+        val week = MealBuilder.week(trainingDay, restDay, days, input.favouriteFoods)
+        val meals = week.firstOrNull { "training" in it.name }?.meals ?: week.first().meals
         val microTargets = MicroTargets.targets(input.sex, input.ageYears, days, calories)
         val micros = microTargets.map { (nutrient, target) ->
-            MicroCoverage(nutrient, target, meals.sumOf { it.micros[nutrient] ?: 0.0 })
+            MicroCoverage(
+                nutrient,
+                target,
+                week.sumOf { d -> d.meals.sumOf { it.micros[nutrient] ?: 0.0 } } / week.size,
+            )
+        }
+        if (input.favouriteFoods.isNotEmpty()) {
+            reasoning += "Meals are built from your ${input.favouriteFoods.size} favourite foods, " +
+                "rotated across the week."
         }
 
         return NutritionPlan(
@@ -273,6 +330,7 @@ object NutritionPlanner {
             fiberG = (calories / 1000.0 * 14).roundToInt(),
             waterLitres = ((0.035 * w + 0.5 * days / 7.0) * 10).roundToInt() / 10.0,
             meals = meals,
+            week = week,
             micros = micros,
             microAdvice = MicroTargets.advice(micros, input.goal, input.sex, days),
             sodiumMg = MicroTargets.sodiumMg(days),
@@ -352,169 +410,4 @@ object NutritionPlanner {
     }
 
     private fun signed(v: Double) = (if (v > 0) "+" else "") + v.fixed(2)
-}
-
-/**
- * A sample training day in real food, sized to the day's macros.
- *
- * One protein food, one carbohydrate food and, when fat is left over, one fat source per
- * meal, solved in that order so each meal lands close to its share. Vegetables are added and
- * not counted toward calories — they are what keeps a deficit bearable, and counting them
- * would only give a reason to leave them out — but they are counted toward micronutrients,
- * where they do most of the work.
- */
-object MealBuilder {
-
-    /**
-     * Per 100 g, as eaten. Micronutrients are rounded USDA FoodData Central values: close
-     * enough to find a gap, not a food label.
-     */
-    private class Food(
-        val name: String,
-        val protein: Double,
-        val carbs: Double,
-        val fat: Double,
-        val micros: Map<Micronutrient, Double> = emptyMap(),
-    )
-
-    private fun m(
-        fiber: Double = 0.0, calcium: Double = 0.0, iron: Double = 0.0, magnesium: Double = 0.0,
-        potassium: Double = 0.0, zinc: Double = 0.0, vitaminC: Double = 0.0, folate: Double = 0.0,
-        b12: Double = 0.0, vitaminD: Double = 0.0, omega3: Double = 0.0,
-    ) = mapOf(
-        Micronutrient.FIBER to fiber,
-        Micronutrient.CALCIUM to calcium,
-        Micronutrient.IRON to iron,
-        Micronutrient.MAGNESIUM to magnesium,
-        Micronutrient.POTASSIUM to potassium,
-        Micronutrient.ZINC to zinc,
-        Micronutrient.VITAMIN_C to vitaminC,
-        Micronutrient.FOLATE to folate,
-        Micronutrient.VITAMIN_B12 to b12,
-        Micronutrient.VITAMIN_D to vitaminD,
-        Micronutrient.OMEGA_3 to omega3,
-    )
-
-    private val YOGURT = Food(
-        "Greek yogurt (0%)", 10.0, 4.0, 0.4,
-        m(calcium = 110.0, iron = 0.1, magnesium = 11.0, potassium = 141.0, zinc = 0.5, folate = 7.0, b12 = 0.75),
-    )
-    private val CHICKEN = Food(
-        "Chicken breast", 31.0, 0.0, 3.6,
-        m(calcium = 15.0, iron = 1.0, magnesium = 29.0, potassium = 256.0, zinc = 1.0, folate = 4.0,
-            b12 = 0.3, vitaminD = 0.1, omega3 = 20.0),
-    )
-    private val BEEF = Food(
-        "Lean beef (5% fat)", 21.0, 0.0, 5.0,
-        m(calcium = 12.0, iron = 2.6, magnesium = 22.0, potassium = 330.0, zinc = 6.3, folate = 8.0,
-            b12 = 2.5, vitaminD = 0.1, omega3 = 20.0),
-    )
-    private val WHITE_FISH = Food(
-        "White fish (cod)", 18.0, 0.0, 0.7,
-        m(calcium = 14.0, iron = 0.5, magnesium = 42.0, potassium = 520.0, zinc = 0.6, vitaminC = 1.0,
-            folate = 8.0, b12 = 1.0, vitaminD = 1.0, omega3 = 190.0),
-    )
-    private val OATS = Food(
-        "Oats", 13.0, 60.0, 7.0,
-        m(fiber = 10.0, calcium = 54.0, iron = 4.7, magnesium = 177.0, potassium = 429.0, zinc = 4.0, folate = 32.0),
-    )
-    private val RICE = Food(
-        "Rice (cooked)", 2.7, 28.0, 0.3,
-        m(fiber = 0.4, calcium = 10.0, iron = 0.2, magnesium = 12.0, potassium = 35.0, zinc = 0.5, folate = 3.0),
-    )
-    private val POTATO = Food(
-        "Potatoes", 2.0, 17.0, 0.1,
-        m(fiber = 1.8, calcium = 5.0, iron = 0.3, magnesium = 22.0, potassium = 380.0, zinc = 0.3,
-            vitaminC = 13.0, folate = 10.0),
-    )
-    private val BANANA = Food(
-        "Banana", 1.1, 23.0, 0.3,
-        m(fiber = 2.6, calcium = 5.0, iron = 0.3, magnesium = 27.0, potassium = 358.0, zinc = 0.15,
-            vitaminC = 8.7, folate = 20.0),
-    )
-    private val OLIVE_OIL = Food("Olive oil", 0.0, 0.0, 100.0)
-    private val NUTS = Food(
-        "Almonds", 21.0, 22.0, 50.0,
-        m(fiber = 12.5, calcium = 269.0, iron = 3.7, magnesium = 270.0, potassium = 733.0, zinc = 3.1, folate = 44.0),
-    )
-
-    /** Mixed vegetables — broccoli, spinach, peppers. Counted for micronutrients only. */
-    private val VEGETABLES = m(
-        fiber = 2.8, calcium = 70.0, iron = 1.5, magnesium = 45.0, potassium = 400.0, zinc = 0.4,
-        vitaminC = 60.0, folate = 110.0,
-    )
-    private const val VEGETABLE_GRAMS = 150
-
-    private class Slot(
-        val name: String,
-        val protein: Food,
-        val carbs: Food,
-        val fat: Food?,
-        val proteinShare: Double,
-        val carbShare: Double,
-        val fatShare: Double,
-        val vegetables: Boolean,
-    )
-
-    // No added fat around training, where it slows digestion for no benefit; the fat the
-    // day needs is spread over the other three.
-    private val SLOTS = listOf(
-        Slot("Breakfast", YOGURT, OATS, NUTS, 0.25, 0.25, 0.35, false),
-        Slot("Lunch", CHICKEN, RICE, OLIVE_OIL, 0.25, 0.25, 0.30, true),
-        Slot("Around training", BEEF, BANANA, null, 0.25, 0.30, 0.0, false),
-        Slot("Dinner", WHITE_FISH, POTATO, OLIVE_OIL, 0.25, 0.20, 0.35, true),
-    )
-
-    fun build(day: Macros): List<Meal> {
-        // Carbohydrate first, then the protein it leaves; only then the added fat, counted
-        // against the whole day, because lean beef and oats bring fat of their own and
-        // topping every meal up to its own share overshot the day by a tenth.
-        val base = SLOTS.map { slot ->
-            val carbGrams = day.carbsG * slot.carbShare / slot.carbs.carbs * 100
-            val proteinLeft = day.proteinG * slot.proteinShare - carbGrams * slot.carbs.protein / 100
-            carbGrams to max(0.0, proteinLeft / slot.protein.protein * 100)
-        }
-        val fatSoFar = SLOTS.indices.sumOf { i ->
-            (base[i].first * SLOTS[i].carbs.fat + base[i].second * SLOTS[i].protein.fat) / 100
-        }
-        val fatLeft = max(0.0, day.fatG - fatSoFar)
-
-        return SLOTS.mapIndexed { i, slot ->
-            val (carbGrams, proteinGrams) = base[i]
-            val portions = listOfNotNull(
-                slot.protein to proteinGrams,
-                slot.carbs to carbGrams,
-                slot.fat?.let { it to fatLeft * slot.fatShare / it.fat * 100 },
-            )
-                .map { (food, grams) -> food to (grams / 5).roundToInt() * 5 }
-                .filter { (_, grams) -> grams > 0 }
-
-            val p = portions.sumOf { (f, g) -> f.protein * g / 100 }
-            val c = portions.sumOf { (f, g) -> f.carbs * g / 100 }
-            val f = portions.sumOf { (food, g) -> food.fat * g / 100 }
-            val items = portions.map { (food, grams) -> FoodPortion(food.name, grams) } +
-                if (slot.vegetables) {
-                    listOf(FoodPortion("Vegetables (not counted)", VEGETABLE_GRAMS))
-                } else {
-                    emptyList()
-                }
-
-            val micros = Micronutrient.entries.associateWith { nutrient ->
-                portions.sumOf { (food, grams) -> (food.micros[nutrient] ?: 0.0) * grams / 100 } +
-                    if (slot.vegetables) (VEGETABLES[nutrient] ?: 0.0) * VEGETABLE_GRAMS / 100 else 0.0
-            }
-
-            Meal(
-                name = slot.name,
-                items = items,
-                micros = micros,
-                macros = Macros(
-                    calories = (p * 4 + c * 4 + f * 9).roundToInt(),
-                    proteinG = p.roundToInt(),
-                    carbsG = c.roundToInt(),
-                    fatG = f.roundToInt(),
-                ),
-            )
-        }
-    }
 }

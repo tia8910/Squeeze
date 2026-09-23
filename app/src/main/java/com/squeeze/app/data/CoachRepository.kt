@@ -1,6 +1,19 @@
 package com.squeeze.app.data
 
+import com.squeeze.app.data.db.ActivityDao
+import com.squeeze.app.data.db.ActivitySessionEntity
+import com.squeeze.app.data.db.LoggedSetEntity
 import com.squeeze.app.data.db.MeasurementDao
+import com.squeeze.app.data.db.WorkoutDao
+import com.squeeze.core.nutrition.FoodLibrary
+import com.squeeze.core.workout.ActivityCalories
+import com.squeeze.core.workout.Discipline
+import com.squeeze.core.workout.HybridPlanner
+import com.squeeze.core.workout.HybridWeek
+import com.squeeze.core.workout.Intensity
+import com.squeeze.core.workout.LoggedSet
+import com.squeeze.core.workout.PlannedItem
+import com.squeeze.core.workout.Sport
 import com.squeeze.app.data.db.PhysiqueDao
 import com.squeeze.app.data.db.PhysiqueReadEntity
 import com.squeeze.app.data.db.ProfileDao
@@ -42,7 +55,128 @@ class CoachRepository @Inject constructor(
     private val measurementDao: MeasurementDao,
     private val physiqueDao: PhysiqueDao,
     private val composition: BodyCompositionRepository,
+    private val workoutDao: WorkoutDao,
+    private val activityDao: ActivityDao,
 ) {
+
+    /**
+     * What the log screen should open with: a session from the week, or an exercise the
+     * machine scanner just identified. Handed over in memory — it is a navigation argument,
+     * not something to keep.
+     */
+    @Volatile
+    var pendingLog: PendingLog? = null
+
+    // ── Sports and foods the user chose ──────────────────────────────────────────────────
+
+    suspend fun disciplines(): Set<Discipline> = profileDao.get()?.disciplines
+        ?.split(",")
+        ?.mapNotNull { runCatching { Discipline.valueOf(it) }.getOrNull() }
+        ?.toSet()
+        .orEmpty()
+
+    suspend fun saveDisciplines(chosen: Set<Discipline>) {
+        val existing = profileDao.get() ?: return
+        profileDao.upsert(existing.copy(disciplines = chosen.joinToString(",") { it.name }))
+    }
+
+    suspend fun favouriteFoods(): Set<String> = profileDao.get()?.favouriteFoods
+        ?.split("|")
+        ?.filter { FoodLibrary.byName(it) != null }
+        ?.toSet()
+        .orEmpty()
+
+    suspend fun saveFavouriteFoods(foods: Set<String>) {
+        val existing = profileDao.get() ?: return
+        profileDao.upsert(existing.copy(favouriteFoods = foods.joinToString("|")))
+    }
+
+    // ── The week ─────────────────────────────────────────────────────────────────────────
+
+    /** The AI scan's weak groups for today's goal, as programme muscle groups. */
+    suspend fun aiWeakTrainingGroups(goal: Goal): List<TrainingGroup> =
+        aiWeakPoints(goal).map { it.group }.distinct()
+
+    /** The combined week for the chosen sports, or null before any are chosen. */
+    suspend fun week(): HybridWeek? {
+        val stored = profileDao.get() ?: return null
+        val chosen = disciplines().takeIf { it.isNotEmpty() } ?: return null
+        val profile = stored.toDomain()
+        return HybridPlanner.plan(
+            disciplines = chosen,
+            daysPerWeek = stored.trainingDaysPerWeek ?: DEFAULT_TRAINING_DAYS,
+            goal = profile.goal,
+            trainingAge = profile.trainingAge,
+            weakGroups = aiWeakTrainingGroups(profile.goal),
+        )
+    }
+
+    // ── The log ──────────────────────────────────────────────────────────────────────────
+
+    suspend fun logSet(exercise: String, group: TrainingGroup?, set: LoggedSet) {
+        workoutDao.insert(
+            LoggedSetEntity(
+                epochDay = LocalDate.now().toEpochDay(),
+                exerciseName = exercise,
+                muscleGroup = group?.name ?: "OTHER",
+                weightKg = set.weightKg,
+                reps = set.reps,
+                rir = set.rir,
+                programWeekIndex = null,
+            ),
+        )
+    }
+
+    suspend fun deleteSet(set: LoggedSetEntity) = workoutDao.delete(set)
+
+    suspend fun todaysSets(): List<LoggedSetEntity> = workoutDao.since(LocalDate.now().toEpochDay())
+
+    /** The last time this exercise was trained, and what to do today because of it. */
+    suspend fun lastSession(exercise: String): List<LoggedSet> =
+        workoutDao.lastSession(exercise, LocalDate.now().toEpochDay())
+            .map { LoggedSet(it.weightKg, it.reps, it.rir) }
+
+    suspend fun logSession(sport: Sport, title: String, minutes: Int, intensity: Intensity, distanceKm: Double?): Int {
+        val weight = measurementDao.latestWeightKg() ?: DEFAULT_WEIGHT_KG
+        val kcal = ActivityCalories.netKcal(sport, intensity, minutes, weight)
+        activityDao.insert(
+            ActivitySessionEntity(
+                epochDay = LocalDate.now().toEpochDay(),
+                sport = sport.name,
+                title = title,
+                minutes = minutes,
+                intensity = intensity.name,
+                distanceKm = distanceKm,
+                netKcal = kcal,
+            ),
+        )
+        return kcal
+    }
+
+    suspend fun recentSessions(days: Long = 14): List<ActivitySessionEntity> =
+        activityDao.since(LocalDate.now().toEpochDay() - days)
+
+    suspend fun deleteSession(session: ActivitySessionEntity) = activityDao.delete(session)
+
+    /**
+     * Sets done this week per muscle group against what the week plans, weak points marked —
+     * the check that the programme's priorities are actually being trained.
+     */
+    suspend fun weeklyVolume(): List<VolumeRow> {
+        val today = LocalDate.now()
+        val monday = today.with(java.time.DayOfWeek.MONDAY).toEpochDay()
+        val done = workoutDao.since(monday)
+            .mapNotNull { set -> runCatching { TrainingGroup.valueOf(set.muscleGroup) }.getOrNull() }
+            .groupingBy { it }.eachCount()
+        val week = week()
+        val planned = week?.weeklySets().orEmpty()
+        val goal = profileDao.get()?.let { runCatching { Goal.valueOf(it.goal) }.getOrNull() } ?: Goal.HYPERTROPHY
+        val weak = aiWeakTrainingGroups(goal).toSet()
+        return (planned.keys + done.keys).distinct().map { g ->
+            VolumeRow(g, done[g] ?: 0, planned[g] ?: 0, g in weak)
+        }.sortedWith(compareByDescending<VolumeRow> { it.weakPoint }.thenByDescending { it.planned })
+    }
+
 
     /** Stores the AI's per-group scores from a saved scan. */
     suspend fun savePhysique(epochDay: Long, goal: Goal, scores: Map<MuscleGroup, Double>) {
@@ -130,6 +264,8 @@ class CoachRepository @Inject constructor(
             null
         }
         val aiScanned = measurements.any { it.visualBodyFatPercent != null }
+        val logged = recentSessions(14)
+        val week = week()
 
         val input = NutritionInputs(
             sex = profile.sex,
@@ -141,7 +277,7 @@ class CoachRepository @Inject constructor(
             bodyFatSource = if (aiScanned) "your body-fat trend, led by the AI scan" else "your body-fat trend",
             goal = profile.goal,
             trainingAge = profile.trainingAge,
-            trainingDaysPerWeek = stored.trainingDaysPerWeek ?: DEFAULT_TRAINING_DAYS,
+            trainingDaysPerWeek = week?.trainingDays ?: stored.trainingDaysPerWeek ?: DEFAULT_TRAINING_DAYS,
             trainingDaysFromProgramme = stored.trainingDaysPerWeek != null,
             weightTrendKgPerWeek = slope,
             trendDays = trendDays,
@@ -149,11 +285,20 @@ class CoachRepository @Inject constructor(
             targetBodyFatPercent = profile.targetBodyFatPercent,
             daysToDeadline = profile.targetEpochDay?.let { it - today },
             priorityGroups = aiWeakGroupNames(profile.goal),
+            favouriteFoods = favouriteFoods(),
+            loggedExerciseKcalPerDay = logged.takeIf { it.isNotEmpty() }?.let { s -> s.sumOf { it.netKcal } / 14.0 },
+            loggedSessions = logged.size,
+            plannedExerciseKcalPerDay = week?.netKcalPerDay(weightTrend.lastOrNull()?.level ?: latestWeight.weightKg!!),
+            plannedSummary = week?.let { w ->
+                w.days.flatMap { it.sessions }.groupingBy { it.discipline.label }.eachCount()
+                    .entries.joinToString { (d, n) -> "$d ×$n" }
+            },
         )
         return NutritionContext(
             plan = NutritionPlanner.plan(input),
             goal = profile.goal,
             trainingDaysPerWeek = input.trainingDaysPerWeek,
+            favourites = input.favouriteFoods,
             trainingDaysFromProgramme = input.trainingDaysFromProgramme,
             hasPhysique = physiqueDao.latest() != null,
         )
@@ -177,6 +322,9 @@ class CoachRepository @Inject constructor(
 
     private companion object {
         const val DEFAULT_TRAINING_DAYS = 4
+
+        /** Used for calorie estimates only until a first weight is logged. */
+        const val DEFAULT_WEIGHT_KG = 75.0
     }
 }
 
@@ -187,6 +335,23 @@ data class NutritionContext(
     val trainingDaysPerWeek: Int,
     val trainingDaysFromProgramme: Boolean,
     val hasPhysique: Boolean,
+    val favourites: Set<String> = emptySet(),
+)
+
+/** One muscle group's week: sets logged since Monday against sets planned. */
+data class VolumeRow(val group: TrainingGroup, val done: Int, val planned: Int, val weakPoint: Boolean)
+
+/**
+ * A session or exercise to open the log with.
+ *
+ * @param exercises strength items to log set by set; empty for a sport logged as a whole
+ */
+data class PendingLog(
+    val sport: Sport,
+    val title: String,
+    val minutes: Int,
+    val intensity: Intensity,
+    val exercises: List<PlannedItem> = emptyList(),
 )
 
 private fun ProfileEntity.toDomain() = Profile(

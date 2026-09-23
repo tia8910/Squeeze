@@ -134,6 +134,10 @@ data class ProfileEntity(
      * user trains. Null until a programme has been generated.
      */
     val trainingDaysPerWeek: Int? = null,
+    /** The sports the user trains, comma-separated `Discipline` names; null until chosen. */
+    val disciplines: String? = null,
+    /** Favourite foods, `|`-separated names from the food library; null until chosen. */
+    val favouriteFoods: String? = null,
 )
 
 /**
@@ -182,4 +186,25 @@ data class PhysiqueReadEntity(
     @PrimaryKey val epochDay: Long,
     val goal: String,
     val scores: String,
+)
+
+/**
+ * One logged session of any sport — a run, a Pilates class, a match, a gym session.
+ *
+ * Strength sets are logged set by set in [LoggedSetEntity]; this row carries the session's
+ * duration and energy so the nutrition plan can count what was actually done.
+ *
+ * @param sport a `Sport` name
+ * @param netKcal calories above rest, worked out at logging time from the bodyweight then
+ */
+@Entity(tableName = "activity_sessions")
+data class ActivitySessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val sport: String,
+    val title: String,
+    val minutes: Int,
+    val intensity: String,
+    val distanceKm: Double?,
+    val netKcal: Int,
 )

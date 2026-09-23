@@ -1,5 +1,5 @@
-"""Writes app/src/main/assets/clip_prompts.json and clip_muscles.json: the text side of the
-on-device model.
+"""Writes app/src/main/assets/clip_prompts.json, clip_muscles.json and clip_equipment.json:
+the text side of the on-device model.
 
 The prompts are fixed, so their embeddings are computed once, here, and shipped as numbers.
 The phone then needs only the image encoder — the text encoder is 254 MB and would do the
@@ -21,6 +21,7 @@ import open_clip
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from prompts import PROMPT_SETS  # noqa: E402
 from muscle_prompts import MUSCLE_PROMPTS  # noqa: E402
+from equipment_prompts import EQUIPMENT_PROMPTS  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 URL = ("https://clip-as-service.s3.us-east-2.amazonaws.com/"
@@ -87,6 +88,15 @@ def main():
         "model": doc["model"],
         "logitScale": 100.0,
         "groups": groups,
+    })
+
+    write("clip_equipment.json", {
+        "model": doc["model"],
+        "logitScale": 100.0,
+        "machines": {
+            machine: embed(session, tokenizer, prompts)
+            for machine, prompts in EQUIPMENT_PROMPTS.items()
+        },
     })
 
 
