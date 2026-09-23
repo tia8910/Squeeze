@@ -34,6 +34,8 @@ data class ExerciseEntry(
     val suggestion: Suggestion,
     val lastSets: List<LoggedSet>,
     val weakPoint: Boolean,
+    val compound: Boolean = false,
+    val lowerBody: Boolean = false,
 )
 
 data class WorkoutLogUiState(
@@ -48,6 +50,8 @@ data class WorkoutLogUiState(
     val weightKg: Double = 75.0,
     val recent: List<ActivitySessionEntity> = emptyList(),
     val message: String? = null,
+    /** Today's workout against last time, shown when the workout is finished. */
+    val summary: com.squeeze.core.workout.WorkoutSummary? = null,
 ) {
     val estimatedKcal: Int
         get() = ActivityCalories.netKcal(if (strength) Sport.STRENGTH else sport, intensity, minutes, weightKg)
@@ -111,7 +115,7 @@ class WorkoutLogViewModel @Inject constructor(
             val lowerBody = group in LOWER
             val p = Coaching.prescribe(goal, age, compound, group in weak)
             val last = coach.lastSession(name)
-            val entry = ExerciseEntry(name, group, p, Coaching.next(last, p, compound, lowerBody), last, group in weak)
+            val entry = ExerciseEntry(name, group, p, Coaching.next(last, p, compound, lowerBody), last, group in weak, compound, lowerBody)
             _state.value = _state.value.copy(exercises = _state.value.exercises + entry)
         }
     }
@@ -136,6 +140,7 @@ class WorkoutLogViewModel @Inject constructor(
             _state.value = s.copy(
                 message = "Saved: ${s.todaysSets.size} sets, about $kcal kcal. Your nutrition plan and " +
                     "this week's volume now include it.",
+                summary = coach.workoutSummary(),
             )
             refresh()
         }

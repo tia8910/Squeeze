@@ -38,6 +38,7 @@ import com.squeeze.core.workout.Sport
 fun WorkoutLogScreen(
     onScanMachine: () -> Unit,
     onDone: () -> Unit,
+    onProgress: (() -> Unit)? = null,
     viewModel: WorkoutLogViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -55,10 +56,13 @@ fun WorkoutLogScreen(
         }
 
         state.message?.let { message ->
+            // The workout, summarised against last time, before leaving the screen.
+            state.summary?.let { com.squeeze.app.ui.progress.WorkoutSummaryCard(it) }
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(message, style = MaterialTheme.typography.bodyMedium)
                     Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                    onProgress?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text("See all my progress ›") } }
                 }
             }
         }
@@ -136,48 +140,23 @@ private fun AddExercise(state: WorkoutLogUiState, viewModel: WorkoutLogViewModel
 
 @Composable
 private fun ExerciseCard(exercise: ExerciseEntry, state: WorkoutLogUiState, viewModel: WorkoutLogViewModel) {
-    val suggestion = exercise.suggestion
-    var weight by remember(exercise.name) { mutableStateOf(suggestion.weightKg?.let { fmt(it) } ?: "") }
-    var reps by remember(exercise.name) { mutableStateOf(suggestion.reps.first.toString()) }
-    var rir by remember(exercise.name) { mutableStateOf(exercise.prescription.rir.toString()) }
-
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 exercise.name + if (exercise.weakPoint) "  ★ weak point" else "",
                 style = MaterialTheme.typography.titleSmall,
             )
-            Text(exercise.prescription.summary, style = MaterialTheme.typography.bodySmall)
-            if (exercise.lastSets.isNotEmpty()) {
-                Text(
-                    "Last time: " + exercise.lastSets.joinToString(", ") { "${fmt(it.weightKg)}×${it.reps}" },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Text("Today: ${suggestion.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-
-            state.todaysSets.filter { it.exerciseName == exercise.name }.forEachIndexed { i, set ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Set ${i + 1}: ${fmt(set.weightKg)} kg × ${set.reps}" + (set.rir?.let { " · $it in reserve" } ?: ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = { viewModel.deleteSet(set) }) { Text("Undo") }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumberField("kg", weight, Modifier.weight(1f)) { weight = it }
-                NumberField("Reps", reps, Modifier.weight(1f)) { reps = it }
-                NumberField("In reserve", rir, Modifier.weight(1f)) { rir = it }
-            }
-            Button(
-                onClick = {
-                    viewModel.logSet(exercise, weight.replace(',', '.').toDoubleOrNull() ?: 0.0, reps.toIntOrNull() ?: 0, rir.toIntOrNull())
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Log set") }
+            com.squeeze.app.ui.progress.SetLogger(
+                exercise = exercise.name,
+                prescription = exercise.prescription,
+                suggestion = exercise.suggestion,
+                lastSets = exercise.lastSets,
+                todaysSets = state.todaysSets.filter { it.exerciseName == exercise.name },
+                compound = exercise.compound,
+                lowerBody = exercise.lowerBody,
+                onLog = { kg, reps, rir -> viewModel.logSet(exercise, kg, reps, rir) },
+                onDelete = viewModel::deleteSet,
+            )
         }
     }
 }

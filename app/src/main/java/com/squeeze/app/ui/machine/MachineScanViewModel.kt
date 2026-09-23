@@ -14,6 +14,10 @@ import com.squeeze.app.scan.PhotoLoader
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.TrainingAge
 import com.squeeze.core.workout.Coaching
+import com.squeeze.core.workout.EquipmentCatalog
+import com.squeeze.core.workout.MachineExercise
+import com.squeeze.core.workout.WorkoutSummary
+import com.squeeze.app.data.db.LoggedSetEntity
 import com.squeeze.core.workout.Intensity
 import com.squeeze.core.workout.LoggedSet
 import com.squeeze.core.workout.MachineGuide
@@ -40,6 +44,14 @@ data class MachineScanUiState(
     val lastSets: List<LoggedSet> = emptyList(),
     val weakPoint: Boolean = false,
     val error: String? = null,
+    /** Every exercise this machine is used for; the selected one is logged here. */
+    val workouts: List<MachineExercise> = emptyList(),
+    val exercise: MachineExercise? = null,
+    /** Today's sets of the selected exercise. */
+    val todaysSets: List<LoggedSetEntity> = emptyList(),
+    /** Today's whole workout against last time, shown once anything is logged. */
+    val summary: WorkoutSummary? = null,
+    val saved: String? = null,
 )
 
 /**
@@ -85,21 +97,63 @@ class MachineScanViewModel @Inject constructor(
     }
 
     fun select(guide: MachineGuide) {
+        val workouts = EquipmentCatalog.workouts(guide)
+        _state.value = _state.value.copy(selected = guide, workouts = workouts, saved = null)
+        workouts.firstOrNull()?.let(::chooseExercise) ?: _state.value.let {
+            _state.value = it.copy(exercise = null, prescription = null, suggestion = null, lastSets = emptyList())
+        }
+    }
+
+    /** Picks which of the machine's exercises to do, with today's target from the log. */
+    fun chooseExercise(exercise: MachineExercise) {
         viewModelScope.launch {
             val profile = profileDao.get()
             val goal = profile?.let { runCatching { Goal.valueOf(it.goal) }.getOrNull() } ?: Goal.HYPERTROPHY
             val age = profile?.let { runCatching { TrainingAge.valueOf(it.trainingAge) }.getOrNull() } ?: TrainingAge.INTERMEDIATE
-            val weak = guide.group != null && guide.group in coach.aiWeakTrainingGroups(goal)
-            val prescription = if (guide.cardio) null else Coaching.prescribe(goal, age, guide.compound, weak)
-            val last = if (guide.cardio) emptyList() else coach.lastSession(guide.exercise)
+            val weak = exercise.group in coach.aiWeakTrainingGroups(goal)
+            val prescription = Coaching.prescribe(goal, age, exercise.compound, weak)
+            val last = coach.lastSession(exercise.name)
             _state.value = _state.value.copy(
-                selected = guide,
+                exercise = exercise,
                 prescription = prescription,
-                suggestion = prescription?.let { Coaching.next(last, it, guide.compound, guide.lowerBody) },
+                suggestion = Coaching.next(last, prescription, exercise.compound, exercise.lowerBody),
                 lastSets = last,
                 weakPoint = weak,
             )
+            refreshLog()
         }
+    }
+
+    /** Logs one set of the selected exercise, right here on the scanner screen. */
+    fun logSet(weightKg: Double, reps: Int, rir: Int?) {
+        val exercise = _state.value.exercise ?: return
+        if (reps <= 0) return
+        viewModelScope.launch {
+            coach.logSet(exercise.name, exercise.group, LoggedSet(weightKg, reps, rir))
+            refreshLog()
+        }
+    }
+
+    fun deleteSet(set: LoggedSetEntity) {
+        viewModelScope.launch { coach.deleteSet(set); refreshLog() }
+    }
+
+    /** Closes the session so its calories reach the nutrition plan. */
+    fun finish(minutes: Int, intensity: Intensity = Intensity.MODERATE) {
+        val guide = _state.value.selected ?: return
+        viewModelScope.launch {
+            val kcal = coach.logSession(guide.sport, guide.name, minutes, intensity, null)
+            _state.value = _state.value.copy(saved = "Saved · $minutes min · about $kcal kcal. Your plan and progress are updated.")
+            refreshLog()
+        }
+    }
+
+    private suspend fun refreshLog() {
+        val name = _state.value.exercise?.name
+        _state.value = _state.value.copy(
+            todaysSets = coach.todaysSets().filter { it.exerciseName == name },
+            summary = coach.workoutSummary().takeIf { it.exercises.isNotEmpty() },
+        )
     }
 
     /** Opens the log with this machine's exercise ready. */

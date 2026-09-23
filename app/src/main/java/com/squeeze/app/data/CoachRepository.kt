@@ -18,6 +18,10 @@ import com.squeeze.core.coach.Journey
 import com.squeeze.core.coach.JourneyFacts
 import com.squeeze.core.coach.JourneyPlanner
 import com.squeeze.core.workout.Sport
+import com.squeeze.core.workout.DatedSet
+import com.squeeze.core.workout.ExerciseProgress
+import com.squeeze.core.workout.ProgressAnalysis
+import com.squeeze.core.workout.WorkoutSummary
 import com.squeeze.app.data.db.PhysiqueDao
 import com.squeeze.app.data.db.PhysiqueReadEntity
 import com.squeeze.app.data.db.ProfileDao
@@ -202,6 +206,17 @@ class CoachRepository @Inject constructor(
     }
 
     suspend fun deleteSet(set: LoggedSetEntity) = workoutDao.delete(set)
+
+    /** Every logged set, for progress and summaries. */
+    private suspend fun allSets(): List<DatedSet> = workoutDao.since(Long.MIN_VALUE)
+        .map { DatedSet(it.epochDay, it.exerciseName, LoggedSet(it.weightKg, it.reps, it.rir)) }
+
+    /** Today's workout against the last session of each exercise. */
+    suspend fun workoutSummary(): WorkoutSummary =
+        ProgressAnalysis.summary(allSets(), LocalDate.now().toEpochDay())
+
+    /** Progressive overload on every exercise ever logged. */
+    suspend fun progress(): List<ExerciseProgress> = ProgressAnalysis.progress(allSets())
 
     suspend fun todaysSets(): List<LoggedSetEntity> = workoutDao.since(LocalDate.now().toEpochDay())
 

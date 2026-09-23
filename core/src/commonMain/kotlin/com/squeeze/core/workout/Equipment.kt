@@ -29,8 +29,119 @@ data class MachineGuide(
     val cardio: Boolean get() = group == null
 }
 
+/**
+ * One exercise a machine is used for, as the log records it.
+ *
+ * @param cue the one line that makes it different from the machine's main exercise
+ */
+data class MachineExercise(
+    val name: String,
+    val group: MuscleGroup,
+    val compound: Boolean,
+    val cue: String,
+) {
+    val lowerBody: Boolean
+        get() = group == MuscleGroup.QUADS || group == MuscleGroup.HAMSTRINGS ||
+            group == MuscleGroup.GLUTES || group == MuscleGroup.CALVES
+}
+
 /** The equipment the camera recognises, and how to use each. */
 object EquipmentCatalog {
+
+    private fun ex(name: String, group: MuscleGroup, compound: Boolean, cue: String) =
+        MachineExercise(name, group, compound, cue)
+
+    /**
+     * What else each machine is for. A cable station is a dozen exercises; a lat pulldown is
+     * two or three. The machine's own exercise always comes first.
+     */
+    private val EXTRA: Map<String, List<MachineExercise>> = mapOf(
+        "lat_pulldown" to listOf(
+            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle, palms facing — pull to the upper chest."),
+            ex("Straight-Arm Pulldown", MuscleGroup.BACK, false, "Stand facing the stack, arms straight, sweep the bar to your thighs."),
+        ),
+        "lat_row_combo" to listOf(
+            ex("Seated Cable Row", MuscleGroup.BACK, true, "Move to the bench, feet on the bar, pull the V-handle to your ribs."),
+            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle on the high pulley — pull to the upper chest."),
+        ),
+        "cable_row" to listOf(
+            ex("Wide-Grip Cable Row", MuscleGroup.BACK, true, "Long bar, wide grip, pull to the lower chest, elbows out."),
+        ),
+        "cable_station" to listOf(
+            ex("Triceps Pushdown", MuscleGroup.TRICEPS, false, "High pulley, rope or bar, elbows pinned — push to straight arms."),
+            ex("Face Pull", MuscleGroup.SHOULDERS, false, "Rope at face height, pull to your forehead, elbows high."),
+            ex("Cable Lateral Raise", MuscleGroup.SHOULDERS, false, "Low pulley, one arm, raise out to the side to shoulder height."),
+            ex("Cable Curl", MuscleGroup.BICEPS, false, "Low pulley, bar or rope, elbows at your sides."),
+            ex("Cable Crunch", MuscleGroup.ABS, false, "Kneel under the high pulley, rope by your head, curl your ribs down."),
+        ),
+        "leg_press" to listOf(
+            ex("Leg Press Calf Raise", MuscleGroup.CALVES, false, "Balls of the feet on the platform edge, legs straight, press with the toes."),
+        ),
+        "smith_machine" to listOf(
+            ex("Smith Machine Bench Press", MuscleGroup.CHEST, true, "Bench under the bar, lower to mid-chest."),
+            ex("Smith Machine Row", MuscleGroup.BACK, true, "Bar at knee height, hinge over, row to the lower ribs."),
+            ex("Smith Machine Hip Thrust", MuscleGroup.GLUTES, true, "Back on a bench, padded bar over the hips, drive up."),
+        ),
+        "squat_rack" to listOf(
+            ex("Front Squat", MuscleGroup.QUADS, true, "Bar on the front of the shoulders, elbows high."),
+            ex("Overhead Press", MuscleGroup.SHOULDERS, true, "Bar from the rack at collarbone height, press overhead."),
+            ex("Barbell Row", MuscleGroup.BACK, true, "Hinge to 45°, row the bar to your lower ribs."),
+        ),
+        "adjustable_bench" to listOf(
+            ex("Dumbbell Bench Press", MuscleGroup.CHEST, true, "Bench flat, press the dumbbells over your chest."),
+            ex("Seated Dumbbell Shoulder Press", MuscleGroup.SHOULDERS, true, "Bench upright, press from the shoulders overhead."),
+            ex("One-Arm Dumbbell Row", MuscleGroup.BACK, true, "Knee and hand on the bench, row to the hip."),
+        ),
+        "dumbbells" to listOf(
+            ex("Dumbbell Curl", MuscleGroup.BICEPS, false, "Elbows at your sides, curl and turn the palms up."),
+            ex("Goblet Squat", MuscleGroup.QUADS, true, "One dumbbell at your chest, sit between your heels."),
+            ex("Dumbbell Romanian Deadlift", MuscleGroup.HAMSTRINGS, true, "Soft knees, push the hips back, dumbbells down the thighs."),
+            ex("Dumbbell Bench Press", MuscleGroup.CHEST, true, "On a flat bench, press over the chest."),
+        ),
+        "pec_deck" to listOf(
+            ex("Reverse Pec Deck", MuscleGroup.SHOULDERS, false, "Face the pad, arms straight, open the handles back — rear delts."),
+        ),
+        "pullup_station" to listOf(
+            ex("Chin-Up", MuscleGroup.BICEPS, true, "Palms facing you, shoulder-width grip."),
+            ex("Assisted Dip", MuscleGroup.TRICEPS, true, "Use the dip handles on the same station."),
+        ),
+        "dip_station" to listOf(
+            ex("Hanging Knee Raise", MuscleGroup.ABS, false, "Support on straight arms, raise the knees to the chest."),
+        ),
+        "barbell" to listOf(
+            ex("Barbell Row", MuscleGroup.BACK, true, "Hinge to 45°, row the bar to your lower ribs."),
+            ex("Overhead Press", MuscleGroup.SHOULDERS, true, "Standing, press from the collarbone to overhead."),
+            ex("Barbell Bench Press", MuscleGroup.CHEST, true, "On a bench with a rack or spotter."),
+        ),
+        "kettlebell" to listOf(
+            ex("Goblet Squat", MuscleGroup.QUADS, true, "Hold the bell at your chest, sit between your heels."),
+            ex("Kettlebell Row", MuscleGroup.BACK, true, "Hinge over, row the bell to your hip."),
+        ),
+        "suspension_trainer" to listOf(
+            ex("Suspension Push-Up", MuscleGroup.CHEST, true, "Feet in the straps or hands on the handles, push up."),
+            ex("Suspension Squat", MuscleGroup.QUADS, true, "Hold the handles for balance, sit deep."),
+        ),
+        "resistance_bands" to listOf(
+            ex("Band Row", MuscleGroup.BACK, true, "Anchor the band, row to your ribs."),
+            ex("Banded Squat", MuscleGroup.QUADS, true, "Stand on the band, handles at the shoulders, squat."),
+        ),
+        "landmine" to listOf(
+            ex("Landmine Row", MuscleGroup.BACK, true, "Straddle the bar, row the end to your chest."),
+            ex("Landmine Squat", MuscleGroup.QUADS, true, "Hold the bar end at your chest, squat."),
+        ),
+        "ez_bar" to listOf(
+            ex("EZ Bar Skull Crusher", MuscleGroup.TRICEPS, false, "Lying on a bench, lower the bar to your forehead, extend."),
+        ),
+        "preacher_curl" to listOf(
+            ex("Preacher Hammer Curl", MuscleGroup.BICEPS, false, "Dumbbell with a neutral grip on the pad."),
+        ),
+    )
+
+    /** Every exercise this machine is used for, its main one first. */
+    fun workouts(guide: MachineGuide): List<MachineExercise> {
+        val main = guide.group?.let { listOf(ex(guide.exercise, it, guide.compound, guide.setup)) }.orEmpty()
+        return (main + EXTRA[guide.id].orEmpty()).distinctBy { it.name }
+    }
 
     val ALL: List<MachineGuide> = listOf(
         MachineGuide(

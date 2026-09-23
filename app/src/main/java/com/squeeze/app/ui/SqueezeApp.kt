@@ -81,6 +81,7 @@ private const val ROUTE_ADD_MEASUREMENT = "add_measurement"
 private const val ROUTE_CELEBRATION = "celebration"
 private const val ROUTE_LOG = "log"
 private const val ROUTE_MACHINE = "machine"
+private const val ROUTE_PROGRESS = "progress"
 
 private enum class Destination(
     val route: String,
@@ -157,7 +158,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         currentRoute == ROUTE_ADD_MEASUREMENT ||
         currentRoute == ROUTE_CELEBRATION ||
         currentRoute == ROUTE_LOG ||
-        currentRoute == ROUTE_MACHINE
+        currentRoute == ROUTE_MACHINE ||
+        currentRoute == ROUTE_PROGRESS
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -174,6 +176,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         currentRoute == ROUTE_ADD_MEASUREMENT -> Text("New measurement")
                         currentRoute == ROUTE_LOG -> Text("Log workout")
                         currentRoute == ROUTE_MACHINE -> Text("Scan a machine")
+                        currentRoute == ROUTE_PROGRESS -> Text("Your progress")
                         // The wordmark is the title on the home tab; a text label there
                         // would waste the one place the brand is always visible.
                         activeTab == Destination.COMPOSITION ->
@@ -294,6 +297,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },
                         onLog = { navController.navigate(ROUTE_LOG) },
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
+                        onProgress = { navController.navigate(ROUTE_PROGRESS) },
                     )
                 }
 
@@ -305,7 +309,12 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                             viewModel.refresh()
                             navController.popBackStack(Destination.COMPOSITION.route, inclusive = false)
                         },
+                        onProgress = { navController.navigate(ROUTE_PROGRESS) },
                     )
+                }
+
+                composable(ROUTE_PROGRESS) {
+                    com.squeeze.app.ui.progress.ProgressScreen(onLog = { navController.navigate(ROUTE_LOG) })
                 }
 
                 composable(ROUTE_MACHINE) {

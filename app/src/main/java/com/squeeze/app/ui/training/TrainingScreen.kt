@@ -48,6 +48,7 @@ fun TrainingScreen(
     onOpenNutrition: () -> Unit = {},
     onLog: () -> Unit = {},
     onScanMachine: () -> Unit = {},
+    onProgress: () -> Unit = {},
     nextStep: com.squeeze.core.coach.JourneyStep? = null,
     onNextStep: () -> Unit = {},
     onPlanChanged: () -> Unit = {},
@@ -122,6 +123,14 @@ fun TrainingScreen(
             WeekList(week, todayIndex, onLogSession = { session -> viewModel.startLog(session); onLog() })
 
             if (state.volume.isNotEmpty()) VolumeCard(state.volume)
+
+            com.squeeze.app.ui.components.BrandRow(onClick = onProgress) {
+                Column(Modifier.weight(1f)) {
+                    Text("Your progress", style = MaterialTheme.typography.titleSmall)
+                    Text("Progressive overload on every lift · workout summaries", style = MaterialTheme.typography.bodySmall)
+                }
+                Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryButton(text = "Log a workout", onClick = onLog, modifier = Modifier.weight(1f))

@@ -81,6 +81,14 @@ data class Prescription(
     private fun formatRest(seconds: Int) = if (seconds % 60 == 0) "${seconds / 60} min" else "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')} min"
 }
 
+/**
+ * What to do on the very next set.
+ *
+ * @param weightKg the weight to load; null when the user should pick (first set)
+ * @param finished true once the planned sets are done
+ */
+data class SetAdvice(val weightKg: Double?, val reps: Int, val text: String, val finished: Boolean)
+
 /** What to do on the next set or session, and why. */
 data class Suggestion(val weightKg: Double?, val reps: IntRange, val reason: String)
 
@@ -174,6 +182,65 @@ object Coaching {
                     "Stay at ${fmt(top)} kg and beat last time: ${atTop.joinToString(", ") { it.reps.toString() }} " +
                         "reps → aim for ${(best + 1).coerceAtMost(prescription.reps.last)}+ on each set.",
                 )
+            }
+        }
+    }
+
+    /**
+     * What to do on the next set, from the sets already done today — the call a coach makes
+     * standing next to you.
+     *
+     * Reads the last set against the prescription: reps against the range, and — when the
+     * user logged it — reps in reserve against the target. Too easy (the top of the range with
+     * more than a rep to spare) means more weight now, not next week; too hard (below the
+     * range, or failure on an early set) means less, so the remaining sets stay productive;
+     * in range means same weight, one more rep. After the last planned set it says so, and
+     * what next session's target is.
+     */
+    fun nextSet(
+        done: List<LoggedSet>,
+        prescription: Prescription,
+        compound: Boolean,
+        lowerBody: Boolean,
+    ): SetAdvice {
+        val last = done.lastOrNull { it.reps > 0 }
+            ?: return SetAdvice(null, prescription.reps.first, "Set 1: warm up with a light set first, then aim for " +
+                "${prescription.reps.first}–${prescription.reps.last} reps, leaving ${prescription.rir} in the tank.", finished = false)
+        val setNumber = done.size + 1
+        val range = prescription.reps
+        val seconds = prescription.restSeconds
+        val rest = if (seconds % 60 == 0) {
+            "Rest ${seconds / 60} min"
+        } else {
+            "Rest ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')} min"
+        }
+        val step = increment(compound, lowerBody)
+
+        if (done.size >= prescription.sets) {
+            val nextSession = next(done, prescription, compound, lowerBody)
+            return SetAdvice(
+                null, range.first,
+                "That's your ${prescription.sets} sets — done. Next session: ${nextSession.reason}",
+                finished = true,
+            )
+        }
+
+        val spare = last.rir
+        return when {
+            last.reps > range.last || (last.reps >= range.last && spare != null && spare > prescription.rir + 1) -> {
+                val up = last.weightKg + step
+                SetAdvice(up, range.first, "Too light — ${last.reps} reps${spare?.let { " with $it to spare" }.orEmpty()}. " +
+                    "Set $setNumber: go up to ${fmt(up)} kg for ${range.first}–${range.last}. $rest.", finished = false)
+            }
+            last.reps < range.first || (spare == 0 && done.size < prescription.sets - 1) -> {
+                val down = kotlin.math.max(0.0, ((last.weightKg * 0.9) / step).roundToInt() * step)
+                SetAdvice(down, range.first, "Too heavy — ${last.reps} reps${if (spare == 0) " to failure" else ""}. " +
+                    "Set $setNumber: drop to ${fmt(down)} kg so the rest of your sets count. $rest.", finished = false)
+            }
+            else -> {
+                val target = (last.reps + 1).coerceAtMost(range.last)
+                SetAdvice(last.weightKg, target, "Good set. Set $setNumber: stay at ${fmt(last.weightKg)} kg and aim for " +
+                    "$target reps. $rest.", finished = false)
             }
         }
     }

@@ -111,4 +111,13 @@ class HybridPlannerTest {
         )
         assertEquals("b", ranked.first().first)
     }
+
+    @Test
+    fun `a machine lists its main exercise first, and cardio machines have none to log as sets`() {
+        val cable = EquipmentCatalog.byId("cable_station")!!
+        val workouts = EquipmentCatalog.workouts(cable)
+        assertEquals(cable.exercise, workouts.first().name)
+        assertTrue(workouts.size >= 4)
+        assertTrue(EquipmentCatalog.workouts(EquipmentCatalog.byId("treadmill")!!).isEmpty())
+    }
 }
