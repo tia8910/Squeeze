@@ -622,7 +622,11 @@ private fun goalName(goal: Goal): String = when (goal) {
  * weak points for the user's goal, and what to do about each weak point.
  */
 @Composable
-fun PhysiqueCard(report: PhysiqueReport, modifier: Modifier = Modifier) {
+fun PhysiqueCard(
+    report: PhysiqueReport,
+    modifier: Modifier = Modifier,
+    previous: Pair<Long, Map<MuscleGroup, Double>>? = null,
+) {
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -652,8 +656,16 @@ fun PhysiqueCard(report: PhysiqueReport, modifier: Modifier = Modifier) {
                         weight = score.score.toFloat(),
                         strongest = score.development == Development.DEVELOPED,
                     )
+                    val change = previous?.second?.get(score.group)?.let { score.score - it }
+                    val since = previous?.first?.let {
+                        java.time.LocalDate.ofEpochDay(it)
+                            .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+                    }
+                    val moved = change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
+                        " · ${if (it > 0) "▲" else "▼"} ${(kotlin.math.abs(it) * 100).toInt()} since $since"
+                    }.orEmpty()
                     Text(
-                        score.development.label,
+                        score.development.label + moved,
                         style = MaterialTheme.typography.labelSmall,
                         color = when (score.development) {
                             Development.DEVELOPED -> MaterialTheme.colorScheme.primary
@@ -699,8 +711,9 @@ fun PhysiqueCard(report: PhysiqueReport, modifier: Modifier = Modifier) {
             Text(
                 "The on-device model's impression of one front photograph, the way a coach " +
                     "sizes you up at a glance — not a measurement. Flexing, a pump or harsh " +
-                    "light make a group look bigger, and it cannot see your back. Change your " +
-                    "goal in Settings to re-prioritise.",
+                    "light make a group look bigger, and it cannot see your back. Saving this " +
+                    "scan puts the weak points into your training block and your nutrition " +
+                    "plan; changing your goal re-ranks them.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

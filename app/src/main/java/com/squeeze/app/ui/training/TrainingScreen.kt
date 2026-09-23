@@ -31,7 +31,10 @@ import com.squeeze.core.program.Session
 import com.squeeze.core.program.TrainingWeek
 
 @Composable
-fun TrainingScreen(viewModel: TrainingViewModel = hiltViewModel()) {
+fun TrainingScreen(
+    viewModel: TrainingViewModel = hiltViewModel(),
+    onOpenNutrition: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Column(
@@ -66,6 +69,17 @@ fun TrainingScreen(viewModel: TrainingViewModel = hiltViewModel()) {
         // A programme that quietly favours calves is indistinguishable from a random one
         // unless the user is told why.
         if (state.weakPoints.isNotEmpty()) WeakPointCard(state.weakPoints)
+
+        // The block and the food are one plan: the days chosen here set the nutrition plan's
+        // activity and carbohydrate split, so the link is offered as soon as a block exists.
+        if (state.mesocycle != null) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = onOpenNutrition,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("See the nutrition plan for ${state.daysPerWeek} training days")
+            }
+        }
 
         state.mesocycle?.let { mesocycle ->
             Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)

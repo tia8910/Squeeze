@@ -16,8 +16,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
         DefinitionLabelEntity::class,
+        PhysiqueReadEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -26,6 +27,7 @@ abstract class SqueezeDatabase : RoomDatabase() {
     abstract fun mesocycleDao(): MesocycleDao
     abstract fun profileDao(): ProfileDao
     abstract fun definitionLabelDao(): DefinitionLabelDao
+    abstract fun physiqueDao(): PhysiqueDao
 }
 
 /**
@@ -149,6 +151,18 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /** Training days on the profile, and the AI physique reads that feed training and nutrition. */
+    private val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN trainingDaysPerWeek INTEGER")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS physique_reads (" +
+                    "epochDay INTEGER NOT NULL, goal TEXT NOT NULL, scores TEXT NOT NULL, " +
+                    "PRIMARY KEY(epochDay))",
+            )
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -165,6 +179,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to

@@ -5,6 +5,7 @@ import com.squeeze.app.data.crypto.DatabaseKeyManager
 import com.squeeze.app.data.db.DefinitionLabelDao
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MesocycleDao
+import com.squeeze.app.data.db.PhysiqueDao
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.SqueezeDatabase
 import com.squeeze.app.data.db.SqueezeDatabaseFactory
@@ -41,6 +42,7 @@ object AppModule {
     @Provides fun provideWorkoutDao(db: SqueezeDatabase): WorkoutDao = db.workoutDao()
     @Provides fun provideMesocycleDao(db: SqueezeDatabase): MesocycleDao = db.mesocycleDao()
     @Provides fun provideProfileDao(db: SqueezeDatabase): ProfileDao = db.profileDao()
+    @Provides fun providePhysiqueDao(db: SqueezeDatabase): PhysiqueDao = db.physiqueDao()
 
     @Provides
     fun provideDefinitionLabelDao(db: SqueezeDatabase): DefinitionLabelDao =

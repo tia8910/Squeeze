@@ -1081,7 +1081,7 @@ private fun ResultStep(
 
         // What the AI made of each muscle group, read against the user's goal. Straight after
         // the figure because it is the other half of the same look at the photograph.
-        state.physique?.let { PhysiqueCard(it) }
+        state.physique?.let { PhysiqueCard(it, previous = state.previousPhysique) }
 
         // **Directly under the headline, and only when the outline could not answer.**
         //

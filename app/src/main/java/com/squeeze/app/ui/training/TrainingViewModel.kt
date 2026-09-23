@@ -3,6 +3,7 @@ package com.squeeze.app.ui.training
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.squeeze.app.data.BodyCompositionRepository
+import com.squeeze.app.data.CoachRepository
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.core.model.Circumferences
@@ -58,6 +59,7 @@ class TrainingViewModel @Inject constructor(
     private val measurementDao: MeasurementDao,
     private val repository: BodyCompositionRepository,
     private val generator: ProgramGenerator,
+    private val coach: CoachRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TrainingUiState())
@@ -71,6 +73,7 @@ class TrainingViewModel @Inject constructor(
                 goal = profile?.let { Goal.valueOf(it.goal) } ?: Goal.HYPERTROPHY,
                 trainingAge = profile?.let { TrainingAge.valueOf(it.trainingAge) }
                     ?: TrainingAge.INTERMEDIATE,
+                daysPerWeek = profile?.trainingDaysPerWeek ?: _state.value.daysPerWeek,
             )
         }
     }
@@ -138,7 +141,16 @@ class TrainingViewModel @Inject constructor(
                 armCm = measurements.firstNotNullOfOrNull { it.armCm },
                 calfCm = measurements.firstNotNullOfOrNull { it.calfCm },
             )
-            val weakPoints = WeakPointAnalysis.analyse(circumferences, profile.sex)
+            // Two independent reads of what is lagging: proportions from the tape or scan
+            // girths, and the on-device AI's look at each group on the last scan. The AI's
+            // go first when both flag a group — it saw the muscle, the ratio inferred it.
+            val aiWeakPoints = coach.aiWeakPoints(current.goal)
+            val weakPoints = (aiWeakPoints + WeakPointAnalysis.analyse(circumferences, profile.sex))
+                .distinctBy { it.group }
+                .take(WeakPointAnalysis.MAX_PRIORITIES)
+
+            // Remembered, so the nutrition plan fuels the block that was actually built.
+            coach.saveTrainingChoices(current.goal, current.trainingAge, current.daysPerWeek)
 
             val snapshot = repository.snapshot(profile)
             val adjustment: VolumeAdjustment = CompositionFeedback.evaluate(

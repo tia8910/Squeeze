@@ -9,6 +9,7 @@ import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.app.data.db.ProfileDao
 import com.squeeze.app.data.db.ProfileEntity
+import com.squeeze.app.data.CoachRepository
 import com.squeeze.app.data.photo.ScanPhotoStore
 import com.squeeze.app.scan.BodyDetector
 import com.squeeze.app.scan.ClipAppearance
@@ -284,6 +285,8 @@ data class ScanUiState(
      * Null when the model did not run — see [appearance] for when that is.
      */
     val physique: PhysiqueReport? = null,
+    /** The last saved physique read before today, and its day, for "since last scan". */
+    val previousPhysique: Pair<Long, Map<MuscleGroup, Double>>? = null,
     /** What the scanner screen draws while the models run; null outside [ScanStep.ANALYSING]. */
     val scanner: AiScanner? = null,
 ) {
@@ -332,6 +335,7 @@ class ScanViewModel @Inject constructor(
     private val measurementDao: MeasurementDao,
     private val profileDao: ProfileDao,
     private val photoStore: ScanPhotoStore,
+    private val coach: CoachRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScanUiState())
@@ -782,6 +786,7 @@ class ScanViewModel @Inject constructor(
             step = ScanStep.RESULT,
             scanner = null,
             physique = physique,
+            previousPhysique = physique?.let { coach.physiqueBefore(LocalDate.now().toEpochDay()) },
             appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
@@ -924,6 +929,14 @@ class ScanViewModel @Inject constructor(
             )
 
             frontBitmap = null
+            // The AI's physique read goes where training and nutrition can use it.
+            _state.value.physique?.let { report ->
+                coach.savePhysique(
+                    epochDay = LocalDate.now().toEpochDay(),
+                    goal = report.goal,
+                    scores = report.scores.associate { it.group to it.score },
+                )
+            }
             _state.value = _state.value.copy(saved = true)
         }
     }

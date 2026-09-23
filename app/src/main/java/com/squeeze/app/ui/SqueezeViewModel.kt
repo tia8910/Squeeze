@@ -51,6 +51,8 @@ data class SqueezeUiState(
      * target, and the day it is read on changes the answer.
      */
     val goalProgress: GoalProgress? = null,
+    /** One line of today's nutrition targets for the dashboard; null before a weight exists. */
+    val nutritionToday: String? = null,
     val loading: Boolean = true,
 )
 
@@ -62,6 +64,7 @@ class SqueezeViewModel @Inject constructor(
     private val securitySettings: SecuritySettings,
     private val uiSettings: UiSettings,
     private val photoStore: ScanPhotoStore,
+    private val coach: com.squeeze.app.data.CoachRepository,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
@@ -123,6 +126,7 @@ class SqueezeViewModel @Inject constructor(
                         ?: existing?.targetBodyFatPercent,
                     targetWeightKg = targetWeightKg ?: existing?.targetWeightKg,
                     targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
+                    trainingDaysPerWeek = existing?.trainingDaysPerWeek,
                 ),
             )
             refresh()
@@ -196,6 +200,11 @@ class SqueezeViewModel @Inject constructor(
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
                 goalProgress = goalProgress(profile, snapshot, measurements),
+                nutritionToday = coach.nutritionPlan()?.plan?.average?.let {
+                    "%,d kcal · %d g protein · %d g carbs · %d g fat".format(
+                        it.calories, it.proteinG, it.carbsG, it.fatG,
+                    )
+                },
                 loading = false,
             )
         }

@@ -90,6 +90,9 @@ fun CompositionScreen(
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
+    /** Today's targets from the nutrition plan, one line; null before a weight is logged. */
+    nutritionToday: String? = null,
+    onOpenNutrition: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -121,6 +124,27 @@ fun CompositionScreen(
         // answers "so what": the number says where you are, this says whether that is
         // enough and what to change if it is not.
         goalProgress?.let { GoalCard(it, onEditGoal) }
+
+        // What to eat to get there, from the same trend the card above just judged.
+        nutritionToday?.let { today ->
+            com.squeeze.app.ui.components.BrandRow(onClick = onOpenNutrition) {
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text(
+                        "Today's fuel",
+                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                    )
+                    androidx.compose.material3.Text(
+                        today,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    )
+                }
+                androidx.compose.material3.Text(
+                    "Plan ›",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
 
         // Body fat alone answers half the question. A percentage can fall because fat went
         // or because muscle did, and those want opposite responses — so the two masses sit

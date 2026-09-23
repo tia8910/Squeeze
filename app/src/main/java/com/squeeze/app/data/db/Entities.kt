@@ -128,6 +128,12 @@ data class ProfileEntity(
     /** A bodyweight to arrive at. Null when the goal is not about weight. */
     val targetWeightKg: Double? = null,
     val targetEpochDay: Long? = null,
+    /**
+     * Sessions a week, as the training programme was last generated with. Read by the
+     * nutrition plan for its activity factor, so the two cannot disagree about how hard the
+     * user trains. Null until a programme has been generated.
+     */
+    val trainingDaysPerWeek: Int? = null,
 )
 
 /**
@@ -159,4 +165,21 @@ data class DefinitionLabelEntity(
     val unusable: Boolean,
     /** When the judgement was made, so a revision can be told from an original. */
     val labelledEpochDay: Long,
+)
+
+/**
+ * One AI physique read: how developed each muscle group looked on a saved scan's front photo.
+ *
+ * Kept so the rest of the app can act on it — the training programme prioritises the weak
+ * groups, the nutrition plan explains itself in terms of them, and the next scan can show
+ * what moved. One row per day; a second scan on the same day replaces the first.
+ *
+ * @param scores `GROUP=score` pairs separated by commas, e.g. `CHEST=0.42,ARMS=0.31`
+ * @param goal the goal the read was ranked against
+ */
+@Entity(tableName = "physique_reads")
+data class PhysiqueReadEntity(
+    @PrimaryKey val epochDay: Long,
+    val goal: String,
+    val scores: String,
 )

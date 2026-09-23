@@ -150,3 +150,19 @@ interface DefinitionLabelDao {
     @Query("DELETE FROM definition_labels")
     suspend fun deleteAll()
 }
+
+@Dao
+interface PhysiqueDao {
+
+    @Query("SELECT * FROM physique_reads ORDER BY epochDay DESC LIMIT 1")
+    suspend fun latest(): PhysiqueReadEntity?
+
+    @Query("SELECT * FROM physique_reads WHERE epochDay < :epochDay ORDER BY epochDay DESC LIMIT 1")
+    suspend fun before(epochDay: Long): PhysiqueReadEntity?
+
+    @Upsert
+    suspend fun upsert(read: PhysiqueReadEntity)
+
+    @Query("DELETE FROM physique_reads")
+    suspend fun deleteAll()
+}

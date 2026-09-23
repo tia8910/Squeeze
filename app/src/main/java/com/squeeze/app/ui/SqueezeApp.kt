@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ import com.squeeze.app.ui.theme.Brand
 import com.squeeze.core.model.Goal
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.training.TrainingScreen
+import com.squeeze.app.ui.nutrition.NutritionScreen
 import java.time.LocalDate
 
 /**
@@ -81,6 +83,7 @@ private enum class Destination(
 ) {
     COMPOSITION("composition", "Body", Icons.Default.MonitorWeight),
     TRAINING("training", "Train", Icons.Default.FitnessCenter),
+    NUTRITION("nutrition", "Fuel", Icons.Default.Restaurant),
     SETTINGS("settings", "You", Icons.Default.Person),
 }
 
@@ -167,6 +170,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                             SqueezeWordmark(markSize = 34.dp, fontSize = 18.sp)
 
                         activeTab == Destination.TRAINING -> Text("Training")
+                        activeTab == Destination.NUTRITION -> Text("Nutrition")
                         else -> Text("You")
                     }
                 },
@@ -201,6 +205,16 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     ) { padding ->
         // Navigating to the celebration screen and popping back to the dashboard, used after
         // both save paths so the two entry points behave identically.
+        // Tabs link to each other — the dashboard to the plan, the plan to the programme —
+        // and a link should land exactly as tapping the tab would.
+        val goToTab: (Destination) -> Unit = { destination ->
+            navController.navigate(destination.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+
         val celebrate: () -> Unit = {
             viewModel.refresh()
             navController.navigate(ROUTE_CELEBRATION) {
@@ -237,10 +251,23 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onStartScan = { navController.navigate(ROUTE_SCAN) },
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
+                        nutritionToday = state.nutritionToday,
+                        onOpenNutrition = { goToTab(Destination.NUTRITION) },
                     )
                 }
 
-                composable(Destination.TRAINING.route) { TrainingScreen() }
+                composable(Destination.TRAINING.route) {
+                    TrainingScreen(onOpenNutrition = { goToTab(Destination.NUTRITION) })
+                }
+
+                composable(Destination.NUTRITION.route) {
+                    NutritionScreen(
+                        onLogWeight = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
+                        onScan = { navController.navigate(ROUTE_SCAN) },
+                        onOpenTraining = { goToTab(Destination.TRAINING) },
+                        onEditGoal = { goToTab(Destination.SETTINGS) },
+                    )
+                }
 
                 composable(LABEL_ROUTE) { LabelScreen() }
 
