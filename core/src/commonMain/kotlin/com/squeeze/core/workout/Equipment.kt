@@ -423,6 +423,251 @@ object EquipmentCatalog {
             listOf("Leaning on the rails", "Tiptoe steps", "Hunching over"),
             sport = Sport.HIKING,
         ),
+        MachineGuide(
+            "lat_row_combo", "Lat pulldown / low row combo", "Lat Pulldown", "Lats, upper back, biceps",
+            MuscleGroup.BACK, true, false,
+            "Two stations on one stack. Pulldown: sit facing the stack, thighs locked under the pads, " +
+                "long bar overhead. Low row: move to the long bench, feet on the foot bar, V-handle on the low pulley.",
+            listOf(
+                "Pulldown — lean back slightly, pull the bar to your upper chest, elbows driving down.",
+                "Let the bar rise slowly until your arms are straight and your lats stretch.",
+                "Low row — sit tall, pull the handle to your lower ribs, squeeze your shoulder blades.",
+                "Return with control, torso still. Do both for a complete back session.",
+            ),
+            listOf("Leaning far back on pulldowns", "Rocking the torso on rows", "Letting the stack crash between reps"),
+        ),
+        MachineGuide(
+            "seated_leg_curl", "Seated leg curl", "Seated Leg Curl", "Hamstrings",
+            MuscleGroup.HAMSTRINGS, false, true,
+            "Knees lined up with the pivot, thigh pad snug on top, roller just above your heels.",
+            listOf(
+                "Sit back with your spine against the pad.",
+                "Curl your heels down and back as far as they go.",
+                "Hold a second at the bottom.",
+                "Let the roller rise slowly until your legs are nearly straight.",
+            ),
+            listOf("Thigh pad loose, so the hips lift", "Short range", "Letting the weight snap back"),
+        ),
+        MachineGuide(
+            "lateral_raise_machine", "Lateral raise machine", "Machine Lateral Raise", "Side delts",
+            MuscleGroup.SHOULDERS, false, false,
+            "Seat height so your shoulders line up with the machine's pivots; pads on the outside of your upper arms.",
+            listOf(
+                "Sit tall, chest against the pad if there is one.",
+                "Raise your arms out to the sides to shoulder height, leading with the elbows.",
+                "Pause at the top.",
+                "Lower slowly over two to three seconds.",
+            ),
+            listOf("Shrugging the shoulders up", "Going above shoulder height", "Bouncing out of the bottom"),
+        ),
+        MachineGuide(
+            "biceps_curl_machine", "Biceps curl machine", "Machine Biceps Curl", "Biceps",
+            MuscleGroup.BICEPS, false, false,
+            "Seat height so your upper arms lie flat on the pad and your elbows line up with the pivot.",
+            listOf(
+                "Grip the handles with arms nearly straight.",
+                "Curl up until your forearms are vertical.",
+                "Squeeze the biceps for a second.",
+                "Lower slowly to almost straight.",
+            ),
+            listOf("Elbows lifting off the pad", "Leaning back to swing it", "Locking out hard at the bottom"),
+        ),
+        MachineGuide(
+            "triceps_machine", "Triceps / seated dip machine", "Machine Triceps Extension", "Triceps",
+            MuscleGroup.TRICEPS, false, false,
+            "Seat height so the handles start at about chest level with your elbows bent.",
+            listOf(
+                "Sit tall, elbows close to your sides.",
+                "Push the handles down (or forward) until your arms are straight.",
+                "Squeeze the triceps at lockout.",
+                "Let the handles come back slowly until your elbows are bent to 90°.",
+            ),
+            listOf("Elbows flaring out", "Leaning over the handles", "Half reps"),
+        ),
+        MachineGuide(
+            "belt_squat", "Belt / pendulum squat", "Belt Squat", "Quads, glutes",
+            MuscleGroup.QUADS, true, true,
+            "Belt round your hips (or shoulders under the pendulum pads); feet shoulder-width on the platform.",
+            listOf(
+                "Stand tall and release the stop.",
+                "Sit down between your heels until your thighs are at least parallel.",
+                "Drive up through the whole foot.",
+                "Keep your chest up — the load is on your hips, not your spine.",
+            ),
+            listOf("Knees caving in", "Cutting depth", "Rising onto the toes"),
+        ),
+        MachineGuide(
+            "glute_kickback", "Glute kickback / multi-hip", "Glute Kickback", "Glutes",
+            MuscleGroup.GLUTES, false, true,
+            "Chest on the pad, standing leg soft, the working foot on the plate or behind the roller.",
+            listOf(
+                "Brace your core and keep your hips square.",
+                "Push the working leg back and up by squeezing the glute.",
+                "Pause at the top without arching your lower back.",
+                "Return slowly; finish all reps, then switch legs.",
+            ),
+            listOf("Arching the lower back", "Swinging the leg", "Twisting the hips open"),
+        ),
+        MachineGuide(
+            "ghd", "Glute-ham developer (GHD)", "Glute-Ham Raise", "Hamstrings, glutes, lower back",
+            MuscleGroup.HAMSTRINGS, true, true,
+            "Knees just behind the pad, ankles locked under the hooks, feet flat on the plate.",
+            listOf(
+                "Start upright on your knees, body in a straight line.",
+                "Lower forward slowly by straightening at the knee.",
+                "Pull back up with your hamstrings, pressing your toes into the plate.",
+                "Use a band or your hands to assist until you can do full reps.",
+            ),
+            listOf("Bending at the hips instead of the knees", "Dropping fast", "Hooks set too loose"),
+        ),
+        MachineGuide(
+            "ab_crunch_machine", "Ab crunch machine", "Machine Crunch", "Abs",
+            MuscleGroup.ABS, false, false,
+            "Seat height so the chest pads or handles sit at your upper chest.",
+            listOf(
+                "Brace and curl your ribs down toward your hips.",
+                "Squeeze the abs at the bottom for a second.",
+                "Return slowly until you feel the stretch.",
+                "Breathe out as you crunch.",
+            ),
+            listOf("Pulling with the arms", "Hinging at the hips instead of curling", "Too heavy for full range"),
+        ),
+        MachineGuide(
+            "rotary_torso", "Rotary torso machine", "Rotary Torso", "Obliques, core",
+            MuscleGroup.ABS, false, false,
+            "Set the start angle, sit tall with your chest against the pad and knees locked in.",
+            listOf(
+                "Rotate your torso slowly away from the start side.",
+                "Keep your hips still — only the upper body turns.",
+                "Return under control.",
+                "Do all reps, then set the other side.",
+            ),
+            listOf("Twisting fast with momentum", "Turning too far", "Letting the hips move"),
+        ),
+        MachineGuide(
+            "landmine", "Landmine", "Landmine Press", "Shoulders, chest, core",
+            MuscleGroup.SHOULDERS, true, false,
+            "Barbell end in the pivot, plates on the free end, stand facing it in a split stance.",
+            listOf(
+                "Hold the bar end at your shoulder with one or both hands.",
+                "Press it up and forward until your arm is straight.",
+                "Lower back to the shoulder under control.",
+                "Also works for rows, squats and rotations.",
+            ),
+            listOf("Leaning back to press", "Shrugging", "Loading more than you can control"),
+        ),
+        MachineGuide(
+            "barbell", "Barbell & plates", "Barbell Deadlift", "Hamstrings, glutes, back",
+            MuscleGroup.HAMSTRINGS, true, true,
+            "Bar over the middle of your feet, feet hip-width, collars on.",
+            listOf(
+                "Hinge down and grip just outside your legs; shins touch the bar.",
+                "Chest up, back flat, take the slack out of the bar.",
+                "Push the floor away and stand up, bar close to your legs.",
+                "Lower by pushing your hips back, then bending the knees.",
+            ),
+            listOf("Rounding the back", "Bar drifting away from the legs", "Jerking it off the floor"),
+        ),
+        MachineGuide(
+            "ez_bar", "EZ curl bar", "EZ Bar Curl", "Biceps",
+            MuscleGroup.BICEPS, false, false,
+            "Load light plates; grip on the angled parts, palms up.",
+            listOf(
+                "Stand tall, elbows by your sides.",
+                "Curl the bar up without moving your elbows forward.",
+                "Squeeze at the top.",
+                "Lower slowly to straight arms.",
+            ),
+            listOf("Swinging with the hips", "Elbows drifting forward", "Dropping the bar"),
+        ),
+        MachineGuide(
+            "medicine_ball", "Medicine / slam ball", "Medicine Ball Slam", "Core, shoulders, conditioning",
+            null, false, false,
+            "Pick a ball you can lift overhead comfortably; clear space around you.",
+            listOf(
+                "Lift the ball overhead, rising onto your toes.",
+                "Slam it into the floor in front of you, hinging at the hips.",
+                "Catch or pick it up with a flat back.",
+                "Work 20–30 s, rest 30 s, 6–8 rounds.",
+            ),
+            listOf("Rounding the back to pick it up", "Using a bouncy ball for slams", "Throwing toward your feet"),
+            sport = Sport.HIIT,
+        ),
+        MachineGuide(
+            "plyo_box", "Plyo box", "Box Jump", "Legs, power",
+            MuscleGroup.QUADS, true, true,
+            "Start with a low box; stand a foot away.",
+            listOf(
+                "Swing your arms and dip into a quarter squat.",
+                "Jump up and land softly with both feet on the box.",
+                "Stand up fully on top.",
+                "Step down — don't jump down.",
+            ),
+            listOf("Box too high", "Landing stiff-legged", "Jumping down repeatedly"),
+        ),
+        MachineGuide(
+            "suspension_trainer", "Suspension trainer (TRX)", "Suspension Row", "Back, biceps, core",
+            MuscleGroup.BACK, true, false,
+            "Straps at mid length; hold the handles and walk your feet forward to lean back.",
+            listOf(
+                "Body straight like a plank, arms extended.",
+                "Pull your chest up to the handles, elbows back.",
+                "Lower slowly to straight arms.",
+                "Walk your feet further forward to make it harder.",
+            ),
+            listOf("Hips sagging", "Straps rubbing on the anchor", "Jerky reps"),
+        ),
+        MachineGuide(
+            "resistance_bands", "Resistance bands", "Band Pull-Apart", "Rear delts, upper back",
+            MuscleGroup.SHOULDERS, false, false,
+            "Pick a light band; hold it at shoulder width, arms straight in front.",
+            listOf(
+                "Pull the band apart until it touches your chest.",
+                "Squeeze your shoulder blades together.",
+                "Return slowly.",
+                "Great as a warm-up: 2–3 sets of 15–20.",
+            ),
+            listOf("Bending the elbows", "Shrugging", "Letting the band snap back"),
+        ),
+        MachineGuide(
+            "air_bike", "Air / assault bike", "Air Bike", "Whole body, heart",
+            null, false, true,
+            "Seat height so your knee is slightly bent at the bottom.",
+            listOf(
+                "Push and pull the handles while you pedal.",
+                "Intervals: 20 s all-out, 40 s easy, 8–10 rounds.",
+                "The harder you go, the harder it gets — pace yourself.",
+                "Cool down 3–5 minutes easy.",
+            ),
+            listOf("Sprinting the first round and dying", "Seat too low", "Only using the legs"),
+            sport = Sport.HIIT,
+        ),
+        MachineGuide(
+            "ski_erg", "SkiErg", "SkiErg", "Lats, core, heart",
+            null, false, false,
+            "Stand close, feet hip-width, one handle in each hand overhead.",
+            listOf(
+                "Pull down by hinging at the hips and driving your arms toward your thighs.",
+                "Let the handles rise as you stand tall again.",
+                "Steady 10–20 min, or 30 s hard / 30 s easy × 10.",
+                "Keep the rhythm smooth.",
+            ),
+            listOf("All arms, no hips", "Squatting instead of hinging", "Standing too far back"),
+            sport = Sport.ROWING,
+        ),
+        MachineGuide(
+            "foam_roller", "Foam roller", "Foam Rolling", "Recovery",
+            null, false, false,
+            "Use on a mat; start with a softer roller.",
+            listOf(
+                "Roll slowly over one area — quads, upper back, calves.",
+                "Pause on tight spots for 20–30 seconds.",
+                "Breathe; it should be uncomfortable, not painful.",
+                "Avoid the lower back and joints.",
+            ),
+            listOf("Rolling fast", "Rolling the lower back", "Going for pain"),
+            sport = Sport.YOGA,
+        ),
     )
 
     fun byId(id: String): MachineGuide? = ALL.firstOrNull { it.id == id }
@@ -438,9 +683,29 @@ object EquipmentCatalog {
  */
 object EquipmentMatcher {
 
-    const val CONFIDENT = 0.45
+    /**
+     * At or above this the top machine is named outright; below it the screen still shows
+     * the best guess's guide, with the runners-up offered as "not this one?".
+     */
+    const val CONFIDENT = 0.35
 
-    /** Machines by probability, most likely first; empty when the inputs are unusable. */
+    /** The id of the "not a machine" class. */
+    const val NONE = "__none__"
+
+    /**
+     * Machines by probability, most likely first; empty when the inputs are unusable.
+     *
+     * **Each machine scores the average of its descriptions**, not its best one. Every
+     * machine is described several ways — its names in a gym photo and in a catalogue shot,
+     * and what it looks like — and a real machine matches most of them a little, where a
+     * look-alike matches one of them a lot. Taking the best single description let a lat
+     * pulldown / low row combination read as a pec deck; averaging read it as itself at 55%.
+     *
+     * **The "not a machine" class scores its best two**, because its descriptions are
+     * deliberately unlike each other (a person, a room, food) and an average of them matches
+     * nothing. Two rather than one, so a gym photo with someone standing in it is not thrown
+     * out for containing a person.
+     */
     fun rank(image: DoubleArray, prompts: Map<String, List<DoubleArray>>): List<Pair<String, Double>> {
         if (image.isEmpty() || prompts.isEmpty() || image.any { !it.isFinite() }) return emptyList()
         val norm = sqrt(image.sumOf { it * it })
@@ -448,10 +713,13 @@ object EquipmentMatcher {
         val unit = DoubleArray(image.size) { image[it] / norm }
 
         val logits = prompts.mapNotNull { (id, embeddings) ->
-            val best = embeddings.filter { it.size == unit.size }
-                .maxOfOrNull { e -> e.indices.sumOf { e[it] * unit[it] } }
+            val sims = embeddings.filter { it.size == unit.size }
+                .map { e -> e.indices.sumOf { e[it] * unit[it] } }
+                .sortedDescending()
+                .takeIf { it.isNotEmpty() }
                 ?: return@mapNotNull null
-            id to 100.0 * best
+            val score = if (id == NONE) sims.take(2).average() else sims.average()
+            id to 100.0 * score
         }
         if (logits.isEmpty()) return emptyList()
         val max = logits.maxOf { it.second }

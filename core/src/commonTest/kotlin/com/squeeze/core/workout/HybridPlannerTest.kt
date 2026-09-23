@@ -95,4 +95,20 @@ class HybridPlannerTest {
         EquipmentCatalog.ALL.forEach { assertTrue(it.steps.size >= 3, it.id) }
         assertEquals(EquipmentCatalog.ALL.size, EquipmentCatalog.ALL.map { it.id }.toSet().size)
     }
+
+    @Test
+    fun `a machine scores the average of its descriptions, so one lucky phrase does not win`() {
+        fun axis(i: Int) = DoubleArray(4) { if (it == i) 1.0 else 0.0 }
+        // "a" matches one of its two descriptions perfectly and the other not at all; "b"
+        // matches both of its descriptions well. The average picks "b".
+        val image = doubleArrayOf(0.6, 0.8, 0.0, 0.0)
+        val ranked = EquipmentMatcher.rank(
+            image,
+            mapOf(
+                "a" to listOf(doubleArrayOf(0.6, 0.8, 0.0, 0.0), axis(3)),
+                "b" to listOf(doubleArrayOf(0.8, 0.6, 0.0, 0.0), doubleArrayOf(0.6, 0.8, 0.0, 0.0)),
+            ),
+        )
+        assertEquals("b", ranked.first().first)
+    }
 }

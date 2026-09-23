@@ -103,9 +103,11 @@ fun MachineScanScreen(
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         state.match?.let { match ->
+            val top = match.candidates.firstOrNull()
             val headline = when {
-                match.noMachine -> "I don't see gym equipment in this photo. Try again with the whole machine in frame — or pick it below."
-                !match.confident -> "Not sure — which one is it?"
+                match.noMachine -> "No gym equipment found in this photo. Get the whole machine in frame and try again — or pick it below."
+                match.confident && top != null -> "Identified: ${top.first.name} (${(top.second * 100).toInt()}% sure). Not this one? Pick below."
+                top != null -> "Best guess: ${top.first.name} (${(top.second * 100).toInt()}%). Not this one? Pick below."
                 else -> null
             }
             headline?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }

@@ -67,7 +67,9 @@ class MachineScanViewModel @Inject constructor(
                 return@launch
             }
             _state.value = _state.value.copy(analysing = false, match = match)
-            if (match.confident) match.candidates.firstOrNull()?.let { select(it.first) }
+            // The best guess's guide is always shown — a coach who is 55% sure it is a lat
+            // pulldown still tells you how to use it, and offers the other options.
+            if (!match.noMachine) match.candidates.firstOrNull()?.let { select(it.first) }
         }
     }
 
