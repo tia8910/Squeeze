@@ -90,10 +90,10 @@ fun CompositionScreen(
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
-    /** Today's targets from the nutrition plan, one line; null before a weight is logged. */
-    nutritionToday: String? = null,
+    /** The journey's next step and a line from every feature; null until first loaded. */
+    summary: com.squeeze.app.data.DashboardSummary? = null,
+    onStep: (com.squeeze.core.coach.StepId) -> Unit = {},
     onOpenNutrition: () -> Unit = {},
-    trainingToday: String? = null,
     onOpenTraining: () -> Unit = {},
 ) {
     Column(
@@ -105,6 +105,19 @@ fun CompositionScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         val latest = trend.lastOrNull()
+
+        // First on the screen, before any figure: the one next step, and a line from every
+        // feature. The dashboard is the way into everything, and each finished step here
+        // knocks over the next.
+        summary?.let {
+            com.squeeze.app.ui.components.JourneyCard(
+                summary = it,
+                onStep = onStep,
+                onOpenTraining = onOpenTraining,
+                onOpenNutrition = onOpenNutrition,
+                onOpenScan = onStartScan,
+            )
+        }
 
         if (latest == null) {
             EmptyState(
@@ -126,48 +139,6 @@ fun CompositionScreen(
         // answers "so what": the number says where you are, this says whether that is
         // enough and what to change if it is not.
         goalProgress?.let { GoalCard(it, onEditGoal) }
-
-        // What to do today, from the week built across the user's sports.
-        trainingToday?.let { today ->
-            com.squeeze.app.ui.components.BrandRow(onClick = onOpenTraining) {
-                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text(
-                        "Today's training",
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
-                    )
-                    androidx.compose.material3.Text(
-                        today,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    )
-                }
-                androidx.compose.material3.Text(
-                    "Train ›",
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-
-        // What to eat to get there, from the same trend the card above just judged.
-        nutritionToday?.let { today ->
-            com.squeeze.app.ui.components.BrandRow(onClick = onOpenNutrition) {
-                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text(
-                        "Today's fuel",
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
-                    )
-                    androidx.compose.material3.Text(
-                        today,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    )
-                }
-                androidx.compose.material3.Text(
-                    "Plan ›",
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
 
         // Body fat alone answers half the question. A percentage can fall because fat went
         // or because muscle did, and those want opposite responses — so the two masses sit

@@ -51,10 +51,8 @@ data class SqueezeUiState(
      * target, and the day it is read on changes the answer.
      */
     val goalProgress: GoalProgress? = null,
-    /** One line of today's nutrition targets for the dashboard; null before a weight exists. */
-    val nutritionToday: String? = null,
-    /** Today's sessions from the week across the user's sports; null when none are chosen. */
-    val trainingToday: String? = null,
+    /** The journey and a line from every feature, for the top of the dashboard. */
+    val summary: com.squeeze.app.data.DashboardSummary? = null,
     val loading: Boolean = true,
 )
 
@@ -181,6 +179,14 @@ class SqueezeViewModel @Inject constructor(
         refresh()
     }
 
+    /** Opens today's planned session in the log, then [then] navigates there. */
+    fun startTodaysSession(then: () -> Unit) {
+        viewModelScope.launch {
+            coach.prepareTodaysSession()
+            then()
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             // History is loaded before the profile check: measurements a user entered
@@ -204,16 +210,7 @@ class SqueezeViewModel @Inject constructor(
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
                 goalProgress = goalProgress(profile, snapshot, measurements),
-                nutritionToday = coach.nutritionPlan()?.plan?.average?.let {
-                    "%,d kcal · %d g protein · %d g carbs · %d g fat".format(
-                        it.calories, it.proteinG, it.carbsG, it.fatG,
-                    )
-                },
-                trainingToday = coach.week()?.let { week ->
-                    val today = week.days[LocalDate.now().dayOfWeek.value - 1]
-                    if (today.rest) "Rest day — recovery is part of the plan"
-                    else today.sessions.joinToString(" + ") { it.title }
-                },
+                summary = coach.dashboard(),
                 loading = false,
             )
         }

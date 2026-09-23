@@ -43,8 +43,13 @@ fun TrainingScreen(
     onOpenNutrition: () -> Unit = {},
     onLog: () -> Unit = {},
     onScanMachine: () -> Unit = {},
+    nextStep: com.squeeze.core.coach.JourneyStep? = null,
+    onNextStep: () -> Unit = {},
+    onPlanChanged: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // A new week changes nutrition, the dashboard and the next step.
+    androidx.compose.runtime.LaunchedEffect(state.week) { onPlanChanged() }
     // Back from the log: this week's volume has changed.
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshWeek() }
 
@@ -79,6 +84,7 @@ fun TrainingScreen(
         }
 
         state.week?.let { week ->
+            nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
             HybridWeekView(week, onLogSession = { session -> viewModel.startLog(session); onLog() })
             if (state.volume.isNotEmpty()) VolumeCard(state.volume)
             androidx.compose.material3.OutlinedButton(onClick = onOpenNutrition, modifier = Modifier.fillMaxWidth()) {

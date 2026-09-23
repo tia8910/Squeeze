@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -67,6 +68,7 @@ import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.training.TrainingScreen
 import com.squeeze.app.ui.nutrition.NutritionScreen
 import com.squeeze.app.ui.log.WorkoutLogScreen
+import com.squeeze.core.coach.StepId
 import com.squeeze.app.ui.machine.MachineScanScreen
 import java.time.LocalDate
 
@@ -223,6 +225,24 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
             }
         }
 
+        // Every step of the journey has one place it is done. The dashboard, the celebration
+        // and the end of each flow all send the user through here, so "next" always means
+        // the same screen.
+        val goToStep: (StepId) -> Unit = { step ->
+            when (step) {
+                StepId.WEIGH_IN, StepId.WEEKLY_WEIGH_IN -> navController.navigate(ROUTE_ADD_MEASUREMENT)
+                StepId.AI_SCAN, StepId.RESCAN -> navController.navigate(ROUTE_SCAN)
+                StepId.CHOOSE_SPORTS -> goToTab(Destination.TRAINING)
+                StepId.PICK_FOODS -> goToTab(Destination.NUTRITION)
+                StepId.TODAYS_SESSION -> viewModel.startTodaysSession { navController.navigate(ROUTE_LOG) }
+            }
+        }
+        val nextStep = state.summary?.journey?.next
+
+        // Anything that changes the plan re-reads the journey, so the next step is always
+        // the true one.
+        LaunchedEffect(currentRoute) { viewModel.refresh() }
+
         val celebrate: () -> Unit = {
             viewModel.refresh()
             navController.navigate(ROUTE_CELEBRATION) {
@@ -259,8 +279,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onStartScan = { navController.navigate(ROUTE_SCAN) },
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
-                        nutritionToday = state.nutritionToday,
-                        trainingToday = state.trainingToday,
+                        summary = state.summary,
+                        onStep = goToStep,
                         onOpenTraining = { goToTab(Destination.TRAINING) },
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },
                     )
@@ -268,6 +288,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
                 composable(Destination.TRAINING.route) {
                     TrainingScreen(
+                        nextStep = nextStep?.takeIf { it.id != StepId.CHOOSE_SPORTS },
+                        onNextStep = { nextStep?.let { goToStep(it.id) } },
+                        onPlanChanged = viewModel::refresh,
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },
                         onLog = { navController.navigate(ROUTE_LOG) },
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
@@ -277,9 +300,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 composable(ROUTE_LOG) {
                     WorkoutLogScreen(
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
+                        // Back to the dashboard, where the next step is waiting.
                         onDone = {
                             viewModel.refresh()
-                            navController.popBackStack()
+                            navController.popBackStack(Destination.COMPOSITION.route, inclusive = false)
                         },
                     )
                 }
@@ -297,6 +321,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
                 composable(Destination.NUTRITION.route) {
                     NutritionScreen(
+                        nextStep = nextStep?.takeIf { it.id != StepId.PICK_FOODS },
+                        onNextStep = { nextStep?.let { goToStep(it.id) } },
+                        onPlanChanged = viewModel::refresh,
                         onLogWeight = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onScan = { navController.navigate(ROUTE_SCAN) },
                         onOpenTraining = { goToTab(Destination.TRAINING) },
@@ -360,6 +387,13 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                             last - first + 1
                         },
                         trend = state.bodyFatTrend.map { it.level },
+                        nextStep = nextStep,
+                        onNextStep = {
+                            nextStep?.let { step ->
+                                navController.popBackStack(Destination.COMPOSITION.route, inclusive = false)
+                                goToStep(step.id)
+                            }
+                        },
                         onViewProgress = {
                             navController.popBackStack(
                                 route = Destination.COMPOSITION.route,

@@ -59,10 +59,14 @@ fun NutritionScreen(
     onScan: () -> Unit,
     onOpenTraining: () -> Unit,
     onEditGoal: () -> Unit,
+    nextStep: com.squeeze.core.coach.JourneyStep? = null,
+    onNextStep: () -> Unit = {},
+    onPlanChanged: () -> Unit = {},
     viewModel: NutritionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
+    LaunchedEffect(state.context?.favourites) { onPlanChanged() }
 
     Column(
         modifier = Modifier
@@ -78,6 +82,7 @@ fun NutritionScreen(
             else -> {
                 Plan(context, state.showTrainingDay, viewModel::showTrainingDay, onLogWeight, onScan, onOpenTraining, onEditGoal)
                 FavouritesSection(state, viewModel)
+                nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
                 WeekSection(context, state.selectedDay, viewModel::selectDay)
                 SourcesSection(context, onLogWeight, onScan, onOpenTraining, onEditGoal)
             }

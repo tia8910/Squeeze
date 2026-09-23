@@ -13,6 +13,10 @@ import com.squeeze.core.workout.HybridWeek
 import com.squeeze.core.workout.Intensity
 import com.squeeze.core.workout.LoggedSet
 import com.squeeze.core.workout.PlannedItem
+import com.squeeze.core.workout.PlannedSession
+import com.squeeze.core.coach.Journey
+import com.squeeze.core.coach.JourneyFacts
+import com.squeeze.core.coach.JourneyPlanner
 import com.squeeze.core.workout.Sport
 import com.squeeze.app.data.db.PhysiqueDao
 import com.squeeze.app.data.db.PhysiqueReadEntity
@@ -66,6 +70,78 @@ class CoachRepository @Inject constructor(
      */
     @Volatile
     var pendingLog: PendingLog? = null
+
+    // ── The journey and the dashboard ────────────────────────────────────────────────────
+
+    /** Today's planned sessions, empty on a rest day or before a week exists. */
+    private suspend fun todaysSessions(week: HybridWeek?): List<PlannedSession> =
+        week?.days?.getOrNull(LocalDate.now().dayOfWeek.value - 1)?.sessions.orEmpty()
+
+    /** Where the user is, and the one thing to do next. */
+    suspend fun journey(): Journey {
+        val today = LocalDate.now().toEpochDay()
+        val measurements = measurementDao.since(Long.MIN_VALUE)
+        val lastWeigh = measurements.filter { it.weightKg != null }.maxOfOrNull { it.epochDay }
+        val lastScan = listOfNotNull(
+            physiqueDao.latest()?.epochDay,
+            measurements.filter { it.photoId != null }.maxOfOrNull { it.epochDay },
+        ).maxOrNull()
+        val week = week()
+        return JourneyPlanner.plan(
+            JourneyFacts(
+                daysSinceWeight = lastWeigh?.let { today - it },
+                daysSinceScan = lastScan?.let { today - it },
+                hasWeek = week != null,
+                hasFavourites = favouriteFoods().isNotEmpty(),
+                todaysSession = todaysSessions(week).firstOrNull()?.title,
+                loggedToday = activityDao.since(today).isNotEmpty() || workoutDao.since(today).isNotEmpty(),
+            ),
+        )
+    }
+
+    /** Hands today's first planned session to the log screen. */
+    suspend fun prepareTodaysSession() {
+        val session = todaysSessions(week()).firstOrNull() ?: return
+        pendingLog = PendingLog(
+            sport = session.discipline.sport,
+            title = session.title,
+            minutes = session.minutes,
+            intensity = session.intensity,
+            exercises = session.items.filter { it.prescription != null },
+        )
+    }
+
+    /** One summary of everything, for the dashboard. */
+    suspend fun dashboard(): DashboardSummary {
+        val week = week()
+        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY).toEpochDay()
+        val sessionsDone = activityDao.since(monday).size
+        val setsDone = workoutDao.since(monday).size
+        val goal = profileDao.get()?.let { runCatching { Goal.valueOf(it.goal) }.getOrNull() } ?: Goal.HYPERTROPHY
+        val report = latestPhysique()?.let { PhysiqueAnalysis.report(it, goal) }
+        val nutrition = nutritionPlan()
+        return DashboardSummary(
+            journey = journey(),
+            todaysTraining = if (week == null) {
+                null
+            } else {
+                todaysSessions(week).takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.title }
+                    ?: "Rest day — recovery is part of the plan"
+            },
+            sessionsDone = sessionsDone,
+            sessionsPlanned = week?.days?.sumOf { it.sessions.size },
+            setsDone = setsDone,
+            strengths = report?.strengths?.map { it.label }.orEmpty(),
+            weakPoints = report?.weaknesses?.map { it.label }.orEmpty(),
+            fuelToday = nutrition?.plan?.let { plan ->
+                val training = todaysSessions(week).isNotEmpty()
+                val m = if (training) plan.trainingDay else plan.restDay
+                "%,d kcal · %d g protein · %d g carbs · %d g fat".format(m.calories, m.proteinG, m.carbsG, m.fatG)
+            },
+            microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
+            goalRate = nutrition?.plan?.intendedKgPerWeek,
+        )
+    }
 
     // ── Sports and foods the user chose ──────────────────────────────────────────────────
 
@@ -336,6 +412,22 @@ data class NutritionContext(
     val trainingDaysFromProgramme: Boolean,
     val hasPhysique: Boolean,
     val favourites: Set<String> = emptySet(),
+)
+
+/**
+ * Everything on one card: where the user is in their journey, and a line from every feature.
+ */
+data class DashboardSummary(
+    val journey: Journey,
+    val todaysTraining: String?,
+    val sessionsDone: Int,
+    val sessionsPlanned: Int?,
+    val setsDone: Int,
+    val strengths: List<String>,
+    val weakPoints: List<String>,
+    val fuelToday: String?,
+    val microGaps: List<String>,
+    val goalRate: Double?,
 )
 
 /** One muscle group's week: sets logged since Monday against sets planned. */
