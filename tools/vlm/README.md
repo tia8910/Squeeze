@@ -43,6 +43,24 @@ Re-anchoring changed no model and no text, only what the answers are worth:
 | softer man, day 2 | 16% | 15.5 | **15.1** |
 | average error | | 1.2 | **0.8** |
 
+## The model is shown the torso, not the whole photograph
+
+The same lean man read 9.1% photographed from the waist up and 12.3% photographed full
+length: his legs and the floor took half of the model's 224 pixels. The app now crops each
+front photograph by its pose landmarks — head to a sixth of the trunk below the hips, twice
+the shoulder width across (`AppearanceEstimator.region`) — before the model sees it:
+
+| | target | whole photo | **torso crop (shipped)** |
+|---|---|---|---|
+| stage-lean bodybuilder | 7% | 7.6 | **8.4** |
+| lean man, waist-up | 8% | 9.2 | **9.5** |
+| lean man, full length | 8% | 12.3 | **9.6** |
+| softer man, day 1 | 16% | 15.8 | **15.0** |
+| softer man, day 2 | 16% | 15.8 | **15.2** |
+
+The crop was chosen as the middle of a flat region in a grid of 36 alternatives, not the
+grid's best cell, so that it is not fitted to five photographs.
+
 Tuning further to force every photo onto its target would be fitting four photographs, and
 would make the next one worse.
 

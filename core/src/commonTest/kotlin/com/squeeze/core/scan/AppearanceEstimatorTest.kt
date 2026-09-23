@@ -101,4 +101,63 @@ class AppearanceEstimatorTest {
         // them is meaningless rather than approximately right.
         assertNull(AppearanceEstimator.estimate(DoubleArray(dim + 1) { 1.0 }, listOf(ladder)))
     }
+
+    @Test
+    fun `the scanner's weights are the probabilities behind the figure`() {
+        val reading = AppearanceEstimator.read(blend(0, 1), listOf(ladder, ladder))
+
+        assertNotNull(reading)
+        val weights = assertNotNull(reading.weights)
+        val anchors = assertNotNull(reading.anchors)
+        assertEquals(1.0, weights.sum(), 1e-9)
+        assertEquals(reading.percent, anchors.indices.sumOf { anchors[it] * weights[it] }, 1e-9)
+    }
+
+    private fun pose(mouthY: Double?, shoulderY: Double, hipY: Double) = FrontPoseGeometry(
+        shoulderLeft = PosePoint(0.40, shoulderY),
+        shoulderRight = PosePoint(0.60, shoulderY),
+        hipLeft = PosePoint(0.44, hipY),
+        hipRight = PosePoint(0.56, hipY),
+        mouth = mouthY?.let { PosePoint(0.5, it) },
+    )
+
+    @Test
+    fun `the model is shown the torso, head to just below the hips`() {
+        val region = assertNotNull(AppearanceEstimator.region(pose(0.10, 0.20, 0.50)))
+
+        // Chin to shoulders is 0.10, so the top sits one and a half of that above the chin.
+        assertEquals(0.0, region.top, 1e-9)
+        // A sixth of the trunk below the hips, and the legs below that left out.
+        assertEquals(0.545, region.bottom, 1e-9)
+        // Twice the shoulders across, centred on them.
+        assertEquals(0.30, region.left, 1e-9)
+        assertEquals(0.70, region.right, 1e-9)
+    }
+
+    @Test
+    fun `a waist-up and a full-length photograph frame the same body the same way`() {
+        // The same body taking up twice as much of the frame: every edge of what the model
+        // sees moves with it, so the body sits in the crop at the same margins either way.
+        val far = pose(0.30, 0.40, 0.70)
+        val near = FrontPoseGeometry(
+            shoulderLeft = PosePoint(0.30, 0.80),
+            shoulderRight = PosePoint(0.70, 0.80),
+            hipLeft = PosePoint(0.38, 1.40),
+            hipRight = PosePoint(0.62, 1.40),
+            mouth = PosePoint(0.5, 0.60),
+        )
+        val a = assertNotNull(AppearanceEstimator.region(far))
+        val b = assertNotNull(AppearanceEstimator.region(near))
+
+        assertEquals((a.top - 0.40) * 2.0, b.top - 0.80, 1e-9)
+        assertEquals((a.left - 0.5) * 2.0, b.left - 0.5, 1e-9)
+        assertEquals((a.right - 0.5) * 2.0, b.right - 0.5, 1e-9)
+    }
+
+    @Test
+    fun `landmarks that are not a body give no region`() {
+        assertNull(AppearanceEstimator.region(pose(0.10, 0.50, 0.40)))
+        // Without a face landmark the head is placed from the trunk instead.
+        assertNotNull(AppearanceEstimator.region(pose(null, 0.20, 0.50)))
+    }
 }

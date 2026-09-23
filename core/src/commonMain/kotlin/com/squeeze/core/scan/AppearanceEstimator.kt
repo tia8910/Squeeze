@@ -1,5 +1,6 @@
 package com.squeeze.core.scan
 
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sqrt
 
@@ -43,12 +44,13 @@ class PromptSet(
  * abs 20%, a rounded stomach 30%, so the AI and the ladder printed beneath it agree on what
  * a body that looks like this is worth.
  *
- * **What it was tested against, stated plainly.** Four photographs, against the owner's own
+ * **What it was tested against, stated plainly.** Five photographs, against the owner's own
  * targets: a stage-lean bodybuilder (7%), a lean man with his abdominals visible relaxed
- * (8%), and two of a man with a soft lower stomach (16%). The shipped model reads them 7.3%,
- * 9.1%, 16.7% and 15.1% — right order, within about a point, unmoved by mirroring. That is
- * enough to trust the ordering and nowhere near enough to call it validated, which is why
- * [STANDARD_ERROR_PERCENT] is wide.
+ * (8%) photographed both waist-up and full length, and two of a man with a soft lower
+ * stomach (16%). Shown the [region] the app crops to, the shipped model reads them 8.4%,
+ * 9.5%, 9.6%, 15.0% and 15.2% — right order, within about a point and a half, and the same
+ * man the same whichever way he was framed. That is enough to trust the ordering and nowhere
+ * near enough to call it validated, which is why [STANDARD_ERROR_PERCENT] is wide.
  *
  * **What it does not do.** Read numbers. "A man with 15 percent body fat" scored every
  * photograph within a point of 16%; CLIP learned from captions, and captions describe what
@@ -78,14 +80,21 @@ object AppearanceEstimator {
      *   need not
      * @param sets the reference descriptions, each already embedded and normalised
      */
-    fun estimate(image: DoubleArray, sets: List<PromptSet>): Double? {
+    fun estimate(image: DoubleArray, sets: List<PromptSet>): Double? = read(image, sets)?.percent
+
+    /**
+     * The same reading as [estimate], with the probability the model gave each reference
+     * body — which is what the scanner shows the user while it decides, so the number arrives
+     * with the reason for it rather than on its own.
+     */
+    fun read(image: DoubleArray, sets: List<PromptSet>): AppearanceReading? {
         if (sets.isEmpty() || image.isEmpty() || image.any { !it.isFinite() }) return null
 
         val norm = sqrt(image.sumOf { it * it })
         if (norm == 0.0) return null
         val unit = DoubleArray(image.size) { image[it] / norm }
 
-        val readings = sets.map { set ->
+        val probabilities = sets.map { set ->
             if (set.embeddings.any { it.size != unit.size }) return null
 
             val logits = DoubleArray(set.anchors.size) { i ->
@@ -97,9 +106,97 @@ object AppearanceEstimator {
             val max = logits.max()
             val weights = logits.map { exp(it - max) }
             val total = weights.sum()
-            weights.indices.sumOf { weights[it] / total * set.anchors[it] }
+            DoubleArray(weights.size) { weights[it] / total }
         }
 
-        return readings.average().takeIf { it.isFinite() }
+        val percent = sets.indices
+            .map { s -> sets[s].anchors.indices.sumOf { probabilities[s][it] * sets[s].anchors[it] } }
+            .average()
+            .takeIf { it.isFinite() } ?: return null
+
+        // Averaged per body only when every phrasing describes the same bodies; otherwise
+        // there is no single list to show, and the figure stands without it.
+        val anchors = sets.first().anchors
+        val shared = sets.all { it.anchors.contentEquals(anchors) }
+        val weights = if (shared) {
+            DoubleArray(anchors.size) { i -> probabilities.sumOf { it[i] } / sets.size }
+        } else {
+            null
+        }
+
+        return AppearanceReading(percent, anchors.takeIf { shared }, weights)
     }
+
+    /**
+     * The part of a front photograph the model is shown: head to just below the hips, twice
+     * the shoulder width across.
+     *
+     * **Why not the whole photograph.** The same lean man read 9.1% photographed from the
+     * waist up and 12.3% photographed full length. Nothing about his body changed; his legs
+     * and the floor took half the model's 224 pixels, and the abdomen — the whole signal —
+     * shrank to a few of them. Cropped like this the two photographs read 9.5% and 9.6%. A
+     * reading that moves three points with where the user stood is not a reading.
+     *
+     * **Why these proportions.** Checked on a grid of alternatives around them, over the five
+     * test photographs: this is the middle of a flat region, where nudging any edge moves no
+     * reading more than about a point. The edges that were tried and lost: tighter than the
+     * shoulders cut a flexing bodybuilder's arms and read him three points fatter; the full
+     * width kept the background and brought back the framing effect.
+     *
+     * Null when the landmarks cannot place a torso, and the caller then shows the whole
+     * photograph, which is what this did before.
+     */
+    fun region(geometry: FrontPoseGeometry): CropRegion? {
+        val shoulderY = (geometry.shoulderLeft.y + geometry.shoulderRight.y) / 2.0
+        val hipY = (geometry.hipLeft.y + geometry.hipRight.y) / 2.0
+        val span = hipY - shoulderY
+        val shoulderWidth = abs(geometry.shoulderRight.x - geometry.shoulderLeft.x)
+        if (span <= 0.0 || shoulderWidth <= 0.0) return null
+
+        val chin = (geometry.mouth ?: geometry.nose)?.y?.takeIf { it < shoulderY }
+            ?: (shoulderY - span * DEFAULT_NECK_TO_TRUNK)
+        val neck = shoulderY - chin
+        val centre = (geometry.shoulderLeft.x + geometry.shoulderRight.x) / 2.0
+        val half = shoulderWidth * CROP_WIDTH_TO_SHOULDERS / 2.0
+
+        val region = CropRegion(
+            left = (centre - half).coerceIn(0.0, 1.0),
+            top = (chin - neck * CROP_HEAD_TO_NECK).coerceIn(0.0, 1.0),
+            right = (centre + half).coerceIn(0.0, 1.0),
+            bottom = (hipY + span * CROP_BELOW_HIPS).coerceIn(0.0, 1.0),
+        )
+        return region.takeIf { it.right - it.left > MIN_CROP && it.bottom - it.top > MIN_CROP }
+    }
+
+    private const val CROP_WIDTH_TO_SHOULDERS = 2.0
+    private const val CROP_HEAD_TO_NECK = 1.5
+    private const val CROP_BELOW_HIPS = 0.15
+
+    /** Chin to shoulders as a share of shoulders to hips, when no face landmark is found. */
+    private const val DEFAULT_NECK_TO_TRUNK = 0.4
+
+    /** Smaller than this, as a share of the frame, and the landmarks were not a body. */
+    private const val MIN_CROP = 0.05
 }
+
+/**
+ * What the model saw, in full.
+ *
+ * @param percent the body fat the photograph looks like
+ * @param anchors the reference bodies, by the body fat each stands for; null when the prompt
+ *   sets disagree about which bodies they describe
+ * @param weights the probability given to each of [anchors], summing to one
+ */
+class AppearanceReading(
+    val percent: Double,
+    val anchors: DoubleArray?,
+    val weights: DoubleArray?,
+)
+
+/** A rectangle in 0..1 fractions of a photograph, the same units the pose landmarks use. */
+data class CropRegion(
+    val left: Double,
+    val top: Double,
+    val right: Double,
+    val bottom: Double,
+)

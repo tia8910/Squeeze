@@ -160,7 +160,7 @@ fun ScanScreen(
             onCheckFraming = viewModel::checkFraming,
         )
 
-        ScanStep.ANALYSING -> AnalysingStep()
+        ScanStep.ANALYSING -> state.scanner?.let { AiScannerView(it) } ?: AnalysingStep()
 
         ScanStep.RESULT -> ResultStep(
             state = state,
@@ -460,6 +460,7 @@ private fun CaptureStep(
             )
 
             CaptureGuideOverlay()
+            if (autoDetect && countdown == 0) LiveScanSweep()
             if (countdown > 0) CountdownOverlay(countdown)
         } else {
             CameraPermissionRequired(onRequest = onRequestCamera)
@@ -531,7 +532,7 @@ private fun CaptureStep(
                 // auto-capture is armed, because otherwise it is a running commentary on a
                 // photo the user has not asked to take.
                 if (autoDetect) {
-                    InfoCard(framingHint ?: "Framing looks good — hold still.")
+                    AiLiveBadge(framingHint)
                 }
 
                 Row(

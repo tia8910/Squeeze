@@ -27,6 +27,9 @@ import com.squeeze.core.model.Sex
 import com.squeeze.core.scan.AbdominalProfile
 import com.squeeze.core.scan.AnatomicalLevelFinder
 import com.squeeze.core.scan.AppearanceEstimator
+import com.squeeze.core.scan.AppearanceReading
+import com.squeeze.core.scan.CropRegion
+import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.AutomaticScanBuilder
 import com.squeeze.core.scan.BodyPartMap
 import com.squeeze.core.scan.BodyProportions
@@ -50,6 +53,7 @@ import com.squeeze.core.scan.SilhouetteBodyFat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +70,33 @@ import javax.inject.Inject
  * for a second width reading.
  */
 enum class ScanStep { WEIGHT, FRONT, OPTIONAL_EXTRAS, SIDE, BACK, ANALYSING, RESULT }
+
+/**
+ * Where the on-device models are in reading a photograph, in the order they run.
+ *
+ * Each stage is entered when that work actually starts and left when it finishes. The screen
+ * shows what is really happening, not an animation timed to look busy.
+ */
+enum class ScannerStage { FINDING_BODY, BODY_FOUND, MEASURING, AI_READING, DONE }
+
+/**
+ * The photograph being scanned, and what the models have found in it so far.
+ *
+ * @param photo the photograph, the same way up as [landmarks] were measured on it
+ * @param landmarks the pose model's shoulders, hips, ankles and face, once it has run
+ * @param aiRegion the part of the photograph the vision-language model is shown
+ * @param reading what that model concluded, once it has
+ * @param aiRuns whether the vision-language model will run on this scan at all, so the
+ *   screen does not promise a stage that is not coming
+ */
+data class AiScanner(
+    val photo: Bitmap,
+    val stage: ScannerStage,
+    val landmarks: FrontPoseGeometry? = null,
+    val aiRegion: CropRegion? = null,
+    val reading: AppearanceReading? = null,
+    val aiRuns: Boolean = true,
+)
 
 data class ScanUiState(
     val step: ScanStep = ScanStep.WEIGHT,
@@ -237,6 +268,8 @@ data class ScanUiState(
      * score is withheld rather than shown, because at that point it is measuring cloth.
      */
     val bareAbdomenFraction: Double? = null,
+    /** What the scanner screen draws while the models run; null outside [ScanStep.ANALYSING]. */
+    val scanner: AiScanner? = null,
 ) {
     /**
      * What the photograph supports, and nothing else.
@@ -412,11 +445,18 @@ class ScanViewModel @Inject constructor(
         _state.value.step in setOf(ScanStep.FRONT, ScanStep.SIDE, ScanStep.BACK)
 
     private fun fail(reason: DetectionFailure) {
-        _state.value = _state.value.copy(step = capturing, failure = reason)
+        _state.value = _state.value.copy(step = capturing, failure = reason, scanner = null)
+    }
+
+    private fun showScanner(scanner: AiScanner) {
+        if (_state.value.step == ScanStep.ANALYSING) {
+            _state.value = _state.value.copy(scanner = scanner)
+        }
     }
 
     private suspend fun process(bitmap: Bitmap) {
         val aspectRatio = bitmap.width.toDouble() / bitmap.height.toDouble()
+        showScanner(AiScanner(photo = bitmap, stage = ScannerStage.FINDING_BODY))
 
         // Inference is heavy and synchronous; off the main thread or the UI freezes.
         val detection = withContext(Dispatchers.Default) { detector.detect(bitmap) }
@@ -449,10 +489,22 @@ class ScanViewModel @Inject constructor(
                     }
                 }
 
+                // Held on screen long enough to be seen: the landmarks the pose model just
+                // placed, over the photograph they were placed on.
+                showScanner(
+                    AiScanner(
+                        photo = frontBitmap?.takeIf { capturing == ScanStep.FRONT } ?: bitmap,
+                        stage = ScannerStage.BODY_FOUND,
+                        landmarks = detection.body.geometry.takeIf { capturing == ScanStep.FRONT },
+                    ),
+                )
+                delay(BODY_FOUND_DWELL_MS)
+
                 // Always return to the decision point. The user chooses when they have
                 // given the scan enough; nothing forces a second photograph.
                 _state.value = _state.value.copy(
                     step = ScanStep.OPTIONAL_EXTRAS,
+                    scanner = null,
                     failure = null,
                     hasSide = sideBody != null,
                     hasBack = backBody != null,
@@ -472,6 +524,19 @@ class ScanViewModel @Inject constructor(
             _state.value = _state.value.copy(step = ScanStep.FRONT, profileMissing = true)
             return
         }
+
+        val isMale = Sex.valueOf(profile.sex) == Sex.MALE
+        val aiRegion = front.geometry?.let(AppearanceEstimator::region)
+        val scanner = frontBitmap?.let { photo ->
+            AiScanner(
+                photo = photo,
+                stage = ScannerStage.MEASURING,
+                landmarks = front.geometry,
+                aiRegion = aiRegion,
+                aiRuns = isMale,
+            )
+        }
+        scanner?.let(::showScanner)
 
         val markers = AutomaticScanBuilder.build(
             frontProfile = front.profile,
@@ -641,19 +706,32 @@ class ScanViewModel @Inject constructor(
 
         // The on-device vision-language model, off the main thread: a first run copies an 88 MB
         // model out of the APK, and every run is a ViT forward pass on the CPU.
-        val appearance = frontBitmap
-            ?.takeIf { Sex.valueOf(profile.sex) == Sex.MALE }
-            ?.let { bitmap -> withContext(Dispatchers.Default) { appearanceModel.estimate(bitmap) } }
-            ?.let {
-                BodyFatEstimate(
-                    percent = it,
-                    method = EstimationMethod.VISUAL_ASSESSMENT,
-                    standardErrorPercent = AppearanceEstimator.STANDARD_ERROR_PERCENT,
-                )
+        //
+        // Shown the torso rather than the whole frame — see AppearanceEstimator.region.
+        scanner?.let { showScanner(it.copy(stage = ScannerStage.AI_READING)) }
+        val reading = frontBitmap
+            ?.takeIf { isMale }
+            ?.let { bitmap ->
+                withContext(Dispatchers.Default) { appearanceModel.read(bitmap, aiRegion) }
             }
+        val appearance = reading?.let {
+            BodyFatEstimate(
+                percent = it.percent,
+                method = EstimationMethod.VISUAL_ASSESSMENT,
+                standardErrorPercent = AppearanceEstimator.STANDARD_ERROR_PERCENT,
+            )
+        }
+
+        // The verdict stays up for a moment, beside the bodies it was weighed against,
+        // before the result card replaces it.
+        if (scanner != null) {
+            showScanner(scanner.copy(stage = ScannerStage.DONE, reading = reading))
+            delay(if (reading != null) VERDICT_DWELL_MS else BODY_FOUND_DWELL_MS)
+        }
 
         _state.value = _state.value.copy(
             step = ScanStep.RESULT,
+            scanner = null,
             appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
@@ -834,3 +912,9 @@ private fun ProfileEntity.toScanProfile() = Profile(
     birthYear = birthYear,
     sex = Sex.valueOf(sex),
 )
+
+/** How long the landmarks the pose model found stay on screen before moving on. */
+private const val BODY_FOUND_DWELL_MS = 900L
+
+/** How long the AI's verdict stays beside its reasoning before the result replaces it. */
+private const val VERDICT_DWELL_MS = 1_800L

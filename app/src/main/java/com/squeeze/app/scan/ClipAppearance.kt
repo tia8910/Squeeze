@@ -10,6 +10,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import com.squeeze.core.scan.AppearanceEstimator
+import com.squeeze.core.scan.AppearanceReading
+import com.squeeze.core.scan.CropRegion
 import com.squeeze.core.scan.PromptSet
 import org.json.JSONObject
 import java.io.File
@@ -42,16 +44,34 @@ class ClipAppearance @Inject constructor(
     private var prompts: List<PromptSet>? = null
     private var unavailable = false
 
-    /** The body fat the photograph looks like, in per cent, or null when it cannot say. */
+    /**
+     * What the photograph looks like to the model, or null when it cannot say.
+     *
+     * @param region the part of [photo] to show it — see [AppearanceEstimator.region]; null
+     *   shows the whole photograph
+     */
     @Synchronized
-    fun estimate(photo: Bitmap): Double? {
+    fun read(photo: Bitmap, region: CropRegion? = null): AppearanceReading? {
         if (unavailable) return null
         return runCatching {
             val loaded = session ?: load() ?: return null
             val sets = prompts ?: return null
-            val embedding = embed(loaded, photo) ?: return null
-            AppearanceEstimator.estimate(embedding, sets)
+            val input = region?.let { crop(photo, it) } ?: photo
+            val embedding = try {
+                embed(loaded, input)
+            } finally {
+                if (input !== photo) input.recycle()
+            } ?: return null
+            AppearanceEstimator.read(embedding, sets)
         }.getOrNull()
+    }
+
+    private fun crop(photo: Bitmap, region: CropRegion): Bitmap? {
+        val left = (region.left * photo.width).toInt().coerceIn(0, photo.width - 1)
+        val top = (region.top * photo.height).toInt().coerceIn(0, photo.height - 1)
+        val right = (region.right * photo.width).toInt().coerceIn(left + 1, photo.width)
+        val bottom = (region.bottom * photo.height).toInt().coerceIn(top + 1, photo.height)
+        return Bitmap.createBitmap(photo, left, top, right - left, bottom - top)
     }
 
     private fun load(): OrtSession? = runCatching {
@@ -120,10 +140,10 @@ class ClipAppearance @Inject constructor(
     /**
      * The photograph as CLIP expects it, prepared the way it was when this was tested.
      *
-     * **Padded to a square, not cropped.** CLIP's usual preparation centre-crops, which on a
-     * standing full-length photograph keeps the midriff and discards the head and legs. The
-     * readings this was checked against came from the whole photograph letterboxed onto
-     * black, so that is what happens here too; changing it changes every reading.
+     * **Padded to a square, not centre-cropped.** CLIP's usual preparation centre-crops, which
+     * cuts wherever the middle of the frame happens to be. The body is cropped by its own
+     * landmarks before it gets here; what remains is letterboxed onto black, as it was when
+     * the readings were checked, and changing it changes every reading.
      *
      * **Halved before the final resize.** Android's filtered scaling reads four pixels per
      * output pixel whatever the ratio, so taking a twelve-megapixel photograph straight to
