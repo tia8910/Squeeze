@@ -283,7 +283,7 @@ object MeasuredParts {
     ): Pair<Map<com.squeeze.core.scan.MuscleGroup, String>, Map<com.squeeze.core.scan.MuscleGroup, String>> {
         val strong = linkedMapOf<com.squeeze.core.scan.MuscleGroup, String>()
         WeakPointAnalysis.strongPoints(c, sex).forEach { g ->
-            toScan(g)?.let { strong.putIfAbsent(it, "Measured ahead of the balanced proportion for your frame.") }
+            toScan(g)?.let { if (it !in strong) strong[it] = "Measured ahead of the balanced proportion for your frame." }
         }
         val chest = c.chestCm
         val waist = c.waistCm
