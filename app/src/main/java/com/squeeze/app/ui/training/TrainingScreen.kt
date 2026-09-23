@@ -32,6 +32,11 @@ import com.squeeze.app.data.VolumeRow
 import com.squeeze.core.workout.Discipline
 import com.squeeze.core.workout.HybridWeek
 import com.squeeze.core.workout.PlannedSession
+import com.squeeze.core.workout.PlannedDay
+import com.squeeze.app.ui.components.BrandCard
+import com.squeeze.app.ui.components.PrimaryButton
+import com.squeeze.app.ui.components.SecondaryButton
+import com.squeeze.app.ui.components.SectionHeader
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.layout.width
@@ -69,58 +74,90 @@ fun TrainingScreen(
             return@Column
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onLog, modifier = Modifier.weight(1f)) { Text("Log a workout") }
-            androidx.compose.material3.OutlinedButton(onClick = onScanMachine, modifier = Modifier.weight(1f)) {
-                Text("Scan a machine")
-            }
-        }
+        var editing by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+        val week = state.week
 
-        SportsSection(state, viewModel)
-        SetupSection(state, viewModel)
-
-        Button(onClick = viewModel::createWeek, modifier = Modifier.fillMaxWidth()) {
-            Text(if (state.week == null) "Create my week" else "Rebuild my week")
-        }
-
-        state.week?.let { week ->
-            nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
-            HybridWeekView(week, onLogSession = { session -> viewModel.startLog(session); onLog() })
-            if (state.volume.isNotEmpty()) VolumeCard(state.volume)
-            androidx.compose.material3.OutlinedButton(onClick = onOpenNutrition, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Nutrition for this week" +
-                        (state.plannedKcalPerDay?.let { " · ~$it kcal/day of training" } ?: ""),
-                )
-            }
-        }
-
-        if (Discipline.GYM in state.disciplines || state.disciplines.isEmpty()) {
-            Text("Gym progression block", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Optional: a multi-week gym block with volume that climbs week to week and a deload, " +
-                    "built from the same goal and weak points.",
-                style = MaterialTheme.typography.bodySmall,
+        if (week == null || editing) {
+            // ── Setup: the only thing on screen until there is a week ──────────────────
+            SectionHeader(
+                title = if (week == null) "Build your week" else "Edit your week",
+                eyebrow = "Train",
+                caption = "Pick your sports and days — the plan does the rest",
             )
-            androidx.compose.material3.OutlinedButton(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
-                Text(if (state.mesocycle == null) "Generate gym block" else "Regenerate gym block")
+            BrandCard(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SportsSection(state, viewModel)
+                    SetupSection(state, viewModel)
+                    Text(
+                        "Goal: ${state.goal.label()} — change it in You.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            PrimaryButton(
+                text = if (week == null) "Create my week" else "Save changes",
+                onClick = { viewModel.createWeek(); editing = false },
+            )
+            if (week != null) {
+                androidx.compose.material3.TextButton(onClick = { editing = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Cancel")
+                }
+            }
+        } else {
+            // ── The week: today first, then the days, then everything optional ─────────
+            nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
+
+            val todayIndex = java.time.LocalDate.now().dayOfWeek.value - 1
+            TodayCard(week.days[todayIndex], onStart = { session -> viewModel.startLog(session); onLog() })
+
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                SectionHeader(
+                    title = "This week",
+                    caption = week.disciplines.joinToString(" · ") { it.label } + " · ${week.trainingDays} days",
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.TextButton(onClick = { editing = true }) { Text("Edit") }
+            }
+            WeekList(week, todayIndex, onLogSession = { session -> viewModel.startLog(session); onLog() })
+
+            if (state.volume.isNotEmpty()) VolumeCard(state.volume)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryButton(text = "Log a workout", onClick = onLog, modifier = Modifier.weight(1f))
+                SecondaryButton(text = "Scan a machine", onClick = onScanMachine, modifier = Modifier.weight(1f))
+            }
+
+            Expandable("How your week was built") {
+                week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                state.plannedKcalPerDay?.let {
+                    Text("Burns about $it kcal a day on average — already in your nutrition plan.", style = MaterialTheme.typography.bodySmall)
+                }
+                androidx.compose.material3.TextButton(onClick = onOpenNutrition) { Text("Open nutrition ›") }
             }
         }
 
-        state.adjustmentRationale?.let { rationale ->
-            // The reason the prescription changed is shown before the prescription itself.
-            // An adjustment the user cannot explain reads as the app being erratic.
-            InfoCard(title = "Adjusted from your measurements", body = rationale)
+        // The optional multi-week gym block, folded away: most people never need it, and
+        // the week above already covers the gym days.
+        if (week != null && !editing && Discipline.GYM in state.disciplines) {
+            Expandable("Advanced: 6-week gym progression block") {
+                Text(
+                    "Volume climbs week to week, then a deload — built from the same goal and weak points.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                androidx.compose.material3.OutlinedButton(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.mesocycle == null) "Generate gym block" else "Regenerate gym block")
+                }
+                state.adjustmentRationale?.let { InfoCard(title = "Adjusted from your measurements", body = it) }
+                if (state.weakPoints.isNotEmpty()) WeakPointCard(state.weakPoints)
+                MesocycleView(state, viewModel)
+            }
         }
+    }
+}
 
-        // Before the block, because it is the reason the block prioritises what it does.
-        // A programme that quietly favours calves is indistinguishable from a random one
-        // unless the user is told why.
-        if (state.weakPoints.isNotEmpty()) WeakPointCard(state.weakPoints)
-
-        // The block and the food are one plan: the days chosen here set the nutrition plan's
-        // activity and carbohydrate split, so the link is offered as soon as a block exists.
-
+@Composable
+private fun MesocycleView(state: TrainingUiState, viewModel: TrainingViewModel) {
         state.mesocycle?.let { mesocycle ->
             Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)
 
@@ -153,33 +190,21 @@ fun TrainingScreen(
                 }
             }
         }
-    }
 }
 
 @Composable
 private fun SetupSection(state: TrainingUiState, viewModel: TrainingViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Days per week", style = MaterialTheme.typography.titleSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             (1..7).forEach { days ->
                 FilterChip(
                     selected = state.daysPerWeek == days,
                     onClick = { viewModel.setDaysPerWeek(days) },
                     label = { Text("$days") },
-                )
-            }
-        }
-
-        Text("Goal", style = MaterialTheme.typography.titleSmall)
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Goal.entries.forEach { goal ->
-                FilterChip(
-                    selected = state.goal == goal,
-                    onClick = { viewModel.setGoal(goal) },
-                    label = { Text(goal.label()) },
                 )
             }
         }
@@ -195,19 +220,21 @@ private fun SetupSection(state: TrainingUiState, viewModel: TrainingViewModel) {
             }
         }
 
-        Text("Equipment", style = MaterialTheme.typography.titleSmall)
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Equipment.entries.forEach { equipment ->
-                FilterChip(
-                    selected = equipment in state.equipment,
-                    onClick = { viewModel.toggleEquipment(equipment) },
-                    label = {
-                        Text(equipment.name.lowercase().replaceFirstChar { it.uppercase() })
-                    },
-                )
+        if (Discipline.GYM in state.disciplines) {
+            Text("Equipment", style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Equipment.entries.forEach { equipment ->
+                    FilterChip(
+                        selected = equipment in state.equipment,
+                        onClick = { viewModel.toggleEquipment(equipment) },
+                        label = {
+                            Text(equipment.name.lowercase().replaceFirstChar { it.uppercase() })
+                        },
+                    )
+                }
             }
         }
     }
@@ -371,33 +398,79 @@ private fun SportsSection(state: TrainingUiState, viewModel: TrainingViewModel) 
     }
 }
 
+/** Today's sessions, with one button to start and log. */
 @Composable
-private fun HybridWeekView(week: HybridWeek, onLogSession: (PlannedSession) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Your week", style = MaterialTheme.typography.titleLarge)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("How it was built", style = MaterialTheme.typography.titleSmall)
-                week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-            }
-        }
-        week.days.forEach { day ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(day.name, style = MaterialTheme.typography.titleSmall)
-                    if (day.rest) {
-                        Text("Rest — recovery is where the training turns into results.", style = MaterialTheme.typography.bodySmall)
-                    }
-                    day.sessions.forEach { session -> PlannedSessionView(session, onLogSession) }
+private fun TodayCard(day: PlannedDay, onStart: (PlannedSession) -> Unit) {
+    BrandCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("TODAY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            if (day.rest) {
+                Text("Rest day", style = MaterialTheme.typography.titleLarge)
+                Text("Recovery is where training turns into results. Walk, stretch, sleep well.", style = MaterialTheme.typography.bodySmall)
+            } else {
+                day.sessions.forEach { session ->
+                    Text(session.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "${session.minutes} min · ${session.intensity.label.lowercase()}" +
+                            session.items.firstOrNull()?.let { " · starts with ${it.name}" }.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    PrimaryButton(text = "Start & log", onClick = { onStart(session) })
                 }
             }
         }
     }
 }
 
+/** The week as one line per day; tap a day to see its sessions. */
+@Composable
+private fun WeekList(week: HybridWeek, todayIndex: Int, onLogSession: (PlannedSession) -> Unit) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(-1) }
+    BrandCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            week.days.forEach { day ->
+                com.squeeze.app.ui.components.BrandRow(onClick = { open = if (open == day.index) -1 else day.index }) {
+                    Text(
+                        day.name.take(3),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (day.index == todayIndex) FontWeight.Bold else FontWeight.Normal,
+                        color = if (day.index == todayIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.width(44.dp),
+                    )
+                    Text(
+                        if (day.rest) "Rest" else day.sessions.joinToString(" + ") { it.title },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (day.rest) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!day.rest) Text(if (open == day.index) "▲" else "▼", style = MaterialTheme.typography.labelSmall)
+                }
+                if (open == day.index) {
+                    Column(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp)) {
+                        day.sessions.forEach { PlannedSessionView(it, onLogSession) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A titled section that stays folded until asked for. */
+@Composable
+private fun Expandable(title: String, content: @Composable () -> Unit) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    com.squeeze.app.ui.components.BrandRow(onClick = { open = !open }) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        Text(if (open) "▲" else "▼", style = MaterialTheme.typography.labelSmall)
+    }
+    if (open) {
+        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+    }
+}
+
 @Composable
 private fun PlannedSessionView(session: PlannedSession, onLog: (PlannedSession) -> Unit) {
-    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

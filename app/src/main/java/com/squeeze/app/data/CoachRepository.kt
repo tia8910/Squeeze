@@ -81,7 +81,6 @@ class CoachRepository @Inject constructor(
     suspend fun journey(): Journey {
         val today = LocalDate.now().toEpochDay()
         val measurements = measurementDao.since(Long.MIN_VALUE)
-        val lastWeigh = measurements.filter { it.weightKg != null }.maxOfOrNull { it.epochDay }
         val lastScan = listOfNotNull(
             physiqueDao.latest()?.epochDay,
             measurements.filter { it.photoId != null }.maxOfOrNull { it.epochDay },
@@ -89,7 +88,6 @@ class CoachRepository @Inject constructor(
         val week = week()
         return JourneyPlanner.plan(
             JourneyFacts(
-                daysSinceWeight = lastWeigh?.let { today - it },
                 daysSinceScan = lastScan?.let { today - it },
                 hasWeek = week != null,
                 hasFavourites = favouriteFoods().isNotEmpty(),

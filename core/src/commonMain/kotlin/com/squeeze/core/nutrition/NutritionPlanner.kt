@@ -168,8 +168,8 @@ object NutritionPlanner {
         }
         reasoning += "Weight ${w.fixed(1)} kg" + (weightAge?.let { ", logged $it" } ?: "") + "."
         if ((input.weightDaysOld ?: 0) > 14) {
-            warnings += "Your last weight is ${input.weightDaysOld} days old. Log today's " +
-                "weight and the plan recalculates."
+            warnings += "Your last weight is ${input.weightDaysOld} days old. A scan check-in " +
+                "updates it and the plan recalculates."
         }
 
         val leanMass = input.bodyFatPercent?.takeIf { it in 3.0..60.0 }?.let { w * (1 - it / 100.0) }

@@ -230,8 +230,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         // the same screen.
         val goToStep: (StepId) -> Unit = { step ->
             when (step) {
-                StepId.WEIGH_IN, StepId.WEEKLY_WEIGH_IN -> navController.navigate(ROUTE_ADD_MEASUREMENT)
-                StepId.AI_SCAN, StepId.RESCAN -> navController.navigate(ROUTE_SCAN)
+                StepId.AI_SCAN, StepId.WEEKLY_CHECK_IN -> navController.navigate(ROUTE_SCAN)
                 StepId.CHOOSE_SPORTS -> goToTab(Destination.TRAINING)
                 StepId.PICK_FOODS -> goToTab(Destination.NUTRITION)
                 StepId.TODAYS_SESSION -> viewModel.startTodaysSession { navController.navigate(ROUTE_LOG) }
@@ -325,7 +324,6 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         nextStep = nextStep?.takeIf { it.id != StepId.PICK_FOODS },
                         onNextStep = { nextStep?.let { goToStep(it.id) } },
                         onPlanChanged = viewModel::refresh,
-                        onLogWeight = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onScan = { navController.navigate(ROUTE_SCAN) },
                         onOpenTraining = { goToTab(Destination.TRAINING) },
                         onEditGoal = { goToTab(Destination.SETTINGS) },

@@ -178,38 +178,22 @@ fun CompositionScreen(
             muscle = leanMassTrend,
         )
 
-        StatRow {
-            StatTile(
-                value = measurements.size.toString(),
-                label = if (measurements.size == 1) "Entry" else "Entries",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = daysTracked(measurements).toString(),
-                label = "Days tracked",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = lastEntryLabel(measurements),
-                label = "Last entry",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
+        // One action: the scan, which also takes the weight. Tape measurements stay
+        // available for people who use a tape, but as a quiet link rather than a second
+        // button of equal weight.
         PrimaryButton(
-            text = "Scan",
+            text = "Scan check-in",
             onClick = onStartScan,
             leading = {
                 Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
             },
         )
-        SecondaryButton(
-            text = "Enter",
-            onClick = onAddMeasurement,
-            leading = {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
+        androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.material3.Text(
+                "Enter tape measurements instead · ${measurements.size} " +
+                    (if (measurements.size == 1) "entry" else "entries") + " so far",
+            )
+        }
 
         // The full analysis lives inside each history entry rather than here. On the
         // dashboard it described whichever fields happened to be newest across different

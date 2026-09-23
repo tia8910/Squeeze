@@ -88,7 +88,28 @@ private fun StrengthLog(state: WorkoutLogUiState, viewModel: WorkoutLogViewModel
 
     state.exercises.forEach { exercise -> ExerciseCard(exercise, state, viewModel) }
 
-    Text("Add an exercise", style = MaterialTheme.typography.titleSmall)
+    // Folded away once the session has exercises: the list is long, and mid-workout the
+    // sets are what matter.
+    var adding by remember { mutableStateOf(false) }
+    val showAdd = adding || state.exercises.isEmpty()
+    TextButton(onClick = { adding = !adding }, modifier = Modifier.fillMaxWidth()) {
+        Text(if (showAdd && state.exercises.isNotEmpty()) "Hide exercise list" else "+ Add an exercise")
+    }
+    if (showAdd) AddExercise(state, viewModel, onScanMachine)
+
+    var minutes by remember(state.minutes) { mutableStateOf(state.minutes.toString()) }
+    NumberField("Session length (min)", minutes) { v -> minutes = v; v.toIntOrNull()?.let(viewModel::setMinutes) }
+    Button(
+        onClick = viewModel::finishStrength,
+        enabled = state.todaysSets.isNotEmpty(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Finish workout · ~${state.estimatedKcal} kcal")
+    }
+}
+
+@Composable
+private fun AddExercise(state: WorkoutLogUiState, viewModel: WorkoutLogViewModel, onScanMachine: () -> Unit) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -110,16 +131,6 @@ private fun StrengthLog(state: WorkoutLogUiState, viewModel: WorkoutLogViewModel
     }
     OutlinedButton(onClick = onScanMachine, modifier = Modifier.fillMaxWidth()) {
         Text("Not sure what a machine is? Scan it")
-    }
-
-    var minutes by remember(state.minutes) { mutableStateOf(state.minutes.toString()) }
-    NumberField("Session length (min)", minutes) { v -> minutes = v; v.toIntOrNull()?.let(viewModel::setMinutes) }
-    Button(
-        onClick = viewModel::finishStrength,
-        enabled = state.todaysSets.isNotEmpty(),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text("Finish workout · ~${state.estimatedKcal} kcal")
     }
 }
 

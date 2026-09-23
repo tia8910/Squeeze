@@ -1,11 +1,13 @@
 package com.squeeze.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,14 +15,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.data.DashboardSummary
 import com.squeeze.core.coach.JourneyStep
 import com.squeeze.core.coach.StepId
 
 /**
- * The top of the dashboard: the one next step, how far through setup the user is, and a line
- * from every feature — each tappable, so the dashboard is the way into everything.
+ * The top of the dashboard, in two cards and no more:
+ *
+ *  1. **Next step** — the one thing to do now, with one button. During setup it also shows how
+ *     far along the user is, as a thin bar rather than a checklist.
+ *  2. **Today** — one line each for training, food and the physique focus, each tappable.
+ *
+ * Everything else lives on its own tab; the dashboard's job is to say what to do and where.
  */
 @Composable
 fun JourneyCard(
@@ -31,104 +39,97 @@ fun JourneyCard(
     onOpenScan: () -> Unit,
 ) {
     val journey = summary.journey
-    BrandCard(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (!journey.setupComplete) {
-                Text(
-                    "Setting up · ${journey.setupDone} of ${journey.setup.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                LinearProgressIndicator(
-                    progress = { journey.setupDone.toFloat() / journey.setup.size },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                journey.setup.forEachIndexed { i, step ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+    val next = journey.next
+
+    if (next != null) {
+        BrandCard(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (journey.setupComplete) "NEXT" else "STEP ${journey.setupDone + 1} OF ${journey.setup.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!journey.setupComplete) {
                         Text(
-                            if (step.done) "✓" else "${i + 1}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = if (step.done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(24.dp),
-                        )
-                        Text(
-                            step.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (step.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                            journey.setup.joinToString("  ") { (if (it.done) "✓ " else "") + it.title.substringBefore(' ') },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-            }
-
-            val next = journey.next
-            if (next != null) {
-                NextStepBlock(next) { onStep(next.id) }
-            } else {
-                Text("You're all caught up today ✓", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Everything is logged. Come back tomorrow — the plan moves with you.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (!journey.setupComplete) {
+                    LinearProgressIndicator(
+                        progress = { journey.setupDone.toFloat() / journey.setup.size },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Text(next.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(next.detail, style = MaterialTheme.typography.bodyMedium)
+                PrimaryButton(text = next.action, onClick = { onStep(next.id) })
             }
         }
+    } else {
+        NoticePill("You're all caught up today ✓")
     }
 
-    // A line from every feature.
-    summary.todaysTraining?.let { today ->
-        SummaryRow(
-            "Training",
-            today + (summary.sessionsPlanned?.let { " · ${summary.sessionsDone} of $it sessions this week" } ?: "") +
-                (if (summary.setsDone > 0) " · ${summary.setsDone} sets" else ""),
-            "Train",
-            onOpenTraining,
-        )
+    val lines = buildList {
+        summary.todaysTraining?.let { training ->
+            add(
+                Triple(
+                    "Train",
+                    training + (summary.sessionsPlanned?.let { " · ${summary.sessionsDone}/$it this week" } ?: ""),
+                    onOpenTraining,
+                ),
+            )
+        }
+        summary.fuelToday?.let { add(Triple("Eat", it, onOpenNutrition)) }
+        if (summary.weakPoints.isNotEmpty() || summary.strengths.isNotEmpty()) {
+            add(
+                Triple(
+                    "Focus",
+                    listOfNotNull(
+                        summary.weakPoints.takeIf { it.isNotEmpty() }?.joinToString(),
+                        summary.strengths.takeIf { it.isNotEmpty() }?.let { "strong: ${it.joinToString()}" },
+                    ).joinToString(" · "),
+                    onOpenScan,
+                ),
+            )
+        }
     }
-    summary.fuelToday?.let { fuel ->
-        SummaryRow(
-            "Fuel today",
-            fuel + (summary.microGaps.takeIf { it.isNotEmpty() }?.let { "\nWatch: ${it.joinToString()}" } ?: ""),
-            "Plan",
-            onOpenNutrition,
-        )
-    }
-    if (summary.strengths.isNotEmpty() || summary.weakPoints.isNotEmpty()) {
-        SummaryRow(
-            "AI physique",
-            listOfNotNull(
-                summary.strengths.takeIf { it.isNotEmpty() }?.let { "Strong: ${it.joinToString()}" },
-                summary.weakPoints.takeIf { it.isNotEmpty() }?.let { "Focus: ${it.joinToString()} (prioritised in training)" },
-            ).joinToString("\n"),
-            "Rescan",
-            onOpenScan,
-        )
+    if (lines.isNotEmpty()) {
+        BrandCard(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("TODAY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                lines.forEachIndexed { i, (label, body, onClick) ->
+                    if (i > 0) HorizontalDivider()
+                    TodayLine(label, body, onClick)
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun SummaryRow(title: String, body: String, action: String, onClick: () -> Unit) {
-    BrandRow(onClick = onClick) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(body, style = MaterialTheme.typography.bodySmall)
-        }
+private fun TodayLine(label: String, body: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
         Text(
-            "$action ›",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp),
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
-    }
-}
-
-@Composable
-private fun NextStepBlock(step: JourneyStep, onGo: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("NEXT STEP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text(step.detail, style = MaterialTheme.typography.bodyMedium)
-        Text("Unlocks: ${step.unlocks}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PrimaryButton(text = step.action, onClick = onGo)
+        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -142,7 +143,6 @@ fun NextStepBanner(step: JourneyStep, onGo: () -> Unit, modifier: Modifier = Mod
         Column(Modifier.weight(1f)) {
             Text("Next step", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             Text(step.title, style = MaterialTheme.typography.titleSmall)
-            Text("Unlocks: ${step.unlocks}", style = MaterialTheme.typography.bodySmall)
         }
         Text(
             "${step.action} ›",

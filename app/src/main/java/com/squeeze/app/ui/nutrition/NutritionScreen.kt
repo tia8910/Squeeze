@@ -21,6 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,15 +51,19 @@ import com.squeeze.core.nutrition.Micronutrient
 import com.squeeze.core.text.fixed
 
 /**
- * The nutrition plan, built from the user's own measurements, goal and training.
+ * Nutrition, in three places instead of one long page:
  *
- * Nothing on this page is entered here. Each number says where it came from, and each source
- * is one tap away: the weight log, the AI scan, the training block, the goal — so changing any
- * of them is how the plan is changed.
+ *  - **Today** — the only numbers most people need: calories and macros for a training or rest
+ *    day.
+ *  - **Meals** — the week of meals and the favourite foods it is built from.
+ *  - **Details** — why each number is what it is, micronutrients, and the links to change the
+ *    inputs.
+ *
+ * Nothing is typed in here. Weight and body fat come from the scan, activity from the week of
+ * sports, and the meals from the favourite foods.
  */
 @Composable
 fun NutritionScreen(
-    onLogWeight: () -> Unit,
     onScan: () -> Unit,
     onOpenTraining: () -> Unit,
     onEditGoal: () -> Unit,
@@ -67,44 +75,66 @@ fun NutritionScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
     LaunchedEffect(state.context?.favourites) { onPlanChanged() }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         val context = state.context
         when {
             state.loading -> Unit
-            context == null -> NeedsWeight(onLogWeight)
+            context == null -> NeedsScan(onScan)
             else -> {
-                Plan(context, state.showTrainingDay, viewModel::showTrainingDay, onLogWeight, onScan, onOpenTraining, onEditGoal)
-                FavouritesSection(state, viewModel)
+                val plan = context.plan
+                SectionHeader(
+                    title = goalLabel(context.goal),
+                    eyebrow = "Your plan",
+                    caption = when {
+                        plan.intendedKgPerWeek < -0.01 -> "Losing ${(-plan.intendedKgPerWeek).fixed(2)} kg a week"
+                        plan.intendedKgPerWeek > 0.01 -> "Gaining ${plan.intendedKgPerWeek.fixed(2)} kg a week"
+                        else -> "Holding weight while composition shifts"
+                    },
+                )
                 nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
-                WeekSection(context, state.selectedDay, viewModel::selectDay)
-                SourcesSection(context, onLogWeight, onScan, onOpenTraining, onEditGoal)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Today", "Meals", "Details").forEachIndexed { i, label ->
+                        FilterChip(selected = tab == i, onClick = { tab = i }, label = { Text(label) })
+                    }
+                }
+
+                when (tab) {
+                    0 -> TodayTab(context, state.showTrainingDay, viewModel::showTrainingDay)
+                    1 -> {
+                        FavouritesSection(state, viewModel)
+                        WeekSection(context, state.selectedDay, viewModel::selectDay)
+                    }
+                    else -> DetailsTab(context, onScan, onOpenTraining, onEditGoal)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun NeedsWeight(onLogWeight: () -> Unit) {
+private fun NeedsScan(onScan: () -> Unit) {
     SectionHeader(
         title = "Your nutrition plan",
-        caption = "Built from your weight, body fat, goal and training — log a weight to start.",
+        eyebrow = "Nutrition",
+        caption = "Built from your own body — it starts with one scan.",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Text(
-            "Every number here is worked out from your own body. The one thing it cannot " +
-                "guess is your weight: log it once and the plan appears, then follows your " +
-                "trend from there.",
+            "The scan asks your weight and reads your body fat from a photo. From those, your " +
+                "goal and your training, every number here is worked out for you.",
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    PrimaryButton(text = "Log your weight", onClick = onLogWeight)
+    PrimaryButton(text = "Start AI scan", onClick = onScan)
 }
 
 private fun goalLabel(goal: Goal) = when (goal) {
@@ -116,27 +146,9 @@ private fun goalLabel(goal: Goal) = when (goal) {
 }
 
 @Composable
-private fun Plan(
-    context: NutritionContext,
-    trainingDay: Boolean,
-    onDayType: (Boolean) -> Unit,
-    onLogWeight: () -> Unit,
-    onScan: () -> Unit,
-    onOpenTraining: () -> Unit,
-    onEditGoal: () -> Unit,
-) {
+private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType: (Boolean) -> Unit) {
     val plan = context.plan
     val day = if (trainingDay) plan.trainingDay else plan.restDay
-
-    SectionHeader(
-        title = "Your nutrition plan",
-        eyebrow = goalLabel(context.goal),
-        caption = when {
-            plan.intendedKgPerWeek < -0.01 -> "Losing ${(-plan.intendedKgPerWeek).fixed(2)} kg a week"
-            plan.intendedKgPerWeek > 0.01 -> "Gaining ${plan.intendedKgPerWeek.fixed(2)} kg a week"
-            else -> "Holding weight while composition shifts"
-        },
-    )
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(selected = trainingDay, onClick = { onDayType(true) }, label = { Text("Training day") })
@@ -159,11 +171,11 @@ private fun Plan(
             StatTile("${day.fatG} g", "Fat", Modifier.weight(1f))
         }
         Box(Modifier.height(10.dp))
-        StatRow {
-            StatTile("${plan.fiberG} g", "Fibre", Modifier.weight(1f))
-            StatTile("${plan.waterLitres} L", "Water", Modifier.weight(1f))
-            StatTile("%,d mg".format(plan.sodiumMg), "Sodium", Modifier.weight(1f))
-        }
+        Text(
+            "Water ${plan.waterLitres} L · Fibre ${plan.fiberG} g · Sodium ${"%,d".format(plan.sodiumMg)} mg",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     if (plan.adjustmentKcal != 0) {
@@ -171,13 +183,27 @@ private fun Plan(
             "Adjusted ${if (plan.adjustmentKcal > 0) "+" else ""}${plan.adjustmentKcal} kcal from your weight trend",
         )
     }
-
-    plan.warnings.forEach { warning ->
-        BrandCard(Modifier.fillMaxWidth()) {
-            Text(warning, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        }
+    plan.warnings.take(2).forEach { warning ->
+        Text("• $warning", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
+    val gaps = plan.micros.filter { it.short }
+    if (gaps.isNotEmpty()) {
+        Text(
+            "Watch this week: ${gaps.joinToString { it.nutrient.label.lowercase() }} — see Details.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
+@Composable
+private fun DetailsTab(
+    context: NutritionContext,
+    onScan: () -> Unit,
+    onOpenTraining: () -> Unit,
+    onEditGoal: () -> Unit,
+) {
+    val plan = context.plan
     SectionHeader(title = "Why these numbers", caption = "Each one traced back to your data")
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -196,22 +222,18 @@ private fun Plan(
         }
     }
 
-    SectionHeader(
-        title = "Micronutrients",
-        caption = "What an average day of your week of meals supplies against your daily targets",
-    )
+    SectionHeader(title = "Micronutrients", caption = "An average day of your meals against your targets")
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             plan.micros.forEach { MicroRow(it) }
+            plan.microAdvice.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
         }
     }
-    if (plan.microAdvice.isNotEmpty()) {
-        BrandCard(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                plan.microAdvice.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
-            }
-        }
-    }
+
+    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
+    SecondaryButton(text = if (context.hasPhysique) "Scan check-in (weight + photo)" else "AI scan (weight + photo)", onClick = onScan)
+    SecondaryButton(text = "Training · ${context.trainingDaysPerWeek} days a week", onClick = onOpenTraining)
+    SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
 
     Text(
         "General guidance for healthy adults, not medical advice. If you have a medical " +
@@ -307,9 +329,21 @@ private fun MealCard(meal: Meal) {
 /** Favourite foods, grouped; the week of meals is built from these. */
 @Composable
 private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewModel) {
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val open = editing || state.favourites.isEmpty() || state.favouritesDirty
+    if (!open) {
+        com.squeeze.app.ui.components.BrandRow(onClick = { editing = true }) {
+            Column(Modifier.weight(1f)) {
+                Text("Built from your ${state.favourites.size} favourite foods", style = MaterialTheme.typography.titleSmall)
+                Text("Meals rotate through them across the week", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("Edit ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        return
+    }
     SectionHeader(
         title = "Your favourite foods",
-        caption = "Tick what you like to eat — your week of meals is built from them",
+        caption = "Tick what you like to eat — your meals are built from them",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -337,7 +371,10 @@ private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewM
         }
     }
     if (state.favouritesDirty) {
-        PrimaryButton(text = "Build my meals from these (${state.favourites.size})", onClick = viewModel::buildMeals)
+        PrimaryButton(
+            text = "Build my meals from these (${state.favourites.size})",
+            onClick = { viewModel.buildMeals(); editing = false },
+        )
     }
 }
 
@@ -345,47 +382,21 @@ private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewM
 @Composable
 private fun WeekSection(context: NutritionContext, selected: Int, onSelect: (Int) -> Unit) {
     val week = context.plan.week
-    SectionHeader(
-        title = "Your week of meals",
-        caption = if (context.favourites.isEmpty()) {
-            "Built from staple foods — tick favourites above to make it yours"
-        } else {
-            "Built from your favourites, rotated so the days differ"
-        },
-    )
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         week.forEachIndexed { i, day ->
-            FilterChip(selected = selected == i, onClick = { onSelect(i) }, label = { Text(day.name) })
+            FilterChip(selected = selected == i, onClick = { onSelect(i) }, label = { Text(day.name.substringBefore(" ·")) })
         }
     }
     week.getOrNull(selected)?.let { day ->
         val m = day.macros
         Text(
-            "${m.calories} kcal · ${m.proteinG} g protein · ${m.carbsG} g carbs · ${m.fatG} g fat",
-            style = MaterialTheme.typography.bodyMedium,
+            "${day.name.substringAfter("· ", "")} day · ${m.calories} kcal · ${m.proteinG} g protein · ${m.carbsG} g carbs · ${m.fatG} g fat",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         day.meals.forEach { MealCard(it) }
     }
-}
-
-/** The links back to everything the plan is built from. */
-@Composable
-private fun SourcesSection(
-    context: NutritionContext,
-    onLogWeight: () -> Unit,
-    onScan: () -> Unit,
-    onOpenTraining: () -> Unit,
-    onEditGoal: () -> Unit,
-) {
-    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
-    PrimaryButton(text = "Log today's weight", onClick = onLogWeight)
-    SecondaryButton(
-        text = if (context.hasPhysique) "Rescan with the AI" else "Scan with the AI for body fat & weak points",
-        onClick = onScan,
-    )
-    SecondaryButton(text = "Training: ${context.trainingDaysPerWeek} days a week — your sports & log", onClick = onOpenTraining)
-    SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
 }

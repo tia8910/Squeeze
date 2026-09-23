@@ -2,13 +2,11 @@ package com.squeeze.core.coach
 
 /** Every step the app can send the user to next. */
 enum class StepId {
-    WEIGH_IN,
     AI_SCAN,
     CHOOSE_SPORTS,
     PICK_FOODS,
     TODAYS_SESSION,
-    WEEKLY_WEIGH_IN,
-    RESCAN,
+    WEEKLY_CHECK_IN,
 }
 
 /**
@@ -29,11 +27,11 @@ data class JourneyStep(
  * What the app knows about where the user is. Gathered from every feature; nothing here is
  * asked for.
  *
- * @param daysSinceWeight / [daysSinceScan] null when there has never been one
+ * @param daysSinceScan null when there has never been one. The scan is also where weight is
+ *   entered, so this is the age of the weight too.
  * @param todaysSession the first session planned for today, null on a rest day or with no week
  */
 data class JourneyFacts(
-    val daysSinceWeight: Long?,
     val daysSinceScan: Long?,
     val hasWeek: Boolean,
     val hasFavourites: Boolean,
@@ -42,7 +40,7 @@ data class JourneyFacts(
 )
 
 /**
- * @param setup the four steps that switch the whole app on, in order
+ * @param setup the three steps that switch the whole app on, in order
  * @param next the single thing to do now; null when everything for today is done
  */
 data class Journey(val setup: List<JourneyStep>, val next: JourneyStep?) {
@@ -53,53 +51,43 @@ data class Journey(val setup: List<JourneyStep>, val next: JourneyStep?) {
 /**
  * The order the app is used in, and the one next step.
  *
- * **Setup, like dominoes.** Each step feeds the next: a weight gives the nutrition plan its
- * size; the AI scan gives body fat (so resting burn is personal) and weak points (so the
- * programme knows what to prioritise); the sports give the week, which gives nutrition its
- * activity; the favourite foods turn the numbers into meals. Asked in any other order, a step
- * would be built on a guess the next step then has to undo.
+ * **Setup, like dominoes.** The AI scan comes first and takes the weight with it — one visit
+ * gives body fat, lean mass, weight and weak points, everything the rest is sized from. The
+ * sports give the week, which gives nutrition its activity; the favourite foods turn the
+ * numbers into meals.
  *
- * **Then the daily loop.** Today's session if one is planned and not yet logged; a weigh-in
- * once a week, because the weekly trend is what corrects the calories; a rescan every two weeks,
- * because that is about as fast as a body visibly changes.
+ * **Then the daily loop.** Today's session if one is planned and not yet logged, and a scan
+ * check-in once a week: the weekly weight is what corrects the calories, and the photo re-ranks
+ * the weak points.
  */
 object JourneyPlanner {
 
-    const val WEIGH_IN_EVERY_DAYS = 7
-    const val RESCAN_EVERY_DAYS = 14
+    const val CHECK_IN_EVERY_DAYS = 7
 
     fun plan(f: JourneyFacts): Journey {
         val setup = listOf(
             JourneyStep(
-                StepId.WEIGH_IN, "Log your weight", "The one number everything else is sized from.",
-                "Log weight", "Your nutrition plan", done = f.daysSinceWeight != null,
-            ),
-            JourneyStep(
-                StepId.AI_SCAN, "AI body scan", "Body fat, lean mass and your strong and weak muscle groups.",
-                "Start scan", "Personal calories and your training priorities", done = f.daysSinceScan != null,
+                StepId.AI_SCAN, "AI body scan", "Your weight and one photo — body fat, lean mass and weak points.",
+                "Start scan", "Your calories and training priorities", done = f.daysSinceScan != null,
             ),
             JourneyStep(
                 StepId.CHOOSE_SPORTS, "Choose your sports", "Gym, calisthenics, Pilates, running — one or a mix.",
-                "Build my week", "Your weekly programme and its calorie burn", done = f.hasWeek,
+                "Build my week", "Your weekly programme", done = f.hasWeek,
             ),
             JourneyStep(
-                StepId.PICK_FOODS, "Pick your favourite foods", "Your week of meals is built from them.",
-                "Pick foods", "A 7-day meal plan that hits your targets", done = f.hasFavourites,
+                StepId.PICK_FOODS, "Pick favourite foods", "Your week of meals is built from them.",
+                "Pick foods", "Your 7-day meal plan", done = f.hasFavourites,
             ),
         )
 
         val next = setup.firstOrNull { !it.done } ?: when {
             f.todaysSession != null && !f.loggedToday -> JourneyStep(
-                StepId.TODAYS_SESSION, "Today: ${f.todaysSession}", "Log it as you go — your next session and your calories adjust from it.",
-                "Start & log", "Progression, weekly volume and nutrition", done = false,
+                StepId.TODAYS_SESSION, f.todaysSession, "Log it as you go — your next session and calories adjust.",
+                "Start workout", "Progression and nutrition", done = false,
             )
-            (f.daysSinceWeight ?: 0) >= WEIGH_IN_EVERY_DAYS -> JourneyStep(
-                StepId.WEEKLY_WEIGH_IN, "Weekly weigh-in", "It's been ${f.daysSinceWeight} days. The weekly trend is what corrects your calories.",
-                "Log weight", "The nutrition check-in", done = false,
-            )
-            (f.daysSinceScan ?: 0) >= RESCAN_EVERY_DAYS -> JourneyStep(
-                StepId.RESCAN, "Rescan with the AI", "It's been ${f.daysSinceScan} days — see what moved and re-rank your weak points.",
-                "Rescan", "Updated body fat, weak points and plan", done = false,
+            (f.daysSinceScan ?: 0) >= CHECK_IN_EVERY_DAYS -> JourneyStep(
+                StepId.WEEKLY_CHECK_IN, "Weekly check-in", "${f.daysSinceScan} days since your last scan — weight and photo.",
+                "Start check-in", "Updated calories and weak points", done = false,
             )
             else -> null
         }
