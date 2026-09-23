@@ -171,6 +171,9 @@ interface PhysiqueDao {
     @Query("SELECT * FROM physique_reads ORDER BY epochDay DESC LIMIT 1")
     suspend fun latest(): PhysiqueReadEntity?
 
+    @Query("SELECT * FROM physique_reads WHERE epochDay = :epochDay")
+    suspend fun on(epochDay: Long): PhysiqueReadEntity?
+
     @Query("SELECT * FROM physique_reads WHERE epochDay < :epochDay ORDER BY epochDay DESC LIMIT 1")
     suspend fun before(epochDay: Long): PhysiqueReadEntity?
 

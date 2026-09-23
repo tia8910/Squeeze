@@ -92,6 +92,11 @@ data class DetectedBody(
      */
     val partMaskRead: Boolean = false,
     /**
+     * Share of each muscle group's region that is bare skin, from the part model. A group
+     * mostly under clothing is not judged by the physique analysis. Empty without a part mask.
+     */
+    val visibility: Map<com.squeeze.core.scan.MuscleGroup, Double> = emptyMap(),
+    /**
      * Why the part model found no neck, when it ran and found none.
      *
      * Named because each reason asks something different of the person holding the camera,
@@ -434,8 +439,11 @@ class BodyDetector @Inject constructor(
                     val partMask =
                         partSegmenter?.segment(partImage)?.categoryMask()?.orElse(null)
                     partMask?.let {
-                        PartMaskReader.readNeck(it, pose) to
-                            PartMaskReader.bareAbdomenFraction(it, pose)
+                        Triple(
+                            PartMaskReader.readNeck(it, pose),
+                            PartMaskReader.bareAbdomenFraction(it, pose),
+                            PartMaskReader.visibility(it, pose),
+                        )
                     }
                 } finally {
                     if (small !== bitmap) small.recycle()
@@ -491,6 +499,7 @@ class BodyDetector @Inject constructor(
                     neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
+                    visibility = parts?.third.orEmpty(),
                 ),
             )
         }
@@ -548,6 +557,7 @@ class BodyDetector @Inject constructor(
                     neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
+                    visibility = parts?.third.orEmpty(),
                 ),
             )
         }
@@ -578,6 +588,7 @@ class BodyDetector @Inject constructor(
                     neckRefusal = (parts?.first as? NeckOutcome.Refused)?.reason,
                     bareAbdomenFraction = parts?.second,
                     partMaskRead = parts != null,
+                    visibility = parts?.third.orEmpty(),
                 ),
             )
         }

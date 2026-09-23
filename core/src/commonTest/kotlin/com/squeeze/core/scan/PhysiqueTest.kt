@@ -112,4 +112,61 @@ class PhysiqueTest {
         assertFalse(MuscleGroup.LEGS in regions)
         assertTrue(MuscleGroup.CHEST in regions)
     }
+
+    // The user's own scan: abs defined, the rest average, thighs in shorts.
+    private val shorts = mapOf(
+        MuscleGroup.ABS to 0.87,
+        MuscleGroup.V_TAPER to 0.42,
+        MuscleGroup.CHEST to 0.42,
+        MuscleGroup.SHOULDERS to 0.41,
+        MuscleGroup.ARMS to 0.37,
+        MuscleGroup.LEGS to 0.17,
+    )
+
+    @Test
+    fun `a group under clothing is neither scored nor called weak`() {
+        val report = assertNotNull(
+            PhysiqueAnalysis.report(shorts, Goal.RECOMP, hidden = setOf(MuscleGroup.LEGS)),
+        )
+        assertFalse(MuscleGroup.LEGS in report.weaknesses)
+        assertFalse(report.scores.any { it.group == MuscleGroup.LEGS })
+        assertEquals(listOf(MuscleGroup.LEGS), report.hidden)
+    }
+
+    @Test
+    fun `measured strengths join the AI's, and win over an average AI read`() {
+        val report = assertNotNull(
+            PhysiqueAnalysis.report(
+                shorts, Goal.RECOMP,
+                hidden = setOf(MuscleGroup.LEGS),
+                measuredStrong = mapOf(MuscleGroup.V_TAPER to "Chest 1.65× your waist.", MuscleGroup.LEGS to "Quads ahead."),
+            ),
+        )
+        assertTrue(MuscleGroup.ABS in report.strengths)
+        assertTrue(MuscleGroup.V_TAPER in report.strengths)
+        assertFalse(MuscleGroup.V_TAPER in report.weaknesses)
+        // A girth taken through shorts is the shorts' girth.
+        assertFalse(MuscleGroup.LEGS in report.strengths)
+        assertTrue(report.strengthEvidence.getValue(MuscleGroup.V_TAPER).contains("1.65"))
+    }
+
+    @Test
+    fun `a group clearly ahead of the rest is a strength even when average`() {
+        val scores = mapOf(
+            MuscleGroup.V_TAPER to 0.55,
+            MuscleGroup.CHEST to 0.40,
+            MuscleGroup.SHOULDERS to 0.38,
+            MuscleGroup.ARMS to 0.36,
+        )
+        val report = assertNotNull(PhysiqueAnalysis.report(scores, Goal.HYPERTROPHY))
+        assertEquals(listOf(MuscleGroup.V_TAPER), report.strengths)
+    }
+
+    @Test
+    fun `nothing is hidden without a part mask, and bare regions are kept`() {
+        val all = MuscleGroup.entries.toSet()
+        assertTrue(PhysiqueAnalysis.hiddenGroups(emptyMap(), all).isEmpty())
+        val hidden = PhysiqueAnalysis.hiddenGroups(mapOf(MuscleGroup.LEGS to 0.2, MuscleGroup.CHEST to 0.9), setOf(MuscleGroup.LEGS, MuscleGroup.CHEST))
+        assertEquals(setOf(MuscleGroup.LEGS), hidden)
+    }
 }

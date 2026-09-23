@@ -118,7 +118,7 @@ class CoachRepository @Inject constructor(
         val sessionsDone = activityDao.since(monday).size
         val setsDone = workoutDao.since(monday).size
         val goal = profileDao.get()?.let { runCatching { Goal.valueOf(it.goal) }.getOrNull() } ?: Goal.HYPERTROPHY
-        val report = latestPhysique()?.let { PhysiqueAnalysis.report(it, goal) }
+        val report = latestReport(goal)
         val nutrition = nutritionPlan()
         return DashboardSummary(
             journey = journey(),
@@ -255,15 +255,58 @@ class CoachRepository @Inject constructor(
 
 
     /** Stores the AI's per-group scores from a saved scan. */
-    suspend fun savePhysique(epochDay: Long, goal: Goal, scores: Map<MuscleGroup, Double>) {
+    suspend fun savePhysique(
+        epochDay: Long,
+        goal: Goal,
+        scores: Map<MuscleGroup, Double>,
+        hidden: Set<MuscleGroup> = emptySet(),
+    ) {
         if (scores.isEmpty()) return
         physiqueDao.upsert(
             PhysiqueReadEntity(
                 epochDay = epochDay,
                 goal = goal.name,
-                scores = scores.entries.joinToString(",") { (g, s) -> "${g.name}=$s" },
+                // Hidden groups are stored as such, so a covered group stays unjudged later
+                // rather than being re-derived from a girth taken through clothing.
+                scores = (scores.entries.map { (g, s) -> "${g.name}=$s" } + hidden.map { "${it.name}=$HIDDEN" })
+                    .joinToString(","),
             ),
         )
+    }
+
+    /** The saved physique read for [epochDay], with its hidden groups; null if none. */
+    suspend fun physiqueOn(epochDay: Long): PhysiqueRead? =
+        physiqueDao.on(epochDay)?.let { PhysiqueRead(decode(it), decodeHidden(it)) }
+
+    /** The full report for a saved read: AI scores, hidden groups and the day's measurements. */
+    suspend fun physiqueReport(read: PhysiqueRead, circumferences: com.squeeze.core.model.Circumferences?): com.squeeze.core.scan.PhysiqueReport? {
+        val profile = profileDao.get() ?: return null
+        val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
+        val (strong, weak) = circumferences
+            ?.let { com.squeeze.core.bodycomp.MeasuredParts.from(it, Sex.valueOf(profile.sex)) }
+            ?: (emptyMap<MuscleGroup, String>() to emptyMap())
+        return PhysiqueAnalysis.report(read.scores, goal, read.hidden, strong, weak)
+    }
+
+    /** The latest read, as a report with the latest measurements folded in. */
+    private suspend fun latestReport(goal: Goal): com.squeeze.core.scan.PhysiqueReport? {
+        val entity = physiqueDao.latest() ?: return null
+        val latest = measurementDao.since(Long.MIN_VALUE)
+            .filter { it.chestCm != null && it.waistCm != null }
+            .maxByOrNull { it.epochDay }
+        val c = latest?.let {
+            com.squeeze.core.model.Circumferences(
+                neckCm = it.neckCm, waistCm = it.waistCm, hipCm = it.hipCm, chestCm = it.chestCm,
+                thighCm = it.thighCm, armCm = it.armCm, calfCm = it.calfCm,
+            )
+        }
+        val profile = profileDao.get()
+        val (strong, weak) = if (c != null && profile != null) {
+            com.squeeze.core.bodycomp.MeasuredParts.from(c, Sex.valueOf(profile.sex))
+        } else {
+            emptyMap<MuscleGroup, String>() to emptyMap()
+        }
+        return PhysiqueAnalysis.report(decode(entity), goal, decodeHidden(entity), strong, weak)
     }
 
     /** The most recent physique read, or null before the first AI scan. */
@@ -294,7 +337,7 @@ class CoachRepository @Inject constructor(
      */
     suspend fun aiWeakPoints(goal: Goal): List<WeakPoint> {
         val scores = latestPhysique() ?: return emptyList()
-        val report = PhysiqueAnalysis.report(scores, goal) ?: return emptyList()
+        val report = latestReport(goal) ?: return emptyList()
         return report.focus.flatMap { advice ->
             val score = scores[advice.group] ?: 0.0
             trainingGroups(advice.group).map { group ->
@@ -312,8 +355,7 @@ class CoachRepository @Inject constructor(
 
     /** The groups the AI flagged, by name, for the nutrition plan's explanation. */
     private suspend fun aiWeakGroupNames(goal: Goal): List<String> {
-        val scores = latestPhysique() ?: return emptyList()
-        return PhysiqueAnalysis.report(scores, goal)?.weaknesses
+        return latestReport(goal)?.weaknesses
             ?.map { it.label.lowercase() }
             .orEmpty()
     }
@@ -380,6 +422,13 @@ class CoachRepository @Inject constructor(
         )
     }
 
+    private fun decodeHidden(read: PhysiqueReadEntity): Set<MuscleGroup> =
+        read.scores.split(",").mapNotNull { pair ->
+            val (name, value) = pair.split("=").takeIf { it.size == 2 } ?: return@mapNotNull null
+            if (value != HIDDEN) return@mapNotNull null
+            runCatching { MuscleGroup.valueOf(name) }.getOrNull()
+        }.toSet()
+
     private fun decode(read: PhysiqueReadEntity): Map<MuscleGroup, Double> =
         read.scores.split(",").mapNotNull { pair ->
             val (name, value) = pair.split("=").takeIf { it.size == 2 } ?: return@mapNotNull null
@@ -398,6 +447,8 @@ class CoachRepository @Inject constructor(
 
     private companion object {
         const val DEFAULT_TRAINING_DAYS = 4
+
+        const val HIDDEN = "hidden"
 
         /** Used for calorie estimates only until a first weight is logged. */
         const val DEFAULT_WEIGHT_KG = 75.0
@@ -429,6 +480,9 @@ data class DashboardSummary(
     val microGaps: List<String>,
     val goalRate: Double?,
 )
+
+/** A saved AI physique read: scores for the groups it could see, and the ones it could not. */
+data class PhysiqueRead(val scores: Map<MuscleGroup, Double>, val hidden: Set<MuscleGroup>)
 
 /** One muscle group's week: sets logged since Monday against sets planned. */
 data class VolumeRow(val group: TrainingGroup, val done: Int, val planned: Int, val weakPoint: Boolean)

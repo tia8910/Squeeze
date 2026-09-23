@@ -33,6 +33,7 @@ import com.squeeze.core.scan.CropRegion
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
+import com.squeeze.core.bodycomp.MeasuredParts
 import com.squeeze.core.scan.PhysiqueRegions
 import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.model.Goal
@@ -745,7 +746,11 @@ class ScanViewModel @Inject constructor(
         // Then each muscle group on a crop of its own, read against the goal the user set.
         // The scanner follows along: the group being judged is outlined on the photograph,
         // and its score appears the moment it is known.
-        val muscleRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
+        // Only groups the photo actually shows: a region that is mostly clothing, by the part
+        // model's reading, is skipped rather than judged — thighs in shorts are the shorts.
+        val allRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
+        val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys)
+        val muscleRegions = allRegions - hidden
         var live = scanner?.copy(
             stage = ScannerStage.MUSCLES,
             reading = reading,
@@ -770,7 +775,9 @@ class ScanViewModel @Inject constructor(
                     )
                 }
                 val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
-                PhysiqueAnalysis.report(scores, goal)
+                val (measuredStrong, measuredWeak) =
+                    MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
+                PhysiqueAnalysis.report(scores, goal, hidden, measuredStrong, measuredWeak)
             }
 
         // The verdict stays up for a moment, beside the bodies it was weighed against,
@@ -935,6 +942,7 @@ class ScanViewModel @Inject constructor(
                     epochDay = LocalDate.now().toEpochDay(),
                     goal = report.goal,
                     scores = report.scores.associate { it.group to it.score },
+                    hidden = report.hidden.toSet(),
                 )
             }
             _state.value = _state.value.copy(saved = true)

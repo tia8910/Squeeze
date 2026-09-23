@@ -84,6 +84,21 @@ object PartMaskReader {
         return BodyPartMap.bareSkinFraction(labels, width, height, shoulderRow, hipRow)
     }
 
+    /**
+     * How much of each muscle group's region is bare skin, 0 to 1 — see
+     * [BodyPartMap.regionSkinFraction]. Groups with no region, or no body in it, are absent.
+     */
+    fun visibility(mask: MPImage, geometry: FrontPoseGeometry): Map<com.squeeze.core.scan.MuscleGroup, Double> {
+        val width = mask.width
+        val height = mask.height
+        if (width <= 0 || height <= 0) return emptyMap()
+        val labels = copyLabels(mask, width, height) ?: return emptyMap()
+        return com.squeeze.core.scan.PhysiqueRegions.regions(geometry).mapNotNull { (group, boxes) ->
+            val fractions = boxes.mapNotNull { BodyPartMap.regionSkinFraction(labels, width, height, it) }
+            fractions.takeIf { it.isNotEmpty() }?.let { group to it.average() }
+        }.toMap()
+    }
+
     private fun copyLabels(mask: MPImage, width: Int, height: Int): ByteArray? {
         val buffer = ByteBufferExtractor.extract(mask)
         val pixels = width * height

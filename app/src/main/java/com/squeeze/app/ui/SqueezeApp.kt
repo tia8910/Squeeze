@@ -280,6 +280,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
                         summary = state.summary,
+                        physiqueFor = viewModel::physiqueFor,
                         onStep = goToStep,
                         onOpenTraining = { goToTab(Destination.TRAINING) },
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },

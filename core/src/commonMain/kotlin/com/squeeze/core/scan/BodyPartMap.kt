@@ -414,6 +414,34 @@ object BodyPartMap {
      * @return null when neither skin nor clothing is present in the band at all, i.e. the
      *   rows are background and there is nothing to take a share of
      */
+    /**
+     * Share of the body inside [region] that is bare skin rather than clothing, or null when
+     * the box holds neither — the landmarks put it somewhere that is not a body.
+     *
+     * What decides whether a muscle group can be judged at all: thighs in shorts are cloth to
+     * the model, and a verdict on cloth is a verdict on the shorts.
+     */
+    fun regionSkinFraction(labels: ByteArray, width: Int, height: Int, region: CropRegion): Double? {
+        if (width <= 0 || height <= 0 || labels.size < width * height) return null
+        val x0 = (region.left * width).toInt().coerceIn(0, width - 1)
+        val x1 = (region.right * width).toInt().coerceIn(0, width - 1)
+        val y0 = (region.top * height).toInt().coerceIn(0, height - 1)
+        val y1 = (region.bottom * height).toInt().coerceIn(0, height - 1)
+        if (x0 >= x1 || y0 >= y1) return null
+        var skin = 0
+        var clothed = 0
+        for (row in y0..y1) {
+            for (column in x0..x1) {
+                when (labels[row * width + column].toInt()) {
+                    BODY_SKIN -> skin++
+                    CLOTHES -> clothed++
+                }
+            }
+        }
+        val total = skin + clothed
+        return if (total == 0) null else skin.toDouble() / total
+    }
+
     fun bareSkinFraction(
         labels: ByteArray,
         width: Int,

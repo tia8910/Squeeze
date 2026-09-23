@@ -92,6 +92,7 @@ fun CompositionScreen(
     modifier: Modifier = Modifier,
     /** The journey's next step and a line from every feature; null until first loaded. */
     summary: com.squeeze.app.data.DashboardSummary? = null,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
     onStep: (com.squeeze.core.coach.StepId) -> Unit = {},
     onOpenNutrition: () -> Unit = {},
     onOpenTraining: () -> Unit = {},
@@ -128,7 +129,7 @@ fun CompositionScreen(
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
             }
             return@Column
         }
@@ -214,7 +215,7 @@ fun CompositionScreen(
         // dashboard it described whichever fields happened to be newest across different
         // sessions, which is a fine answer to "where am I now" and a poor thing to call an
         // analysis, because no single measurement ever produced that combination.
-        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
 
         repeatability?.let { RepeatabilityCard(it) }
     }
@@ -412,6 +413,7 @@ private fun HistorySection(
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onDelete: (MeasurementEntity) -> Unit,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
 ) {
     if (measurements.isEmpty()) return
 
@@ -488,6 +490,7 @@ private fun HistorySection(
                 selected = null
             },
             onDismiss = { selected = null },
+            physiqueFor = physiqueFor,
         )
     }
 }

@@ -174,6 +174,12 @@ data class PhysiqueReport(
     val weaknesses: List<MuscleGroup>,
     val focus: List<FocusAdvice>,
     val summary: String,
+    /** Groups the photo did not show well enough to judge — covered, or out of frame. */
+    val hidden: List<MuscleGroup> = emptyList(),
+    /** Why each strength is one: what the AI saw, what was measured, or both. */
+    val strengthEvidence: Map<MuscleGroup, String> = emptyMap(),
+    /** What the measurements add to a weak point, when they agree with the AI. */
+    val weaknessEvidence: Map<MuscleGroup, String> = emptyMap(),
 )
 
 /**
@@ -203,22 +209,76 @@ object PhysiqueAnalysis {
         else -> Development.AVERAGE
     }
 
-    /** Null when no group could be read. */
-    fun report(scores: Map<MuscleGroup, Double>, goal: Goal): PhysiqueReport? {
+    /** Below this share of bare skin, a group's region is clothing and is not judged. */
+    const val MIN_VISIBLE = 0.5
+
+    /**
+     * A group ahead of the rest of this physique by at least this much counts as a relative
+     * strength even below [DEVELOPED_AT] — "your back is your best area" is true and useful
+     * for someone whose whole physique is average.
+     */
+    private const val RELATIVE_LEAD = 0.08
+    private const val RELATIVE_MIN = 0.45
+
+    /**
+     * Strengths and weak points from everything known about this body.
+     *
+     * **Only what the photo shows.** [hidden] groups — under clothing or out of frame — are
+     * not scored, not ranked, and not named a weakness. The first version judged thighs in a
+     * pair of shorts and put them first among the weak points; that was a verdict on the
+     * shorts. The same goes for measured findings about a hidden group: a thigh girth taken
+     * through cloth is the cloth's girth.
+     *
+     * **Every strength, not only the obvious one.** A group is a strength when the AI sees it
+     * developed, when it clearly leads the rest of this physique, or when the measurements
+     * say so ([measuredStrong]: proportions like chest-to-waist, which read the V-taper more
+     * directly than any photo impression). When the AI and the tape disagree about a group,
+     * the tape wins the strength and the group is not called weak.
+     *
+     * **Abs are never a relative strength.** The abdominal descriptions score every stomach a
+     * little high — next to "a smooth stomach" any stomach looks firm — so abs count only
+     * when the AI reads them developed outright.
+     */
+    fun report(
+        scores: Map<MuscleGroup, Double>,
+        goal: Goal,
+        hidden: Set<MuscleGroup> = emptySet(),
+        measuredStrong: Map<MuscleGroup, String> = emptyMap(),
+        measuredWeak: Map<MuscleGroup, String> = emptyMap(),
+    ): PhysiqueReport? {
         val read = scores
+            .filterKeys { it !in hidden }
             .filterValues { it.isFinite() }
             .map { (group, score) -> MuscleScore(group, score.coerceIn(0.0, 1.0), development(score)) }
             .sortedByDescending { it.score }
-        if (read.isEmpty()) return null
+        if (read.isEmpty() && measuredStrong.isEmpty()) return null
 
-        val strengths = read.filter { it.development == Development.DEVELOPED }.map { it.group }
+        val mean = read.map { it.score }.average().takeIf { it.isFinite() } ?: 0.0
+        val evidence = linkedMapOf<MuscleGroup, String>()
+        read.filter { it.development == Development.DEVELOPED }.forEach {
+            evidence[it.group] = "Looks developed to the AI (${pct(it.score)}/100)."
+        }
+        read.filter {
+            it.group != MuscleGroup.ABS && it.group !in evidence &&
+                it.score >= RELATIVE_MIN && it.score >= mean + RELATIVE_LEAD
+        }.forEach {
+            evidence[it.group] = "Ahead of the rest of your physique (${pct(it.score)}/100 against an average of ${pct(mean)})."
+        }
+        measuredStrong.filterKeys { it !in hidden }.forEach { (group, why) ->
+            evidence[group] = evidence[group]?.let { "$it $why" } ?: why
+        }
+        val strengths = evidence.keys.toList()
 
-        // Need: how far a group is from developed, weighted by how much the goal cares.
-        val weaknesses = read
-            .filter { it.development != Development.DEVELOPED }
-            .sortedByDescending { importance(goal, it.group) * (1.0 - it.score) }
+        // Need: how far a group is from developed, weighted by how much the goal cares, with
+        // a nudge when the measurements agree it is behind.
+        val scoreOf = read.associate { it.group to it.score }
+        val candidates = (read.filter { it.development != Development.DEVELOPED }.map { it.group } +
+            measuredWeak.keys).distinct().filter { it !in strengths && it !in hidden }
+        val weaknesses = candidates
+            .sortedByDescending { g ->
+                importance(goal, g) * (1.0 - (scoreOf[g] ?: 0.4)) + if (g in measuredWeak) 0.1 else 0.0
+            }
             .take(MAX_WEAKNESSES)
-            .map { it.group }
 
         return PhysiqueReport(
             goal = goal,
@@ -227,8 +287,21 @@ object PhysiqueAnalysis {
             weaknesses = weaknesses,
             focus = weaknesses.map { FocusAdvice(it, why(goal, it), how(goal, it)) },
             summary = summary(goal, weaknesses.isEmpty(), strengths.isEmpty()),
+            hidden = hidden.sortedBy { it.ordinal },
+            strengthEvidence = evidence,
+            weaknessEvidence = measuredWeak.filterKeys { it in weaknesses },
         )
     }
+
+    /** The groups a scan's part mask shows too little skin of to judge. */
+    fun hiddenGroups(visibility: Map<MuscleGroup, Double>, regions: Set<MuscleGroup>): Set<MuscleGroup> =
+        if (visibility.isEmpty()) {
+            emptySet()
+        } else {
+            regions.filter { (visibility[it] ?: 0.0) < MIN_VISIBLE }.toSet()
+        }
+
+    private fun pct(v: Double) = (v * 100).toInt()
 
     private const val MAX_WEAKNESSES = 2
 

@@ -626,6 +626,8 @@ fun PhysiqueCard(
     report: PhysiqueReport,
     modifier: Modifier = Modifier,
     previous: Pair<Long, Map<MuscleGroup, Double>>? = null,
+    /** Whole-body findings from the measurements — waist-to-height, body fat, lean mass. */
+    measured: List<com.squeeze.core.bodycomp.BodyFinding> = emptyList(),
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -677,13 +679,30 @@ fun PhysiqueCard(
                 }
             }
 
+            if (report.hidden.isNotEmpty()) {
+                Text(
+                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered by " +
+                        "clothing or out of frame in this photo. Scan with them bare to include them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             Text("Strengths", style = MaterialTheme.typography.titleSmall)
-            Text(
-                report.strengths.takeIf { it.isNotEmpty() }
-                    ?.joinToString { it.label }
-                    ?: "None stands out yet — that is normal early on, and it is what training fixes.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (report.strengths.isEmpty()) {
+                Text(
+                    "None stands out yet — that is normal early on, and it is what training fixes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            report.strengths.forEach { group ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("✓ ${group.label}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    report.strengthEvidence[group]?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
 
             Text("Weak points for your goal", style = MaterialTheme.typography.titleSmall)
             if (report.focus.isEmpty()) {
@@ -700,11 +719,28 @@ fun PhysiqueCard(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(advice.why, style = MaterialTheme.typography.bodyMedium)
+                    report.weaknessEvidence[advice.group]?.let {
+                        Text("Measured: $it", style = MaterialTheme.typography.bodySmall)
+                    }
                     Text(
                         advice.how,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            if (measured.isNotEmpty()) {
+                Text("From your measurements", style = MaterialTheme.typography.titleSmall)
+                measured.forEach { finding ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            (if (finding.kind == com.squeeze.core.bodycomp.FindingKind.STRENGTH) "✓ " else "! ") + finding.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(finding.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
 
