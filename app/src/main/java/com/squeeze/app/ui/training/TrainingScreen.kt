@@ -1,6 +1,11 @@
 package com.squeeze.app.ui.training
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import com.squeeze.core.program.BlockOverview
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -167,38 +172,94 @@ fun TrainingScreen(
 
 @Composable
 private fun MesocycleView(state: TrainingUiState, viewModel: TrainingViewModel) {
-        state.mesocycle?.let { mesocycle ->
-            Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)
+    val mesocycle = state.mesocycle ?: return
+    val summaries = BlockOverview.weeks(mesocycle)
+    val selected = state.selectedWeek.coerceIn(0, (mesocycle.weeks.size - 1).coerceAtLeast(0))
 
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                mesocycle.weeks.forEachIndexed { index, week ->
-                    FilterChip(
-                        selected = state.selectedWeek == index,
-                        onClick = { viewModel.selectWeek(index) },
-                        label = { Text(if (week.isDeload) "Deload" else "Week ${index + 1}") },
-                    )
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(mesocycle.name, style = MaterialTheme.typography.titleLarge)
+
+        // The block's shape in one picture: how much work each week holds, rising to the
+        // peak and dropping for the deload. The chips it replaces said "Week 1 … Deload"
+        // and nothing about what changes between them. Each bar is also the week picker.
+        WeekStrip(summaries, selected, onSelect = viewModel::selectWeek)
+
+        summaries.getOrNull(selected)?.let { summary ->
+            mesocycle.weeks.getOrNull(selected)?.let { week ->
+                WeekDetail(week, summary, weeks = summaries.size)
             }
+        }
 
-            mesocycle.weeks.getOrNull(state.selectedWeek)?.let { WeekDetail(it) }
-
-            if (mesocycle.notes.isNotEmpty()) {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text("How to run this", style = MaterialTheme.typography.titleSmall)
-                        mesocycle.notes.forEach {
-                            Text("• $it", style = MaterialTheme.typography.bodySmall)
-                        }
+        if (mesocycle.notes.isNotEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text("How to run this", style = MaterialTheme.typography.titleSmall)
+                    mesocycle.notes.forEach {
+                        Text("• $it", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
+    }
+}
+
+/** One bar per week, height by total sets; tap to open that week. */
+@Composable
+private fun WeekStrip(
+    weeks: List<BlockOverview.WeekSummary>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val most = weeks.maxOfOrNull { it.totalSets }?.coerceAtLeast(1) ?: 1
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.Bottom,
+    ) {
+        weeks.forEachIndexed { index, week ->
+            val isSelected = index == selected
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                    )
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    "${week.totalSets}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .width(22.dp)
+                        .height((56f * week.totalSets / most).coerceAtLeast(6f).dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                        .background(if (isSelected) accent else accent.copy(alpha = if (week.isDeload) 0.18f else 0.35f)),
+                )
+                Text(
+                    if (week.isDeload) "Deload" else "Wk ${index + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    Text(
+        "Hard sets per week. Volume builds, then the deload lets it pay off.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -250,62 +311,139 @@ private fun SetupSection(state: TrainingUiState, viewModel: TrainingViewModel) {
 }
 
 @Composable
-private fun WeekDetail(week: TrainingWeek) {
+private fun WeekDetail(week: TrainingWeek, summary: BlockOverview.WeekSummary, weeks: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (week.isDeload) {
-            InfoCard(
-                title = "Deload week",
-                body = "Volume drops to maintenance and effort backs off. This is scheduled, " +
-                    "not earned: waiting until you feel you need one costs two weeks of progress.",
+        // The week in one card: where it sits in the block, how much it holds, and how hard
+        // to push — said once, in words, instead of "@ 3 RIR" repeated on every row.
+        BrandCard(Modifier.fillMaxWidth()) {
+            Text(
+                if (summary.isDeload) "Deload · week ${summary.weekIndex + 1} of $weeks" else "Week ${summary.weekIndex + 1} of $weeks",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
+            Text(
+                "${summary.sessions} sessions · ${summary.totalSets} hard sets",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            summary.rir?.let {
+                Text(
+                    BlockOverview.effortSentence(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            if (summary.isDeload) {
+                Text(
+                    "Volume drops to maintenance and effort backs off. This is scheduled, " +
+                        "not earned: waiting until you feel you need one costs two weeks of progress.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
 
-        week.sessions.forEach { SessionCard(it) }
+        week.sessions.forEachIndexed { index, session ->
+            SessionCard(session, dayNumber = index + 1, weekRir = summary.rir)
+        }
+    }
+}
+
+/**
+ * One gym day, organised the way it is run: what it trains and how long it takes, then the
+ * heavy lifts to do first and fresh, then the accessories.
+ */
+@Composable
+private fun SessionCard(session: Session, dayNumber: Int, weekRir: Int?) {
+    val summary = BlockOverview.session(session)
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "DAY $dayNumber",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(session.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                    Text("~${summary.minutes} min", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "${session.totalSets} sets",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Text(
+                summary.focus.joinToString(" · ") { BlockOverview.label(it) },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            var number = 0
+            if (summary.main.isNotEmpty()) {
+                ExerciseGroupHeader("Main lifts", "Heavy — do these first, while fresh")
+                summary.main.forEach { ExerciseRow(++number, it, weekRir) }
+            }
+            if (summary.accessory.isNotEmpty()) {
+                ExerciseGroupHeader("Accessories", "Lighter — control the weight, chase the pump")
+                summary.accessory.forEach { ExerciseRow(++number, it, weekRir) }
+            }
+        }
     }
 }
 
 @Composable
-private fun SessionCard(session: Session) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(session.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "${session.totalSets} sets",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+private fun ExerciseGroupHeader(title: String, caption: String) {
+    Column(Modifier.padding(top = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
 
-            session.prescriptions.forEach { prescription ->
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = prescription.exerciseName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        // Sets × reps @ RIR. The load is deliberately absent: the programme
-                        // prescribes proximity to failure and the lifter picks the weight,
-                        // which is both safer and more accurate than a percentage table.
-                        text = "%d × %d–%d @ %d RIR".format(
-                            prescription.sets,
-                            prescription.repRangeLow,
-                            prescription.repRangeHigh,
-                            prescription.targetRir,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
+@Composable
+private fun ExerciseRow(number: Int, prescription: com.squeeze.core.program.SetPrescription, weekRir: Int?) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Text(
+            "$number",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(22.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(prescription.exerciseName, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                BlockOverview.label(prescription.muscleGroup) +
+                    // Only when it differs from the week's: a number repeated on every row
+                    // is a number nobody reads.
+                    if (weekRir == null || prescription.targetRir != weekRir) " · stop ${prescription.targetRir} short" else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        // Sets × reps. The load is deliberately absent: the programme prescribes proximity to
+        // failure and the lifter picks the weight, which is safer and more accurate than a
+        // percentage table.
+        Text(
+            "${prescription.sets} × ${prescription.repRangeLow}–${prescription.repRangeHigh}",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
     }
 }
 
