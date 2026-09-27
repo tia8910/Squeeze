@@ -169,7 +169,7 @@ class CoachRepository @Inject constructor(
                 null
             } else {
                 todaysSessions(week).takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.title }
-                    ?: "Rest day — recovery is part of the plan"
+                    ?: "Rest day. Recovery is part of the plan."
             },
             sessionsDone = sessionsDone,
             sessionsPlanned = week?.days?.sumOf { it.sessions.size },

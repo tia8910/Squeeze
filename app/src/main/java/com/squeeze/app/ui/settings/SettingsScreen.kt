@@ -182,7 +182,7 @@ private fun AboutCard() {
             )
         }
         Text(
-            text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
+            text = "Build ${BuildConfig.VERSION_CODE} · no internet permission. Verify it " +
                 "under App info › Permissions.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -256,7 +256,7 @@ private fun NotificationsSection() {
     SectionHeader(
         eyebrow = "Notifications",
         title = "Reminders",
-        caption = "At most one in the morning and one in the evening — only when there's something to do.",
+        caption = "At most one in the morning and one in the evening, only when there's something to do.",
     )
 
     if (!allowed) {

@@ -431,7 +431,7 @@ class ScanViewModel @Inject constructor(
                     "Your outline is hard to separate from the background."
 
                 DetectionFailure.ScaleUnreliable ->
-                    "The background is being counted as part of you — try a plainer wall."
+                    "The background is being counted as part of you. Try a plainer wall."
 
                 DetectionFailure.PhotoUnreadable -> "Waiting for the camera."
                 is DetectionFailure.NotFacingCamera -> reason.advice

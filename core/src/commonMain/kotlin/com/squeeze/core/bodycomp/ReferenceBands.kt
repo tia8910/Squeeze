@@ -64,7 +64,7 @@ object ReferenceBands {
             percent < essential -> ReferenceBand(
                 BandPosition.LOW,
                 "Below essential",
-                "Under the fat the body needs to function. Not a target — check the scan.",
+                "Under the fat the body needs to function. Not a target. Check the scan.",
             )
 
             percent <= (if (sex == Sex.MALE) 5.0 else 13.0) -> ReferenceBand(
@@ -141,8 +141,8 @@ object ReferenceBands {
 
             else -> ReferenceBand(
                 BandPosition.HIGH,
-                "Exceptional — check your inputs",
-                "Above the usual drug-free limit. A too-low body fat reading inflates it — check both inputs.",
+                "Exceptional, check inputs",
+                "Above the usual drug-free limit. A too-low body fat reading inflates it, so check both inputs.",
             )
         }
     }
@@ -176,7 +176,7 @@ object ReferenceBands {
         else -> ReferenceBand(
             BandPosition.HIGH,
             "High",
-            "Well above the healthy range — the measure most worth moving.",
+            "Well above the healthy range. The measure most worth moving.",
         )
     }
 
@@ -204,7 +204,7 @@ object ReferenceBands {
             else -> ReferenceBand(
                 BandPosition.HIGH,
                 "High",
-                "Over the WHO cut-off — the pattern most linked to metabolic risk.",
+                "Over the WHO cut-off, the pattern most linked to metabolic risk.",
             )
         }
     }

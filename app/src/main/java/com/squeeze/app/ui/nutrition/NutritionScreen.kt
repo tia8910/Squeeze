@@ -125,7 +125,7 @@ private fun NeedsScan(onScan: () -> Unit) {
     SectionHeader(
         title = "Your nutrition plan",
         eyebrow = "Nutrition",
-        caption = "Built from your own body — it starts with one scan.",
+        caption = "Built from your own body. It starts with one scan.",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Text(
@@ -192,7 +192,7 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
     val gaps = plan.micros.filter { it.short }
     if (gaps.isNotEmpty()) {
         Text(
-            "Watch this week: ${gaps.joinToString { it.nutrient.label.lowercase() }} — see Details.",
+            "Watch this week: ${gaps.joinToString { it.nutrient.label.lowercase() }}. See Details.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -233,7 +233,7 @@ private fun DetailsTab(
         }
     }
 
-    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
+    SectionHeader(title = "Change the plan", caption = "It follows these. Update them and it updates.")
     SecondaryButton(text = if (context.hasPhysique) "Scan check-in (weight + photo)" else "AI scan (weight + photo)", onClick = onScan)
     SecondaryButton(text = "Training · ${context.trainingDaysPerWeek} days a week", onClick = onOpenTraining)
     SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
@@ -346,7 +346,7 @@ private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewM
     }
     SectionHeader(
         title = "Your favourite foods",
-        caption = "Tick what you like to eat — your meals are built from them",
+        caption = "Tick what you like to eat. Your meals are built from them.",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

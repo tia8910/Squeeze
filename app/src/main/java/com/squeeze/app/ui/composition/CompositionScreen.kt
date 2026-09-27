@@ -237,7 +237,7 @@ private fun FilteredTrend(
     if (factor == null) {
         InfoCard(
             "Scan or weigh in once more and the trend appears here. One reading is a " +
-                "point — the direction only exists once there are two.",
+                "point; a direction needs two.",
         )
         return
     }
@@ -281,7 +281,7 @@ private fun FilteredTrend(
             // broken feature; naming what is missing turns it into an instruction.
             InfoCard(
                 "Only one ${factor.label.lowercase()} reading so far. One reading is a " +
-                    "point — the direction only exists once there are two.",
+                    "point; a direction needs two.",
             )
         }
     }
@@ -355,7 +355,7 @@ private fun HeroCard(
             text = if (calibration.isActive) {
                 "Calibrated to your own scan results."
             } else {
-                "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
+                "Uncalibrated. Add a DEXA or BodPod result to anchor it to your body."
             },
             style = MaterialTheme.typography.bodySmall,
             color = subColour,
@@ -394,10 +394,10 @@ private fun HeroCard(
             text = when {
                 latest.isChangeSignificant -> {
                     val direction = if (latest.weeklyChange < 0) "Down" else "Up"
-                    "%s %.2f points a week — a real change".format(direction, abs(latest.weeklyChange))
+                    "%s %.2f points a week. A real change.".format(direction, abs(latest.weeklyChange))
                 }
                 change != null ->
-                    "%+.1f since %s — within noise, no real change yet".format(
+                    "%+.1f since %s. Within noise, so no real change yet.".format(
                         change.delta,
                         heroDate(change.fromDay),
                     )
@@ -643,7 +643,7 @@ private fun EmptyState(
         Text(
             text = "Two measurements are needed before a trend appears, and about three weeks " +
                 "before the app can tell a real change from measurement noise. A tape is more " +
-                "repeatable than any photo method — the scan is faster, the tape is more precise.",
+                "repeatable than any photo method: the scan is faster, the tape more precise.",
             style = MaterialTheme.typography.bodySmall,
             color = subColour,
         )

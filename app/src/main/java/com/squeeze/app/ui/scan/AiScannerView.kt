@@ -440,7 +440,7 @@ private fun AiVerdict(scanner: AiScanner) {
                     )
                     Text(
                         "Abdominal definition, how the lower stomach sits, how much muscle " +
-                            "shows through — what a coach reads at a glance.",
+                            "shows through: what a coach reads at a glance.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -550,7 +550,7 @@ fun AiLiveBadge(hint: String?, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    hint ?: "Framing looks good — hold still.",
+                    hint ?: "Framing looks good. Hold still.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -689,12 +689,9 @@ fun PhysiqueCard(
 
             Text(
                 if (report.reads > 1) {
-                    "Each bar combines your last ${report.reads} scans, so one dim or awkward " +
-                        "photo cannot swing it. A change is shown only when it is bigger than " +
-                        "photo-to-photo noise."
+                    "Each bar blends your last ${report.reads} scans, so one awkward photo can't swing it. Changes show only when they beat photo noise."
                 } else {
-                    "First scan — a single photo can be off by 15 points either way. Scan " +
-                        "again in similar light and each bar will settle."
+                    "First scan. One photo can be 15 points out; scan again in similar light and the bars will settle."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -702,8 +699,7 @@ fun PhysiqueCard(
 
             if (report.hidden.isNotEmpty()) {
                 Text(
-                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered by " +
-                        "clothing or out of frame in this photo. Scan with them bare to include them.",
+                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }}, covered or out of frame. Scan them bare to include them.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -712,7 +708,7 @@ fun PhysiqueCard(
             Text("Strengths", style = MaterialTheme.typography.titleSmall)
             if (report.strengths.isEmpty()) {
                 Text(
-                    "None stands out yet — that is normal early on, and it is what training fixes.",
+                    "None stands out yet. That's normal early on, and it's what training builds.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -766,11 +762,7 @@ fun PhysiqueCard(
             }
 
             Text(
-                "The on-device model's impression of one front photograph, the way a coach " +
-                    "sizes you up at a glance — not a measurement. Flexing, a pump or harsh " +
-                    "light make a group look bigger, and it cannot see your back. Saving this " +
-                    "scan puts the weak points into your training block and your nutrition " +
-                    "plan; changing your goal re-ranks them.",
+                "A coach's first impression from one front photo, not a measurement. Flexing, a pump or harsh light inflate a group, and your back isn't visible. Saving puts the weak points into your training and nutrition.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

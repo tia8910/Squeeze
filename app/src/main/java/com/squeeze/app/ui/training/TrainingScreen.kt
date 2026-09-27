@@ -88,14 +88,14 @@ fun TrainingScreen(
             SectionHeader(
                 title = if (week == null) "Build your week" else "Edit your week",
                 eyebrow = "Train",
-                caption = "Pick your sports and days — the plan does the rest",
+                caption = "Pick your sports and days. The plan does the rest.",
             )
             BrandCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SportsSection(state, viewModel)
                     SetupSection(state, viewModel)
                     Text(
-                        "Goal: ${state.goal.label()} — change it in You.",
+                        "Goal: ${state.goal.label()}. Change it in You.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -145,7 +145,7 @@ fun TrainingScreen(
             Expandable("How your week was built") {
                 week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                 state.plannedKcalPerDay?.let {
-                    Text("Burns about $it kcal a day on average — already in your nutrition plan.", style = MaterialTheme.typography.bodySmall)
+                    Text("Burns about $it kcal a day on average, already counted in your nutrition plan.", style = MaterialTheme.typography.bodySmall)
                 }
                 androidx.compose.material3.TextButton(onClick = onOpenNutrition) { Text("Open nutrition ›") }
             }
@@ -156,7 +156,7 @@ fun TrainingScreen(
         if (week != null && !editing && Discipline.GYM in state.disciplines) {
             Expandable("Advanced: 6-week gym progression block") {
                 Text(
-                    "Volume climbs week to week, then a deload — built from the same goal and weak points.",
+                    "Volume builds week by week, then a deload. Built from your goal and weak points.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 androidx.compose.material3.OutlinedButton(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
@@ -389,11 +389,11 @@ private fun SessionCard(session: Session, dayNumber: Int, weekRir: Int?) {
 
             var number = 0
             if (summary.main.isNotEmpty()) {
-                ExerciseGroupHeader("Main lifts", "Heavy — do these first, while fresh")
+                ExerciseGroupHeader("Main lifts", "Heavy. Do these first, while fresh.")
                 summary.main.forEach { ExerciseRow(++number, it, weekRir) }
             }
             if (summary.accessory.isNotEmpty()) {
-                ExerciseGroupHeader("Accessories", "Lighter — control the weight, chase the pump")
+                ExerciseGroupHeader("Accessories", "Lighter. Control the weight and chase the pump.")
                 summary.accessory.forEach { ExerciseRow(++number, it, weekRir) }
             }
         }
@@ -495,7 +495,7 @@ private fun WeakPointCard(weakPoints: List<WeakPoint>) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = "These are proportions, not absolutes — the parts furthest from where " +
+                text = "These are proportions, not absolutes: the parts furthest from where " +
                     "the rest of your body sits. The block below gives the first " +
                     "${WeakPointAnalysis.MAX_PRIORITIES} of them extra sets.",
                 style = MaterialTheme.typography.bodySmall,
@@ -527,7 +527,7 @@ private fun WeakPointCard(weakPoints: List<WeakPoint>) {
 @Composable
 private fun SportsSection(state: TrainingUiState, viewModel: TrainingViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Your sports — pick one or combine several", style = MaterialTheme.typography.titleSmall)
+        Text("Your sports · pick one or combine several", style = MaterialTheme.typography.titleSmall)
         Discipline.entries.chunked(4).forEach { row ->
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),

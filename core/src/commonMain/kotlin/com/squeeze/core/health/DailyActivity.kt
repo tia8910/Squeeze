@@ -76,7 +76,7 @@ object ActivityInsights {
         return if (walk == 0) {
             "Goal of ${(goal).grouped()} reached"
         } else {
-            "${(goal - steps).grouped()} to go — about a $walk-minute walk"
+            "${(goal - steps).grouped()} to go, about a $walk-minute walk"
         }
     }
 
@@ -124,7 +124,7 @@ object ActivityInsights {
             shortSleep ->
                 "Short night (${hoursMinutes(sleep!!)}). Keep today's session, and keep the last set honest rather than heroic."
             elevated ->
-                "Resting pulse ${hr!! - baselineRestingHr!!} bpm above your usual — often a sign of fatigue " +
+                "Resting pulse ${hr!! - baselineRestingHr!!} bpm above your usual, often a sign of fatigue " +
                     "or a cold coming. Warm up longer and see how the first sets feel."
             else -> null
         }

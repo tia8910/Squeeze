@@ -57,18 +57,18 @@ object EquipmentCatalog {
      */
     private val EXTRA: Map<String, List<MachineExercise>> = mapOf(
         "lat_pulldown" to listOf(
-            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle, palms facing — pull to the upper chest."),
+            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle, palms facing. Pull to the upper chest."),
             ex("Straight-Arm Pulldown", MuscleGroup.BACK, false, "Stand facing the stack, arms straight, sweep the bar to your thighs."),
         ),
         "lat_row_combo" to listOf(
             ex("Seated Cable Row", MuscleGroup.BACK, true, "Move to the bench, feet on the bar, pull the V-handle to your ribs."),
-            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle on the high pulley — pull to the upper chest."),
+            ex("Close-Grip Pulldown", MuscleGroup.BACK, true, "V-handle on the high pulley. Pull to the upper chest."),
         ),
         "cable_row" to listOf(
             ex("Wide-Grip Cable Row", MuscleGroup.BACK, true, "Long bar, wide grip, pull to the lower chest, elbows out."),
         ),
         "cable_station" to listOf(
-            ex("Triceps Pushdown", MuscleGroup.TRICEPS, false, "High pulley, rope or bar, elbows pinned — push to straight arms."),
+            ex("Triceps Pushdown", MuscleGroup.TRICEPS, false, "High pulley, rope or bar, elbows pinned. Push to straight arms."),
             ex("Face Pull", MuscleGroup.SHOULDERS, false, "Rope at face height, pull to your forehead, elbows high."),
             ex("Cable Lateral Raise", MuscleGroup.SHOULDERS, false, "Low pulley, one arm, raise out to the side to shoulder height."),
             ex("Cable Curl", MuscleGroup.BICEPS, false, "Low pulley, bar or rope, elbows at your sides."),
@@ -99,7 +99,7 @@ object EquipmentCatalog {
             ex("Dumbbell Bench Press", MuscleGroup.CHEST, true, "On a flat bench, press over the chest."),
         ),
         "pec_deck" to listOf(
-            ex("Reverse Pec Deck", MuscleGroup.SHOULDERS, false, "Face the pad, arms straight, open the handles back — rear delts."),
+            ex("Reverse Pec Deck", MuscleGroup.SHOULDERS, false, "Face the pad, arms straight, open the handles back. Targets the rear delts."),
         ),
         "pullup_station" to listOf(
             ex("Chin-Up", MuscleGroup.BICEPS, true, "Palms facing you, shoulder-width grip."),
@@ -164,7 +164,7 @@ object EquipmentCatalog {
                 "Sit upright with arms straight and the stack just lifted.",
                 "Pull the handle to your lower ribs, elbows close to your sides.",
                 "Squeeze your shoulder blades together for a second.",
-                "Return until your arms are straight and your upper back is stretched — torso stays still.",
+                "Return until your arms are straight and your upper back is stretched, torso still.",
             ),
             listOf("Rocking the torso to move the weight", "Shrugging the shoulders up", "Rounding the lower back"),
         ),
@@ -267,7 +267,7 @@ object EquipmentCatalog {
         MachineGuide(
             "dumbbells", "Dumbbell rack", "Dumbbell Lateral Raise", "Side delts",
             MuscleGroup.SHOULDERS, false, false,
-            "Pick a light pair — lateral raises need far less than you think.",
+            "Pick a light pair. Lateral raises need far less than you think.",
             listOf(
                 "Stand tall, dumbbells at your sides, slight bend at the elbows.",
                 "Raise your arms out to the sides until they are level with your shoulders.",
@@ -296,7 +296,7 @@ object EquipmentCatalog {
                 "Sit tall with your back against the pad.",
                 "Bring the handles together in front of you in an arc.",
                 "Squeeze the chest for a second.",
-                "Open slowly until you feel the stretch — not past it.",
+                "Open slowly until you feel the stretch, not past it.",
             ),
             listOf("Letting the arms go too far back", "Using momentum", "Pressing instead of hugging"),
         ),
@@ -403,7 +403,7 @@ object EquipmentCatalog {
             listOf(
                 "Cross your arms over your chest.",
                 "Lower your torso by hinging at the hips.",
-                "Rise until your body is in a straight line — not beyond.",
+                "Rise until your body is in a straight line, not beyond.",
                 "Squeeze the glutes at the top.",
             ),
             listOf("Hyperextending at the top", "Rounding the spine", "Swinging quickly"),
@@ -416,7 +416,7 @@ object EquipmentCatalog {
                 "Hold the bar or dumbbell with arms nearly straight on the pad.",
                 "Curl it up until your forearms are vertical.",
                 "Squeeze the biceps.",
-                "Lower slowly to almost straight — keep a slight bend.",
+                "Lower slowly to almost straight, keeping a slight bend.",
             ),
             listOf("Lifting the elbows off the pad", "Dropping to a locked elbow", "Using body lean"),
         ),
@@ -475,7 +475,7 @@ object EquipmentCatalog {
             "Clip the safety key to your clothes. Start at walking pace.",
             listOf(
                 "Warm up 5 minutes at an easy pace.",
-                "Intervals: 1 minute hard, 2 minutes easy, 6–8 rounds — or steady 20–40 minutes you could talk through.",
+                "Intervals: 1 minute hard, 2 minutes easy, 6–8 rounds, or a steady 20–40 minutes you could talk through.",
                 "Stand tall; don't hold the rails.",
                 "Cool down 5 minutes.",
             ),
@@ -540,9 +540,9 @@ object EquipmentCatalog {
             "Two stations on one stack. Pulldown: sit facing the stack, thighs locked under the pads, " +
                 "long bar overhead. Low row: move to the long bench, feet on the foot bar, V-handle on the low pulley.",
             listOf(
-                "Pulldown — lean back slightly, pull the bar to your upper chest, elbows driving down.",
+                "Pulldown: lean back slightly, pull the bar to your upper chest, elbows driving down.",
                 "Let the bar rise slowly until your arms are straight and your lats stretch.",
-                "Low row — sit tall, pull the handle to your lower ribs, squeeze your shoulder blades.",
+                "Low row: sit tall, pull the handle to your lower ribs, squeeze your shoulder blades.",
                 "Return with control, torso still. Do both for a complete back session.",
             ),
             listOf("Leaning far back on pulldowns", "Rocking the torso on rows", "Letting the stack crash between reps"),
@@ -603,7 +603,7 @@ object EquipmentCatalog {
                 "Stand tall and release the stop.",
                 "Sit down between your heels until your thighs are at least parallel.",
                 "Drive up through the whole foot.",
-                "Keep your chest up — the load is on your hips, not your spine.",
+                "Keep your chest up; the load is on your hips, not your spine.",
             ),
             listOf("Knees caving in", "Cutting depth", "Rising onto the toes"),
         ),
@@ -649,7 +649,7 @@ object EquipmentCatalog {
             "Set the start angle, sit tall with your chest against the pad and knees locked in.",
             listOf(
                 "Rotate your torso slowly away from the start side.",
-                "Keep your hips still — only the upper body turns.",
+                "Keep your hips still. Only the upper body turns.",
                 "Return under control.",
                 "Do all reps, then set the other side.",
             ),
@@ -712,7 +712,7 @@ object EquipmentCatalog {
                 "Swing your arms and dip into a quarter squat.",
                 "Jump up and land softly with both feet on the box.",
                 "Stand up fully on top.",
-                "Step down — don't jump down.",
+                "Step down. Don't jump down.",
             ),
             listOf("Box too high", "Landing stiff-legged", "Jumping down repeatedly"),
         ),
@@ -747,7 +747,7 @@ object EquipmentCatalog {
             listOf(
                 "Push and pull the handles while you pedal.",
                 "Intervals: 20 s all-out, 40 s easy, 8–10 rounds.",
-                "The harder you go, the harder it gets — pace yourself.",
+                "The harder you go, the harder it gets. Pace yourself.",
                 "Cool down 3–5 minutes easy.",
             ),
             listOf("Sprinting the first round and dying", "Seat too low", "Only using the legs"),
@@ -771,7 +771,7 @@ object EquipmentCatalog {
             null, false, false,
             "Use on a mat; start with a softer roller.",
             listOf(
-                "Roll slowly over one area — quads, upper back, calves.",
+                "Roll slowly over one area: quads, upper back or calves.",
                 "Pause on tight spots for 20–30 seconds.",
                 "Breathe; it should be uncomfortable, not painful.",
                 "Avoid the lower back and joints.",

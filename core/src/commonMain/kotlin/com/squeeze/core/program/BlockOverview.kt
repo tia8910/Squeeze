@@ -74,7 +74,7 @@ object BlockOverview {
     fun effortSentence(rir: Int): String = when (rir) {
         0 -> "Take every set to failure."
         1 -> "Stop each set 1 rep short of failure."
-        else -> "Stop each set $rir reps short of failure — you could do $rir more with good form."
+        else -> "Stop each set $rir reps short of failure. You could do $rir more with good form."
     }
 
     fun label(group: MuscleGroup): String = when (group) {

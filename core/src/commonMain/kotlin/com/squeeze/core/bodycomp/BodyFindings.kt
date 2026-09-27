@@ -123,17 +123,17 @@ object BodyFindings {
             when (metric.band?.label) {
                 "Healthy" -> findings += strength(
                     "Waist under half your height",
-                    "${metric.formatted()} — under the 0.5 line for belly fat.",
+                    "${metric.formatted()}, under the 0.5 line for belly fat.",
                 )
 
                 "Slim" -> findings += strength(
                     "Narrow waist for your height",
-                    "${metric.formatted()} — well under the 0.5 line.",
+                    "${metric.formatted()}, well under the 0.5 line.",
                 )
 
                 "Increased", "High" -> findings += weakness(
                     "Waist is over half your height",
-                    "${metric.formatted()} against a 0.5 target — the number most worth moving.",
+                    "${metric.formatted()} against a 0.5 target. The number most worth moving.",
                 )
             }
         }
@@ -146,7 +146,7 @@ object BodyFindings {
             when (band?.label) {
                 "Athletic", "Fitness" -> findings += strength(
                     "Body fat in the ${band.label.lowercase()} range",
-                    "${metric.formatted()} — " +
+                    "${metric.formatted()}. " +
                         band.detail.replaceFirstChar { it.lowercase() },
                 )
 
@@ -157,12 +157,12 @@ object BodyFindings {
 
                 "Essential fat only" -> findings += weakness(
                     "At essential-fat level",
-                    "${metric.formatted()}. Contest-lean, not a place to stay — check the scan before acting on it.",
+                    "${metric.formatted()}. Contest-lean, not a place to stay. Check the scan before acting on it.",
                 )
 
                 "Below essential" -> findings += weakness(
                     "Below the fat your body needs",
-                    "${metric.formatted()}. Not a target — check the scan before acting on it.",
+                    "${metric.formatted()}. Not a target. Check the scan before acting on it.",
                 )
             }
         }
@@ -176,7 +176,7 @@ object BodyFindings {
 
                 "High" -> findings += weakness(
                     "Fat sits around the middle",
-                    "Waist-to-hip ${metric.formatted()} — linked to metabolic risk more than the total is.",
+                    "Waist-to-hip ${metric.formatted()}, which matters more for metabolic risk than the total.",
                 )
             }
         }
@@ -216,7 +216,7 @@ object BodyFindings {
                         " Strength training is what raises it.",
                 )
 
-                "Exceptional — check your inputs" -> findings += weakness(
+                "Exceptional, check inputs" -> findings += weakness(
                     "This reading needs checking",
                     "FFMI ${metric.formatted()}, above the usual drug-free limit. A too-low body fat reading inflates it.",
                 )
@@ -287,7 +287,7 @@ object MeasuredParts {
             val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
             if (ratio >= marked) {
                 val v = com.squeeze.core.scan.MuscleGroup.V_TAPER
-                val taper = "Chest ${(ratio * 100).toInt() / 100.0}× your waist — a marked V-taper."
+                val taper = "Chest ${(ratio * 100).toInt() / 100.0}× your waist, a marked V-taper."
                 strong[v] = strong[v]?.let { "$it $taper" } ?: taper
             }
         }

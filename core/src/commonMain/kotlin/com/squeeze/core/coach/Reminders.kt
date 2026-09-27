@@ -89,7 +89,7 @@ object ReminderPlanner {
         return Reminder(
             kind = ReminderKind.WORKOUT,
             title = "Today: $session$length",
-            body = "Log it as you go — your next session and your calories adjust to what you did.",
+            body = "Log it as you go. Your next session and calories adjust to what you did.",
             publicTitle = "Today's session is ready",
             opens = StepId.TODAYS_SESSION,
         )
@@ -101,7 +101,7 @@ object ReminderPlanner {
         return Reminder(
             kind = ReminderKind.WORKOUT,
             title = "$session is still open",
-            body = "Done it? Log it so the plan knows. Skipped it? Nothing to do — the week " +
+            body = "Done it? Log it so the plan knows. Skipped it? Nothing to do: the week " +
                 "absorbs one missed session.",
             publicTitle = "A session is still open",
             opens = StepId.TODAYS_SESSION,
@@ -119,7 +119,7 @@ object ReminderPlanner {
         if (walk == 0 || walk > MAX_WALK_MINUTES) return null
         return Reminder(
             kind = ReminderKind.STEPS,
-            title = "${(steps).grouped()} steps — a $walk-minute walk reaches ${(f.stepGoal).grouped()}",
+            title = "${(steps).grouped()} steps. A $walk-minute walk reaches ${(f.stepGoal).grouped()}",
             body = "Walking is the cheapest fat loss there is, and it barely touches recovery.",
             publicTitle = "A short walk closes today's steps",
             opens = null,
@@ -133,7 +133,7 @@ object ReminderPlanner {
         if (days < JourneyPlanner.CHECK_IN_EVERY_DAYS) return null
         return Reminder(
             kind = ReminderKind.CHECK_IN,
-            title = "Weekly check-in — $days days since your last scan",
+            title = "Weekly check-in · $days days since your last scan",
             body = "Same spot, same light, same pose as last time, arms relaxed, phone away " +
                 "from your chest. Matching photos are what make the comparison accurate.",
             publicTitle = "Time for your weekly check-in",
@@ -146,7 +146,7 @@ object ReminderPlanner {
         val sets = if (f.setsPlanned > 0) " · ${f.setsLogged} of ${f.setsPlanned} sets" else ""
         val verdict = when {
             f.sessionsLogged >= f.sessionsPlanned -> "Every planned session done. Next week builds on it."
-            f.sessionsLogged == 0 -> "Nothing logged this week. A fresh week starts tomorrow — one session is enough to restart."
+            f.sessionsLogged == 0 -> "Nothing logged this week. A fresh week starts tomorrow, and one session is enough to restart."
             else -> "Consistency beats perfection. Next week's plan is ready."
         }
         return Reminder(

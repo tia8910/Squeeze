@@ -236,9 +236,9 @@ internal fun changeSentence(change: TrendChange, unitSuffix: String): String {
     val since = "since ${shortDate(change.fromDay)}"
     return if (change.significant) {
         val per = "%.2f%s a week".format(abs(change.weeklyChange), unitSuffix)
-        "$arrow $amount $since — a real change, $per"
+        "$arrow $amount $since. A real change of $per."
     } else {
-        "$arrow $amount $since — within measurement noise, no real change yet"
+        "$arrow $amount $since. Within measurement noise, so no real change yet."
     }
 }
 

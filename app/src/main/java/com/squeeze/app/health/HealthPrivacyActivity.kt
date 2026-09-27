@@ -45,7 +45,7 @@ class HealthPrivacyActivity : ComponentActivity() {
 
     private companion object {
         val POINTS = listOf(
-            "Squeeze has no internet permission. Nothing read from Health Connect can leave your phone — the operating system will not let the app open a network connection.",
+            "Squeeze has no internet permission. Nothing read from Health Connect can leave your phone: the operating system will not let the app open a network connection.",
             "Steps, active calories and workouts from your watch or phone show your day's activity, and a workout recorded by your watch counts as today's session.",
             "Sleep and resting heart rate add a short recovery note on days that stand out.",
             "Food logged in a nutrition app is compared with today's calorie and protein targets.",

@@ -129,7 +129,7 @@ fun OnboardingScreen(
             Text("Height", style = MaterialTheme.typography.titleSmall)
             Text(
                 text = "The scan has no depth sensor, so it uses your height to turn the " +
-                    "photo into centimetres. Every measurement scales with it — be exact.",
+                    "photo into centimetres. Every measurement scales with it, so be exact.",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -154,7 +154,7 @@ fun OnboardingScreen(
         BrandCard(Modifier.fillMaxWidth()) {
             Text("Year of birth", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "The equations are age-dependent — body composition at the same " +
+                text = "The equations depend on age: body composition at the same " +
                     "measurements means something different at 25 and at 55.",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
@@ -302,11 +302,11 @@ private fun GoalPrompt(
         (option.wantsWeight && targetWeightText.isNotBlank())
 
     BrandCard(Modifier.fillMaxWidth()) {
-        Text("Your goal — optional", style = MaterialTheme.typography.titleSmall)
+        Text("Your goal (optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             text = "A target with a date is what lets the app tell you whether what you are " +
                 "doing is working, rather than only showing you a number. Skip it if you do " +
-                "not know yet — you can set one any time under You.",
+                "not know yet; you can set one any time under You.",
             style = MaterialTheme.typography.bodySmall,
             color = muted,
             modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),

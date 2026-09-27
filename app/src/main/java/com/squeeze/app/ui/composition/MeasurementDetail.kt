@@ -254,8 +254,7 @@ fun MeasurementDetailDialog(
                         modifier = Modifier.padding(top = 4.dp),
                     )
                     Text(
-                        text = "Worked out from this entry alone, so it says what this " +
-                            "session said rather than what the trend believes today.",
+                        text = "From this entry alone, not the trend.",
                         style = MaterialTheme.typography.bodySmall,
                         color = muted,
                     )

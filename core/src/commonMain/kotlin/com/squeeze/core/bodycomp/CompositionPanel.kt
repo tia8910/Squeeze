@@ -165,7 +165,7 @@ object CompositionAnalyser {
                 unit = "kg",
                 confidence = Confidence.ROUGH,
                 detail = "Lee 2000, from arm, thigh and calf girths. Runs high without " +
-                    "skinfolds — track the direction, not the value.",
+                    "skinfolds, so track the direction, not the value.",
             )
         } else {
             missing += MissingInput(
@@ -195,7 +195,7 @@ object CompositionAnalyser {
                 // The band says where the value sits; this says what the measure is, so the
                 // two lines never repeat each other.
                 detail = if (whtr >= 0.5) {
-                    "Waist ÷ height. Over 0.5 — aim to bring it under."
+                    "Waist ÷ height. Over 0.5; aim to bring it under."
                 } else {
                     "Waist ÷ height. Under 0.5, the target for belly fat."
                 },
@@ -222,7 +222,7 @@ object CompositionAnalyser {
                     value = bmi,
                     unit = "",
                     confidence = Confidence.DIRECT,
-                    detail = "For reference only — BMI cannot tell muscle from fat.",
+                    detail = "For reference only. BMI can't tell muscle from fat.",
                     band = ReferenceBands.bmi(bmi),
                 )
             }
@@ -318,7 +318,7 @@ object CompositionAnalyser {
                 value = bmr * 1.375,
                 unit = "kcal/day",
                 confidence = Confidence.ROUGH,
-                detail = "Resting × 1.375. A generic guide — your Fuel plan uses your real week.",
+                detail = "Resting × 1.375. A generic guide; your Fuel plan uses your real week.",
             )
         }
 

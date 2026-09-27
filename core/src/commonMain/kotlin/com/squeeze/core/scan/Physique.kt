@@ -323,13 +323,13 @@ object PhysiqueAnalysis {
         val mean = read.map { it.score }.average().takeIf { it.isFinite() } ?: 0.0
         val evidence = linkedMapOf<MuscleGroup, String>()
         read.filter { it.development == Development.DEVELOPED }.forEach {
-            evidence[it.group] = "Looks developed to the AI (${pct(it.score)}/100)."
+            evidence[it.group] = "Reads developed: ${pct(it.score)}/100."
         }
         read.filter {
             it.group != MuscleGroup.ABS && it.group !in evidence &&
                 it.score >= RELATIVE_MIN && it.score >= mean + RELATIVE_LEAD
         }.forEach {
-            evidence[it.group] = "Ahead of the rest of your physique (${pct(it.score)}/100 against an average of ${pct(mean)})."
+            evidence[it.group] = "${pct(it.score)}/100, ahead of your average of ${pct(mean)}."
         }
         measuredStrong.filterKeys { it !in hidden }.forEach { (group, why) ->
             evidence[group] = evidence[group]?.let { "$it $why" } ?: why
@@ -363,7 +363,7 @@ object PhysiqueAnalysis {
             scores = shown,
             strengths = strengths,
             weaknesses = weaknesses,
-            focus = weaknesses.map { FocusAdvice(it, why(goal, it), how(goal, it)) },
+            focus = weaknesses.map { FocusAdvice(it, why(goal, it, gap(scoreOf[it], mean)), how(goal, it)) },
             summary = summary(goal, weaknesses.isEmpty(), strengths.isEmpty()),
             hidden = hidden.sortedBy { it.ordinal },
             strengthEvidence = evidence,
@@ -409,14 +409,14 @@ object PhysiqueAnalysis {
 
     private fun summary(goal: Goal, balanced: Boolean, noStrengths: Boolean): String = when {
         noStrengths && goal != Goal.CUT && goal != Goal.MAKE_WEIGHT ->
-            "No group stands out yet — a full-body programme will build the base fastest, " +
+            "No group stands out yet. A full-body programme will build the base fastest, " +
                 "starting with the gaps below."
         else -> goalSummary(goal, balanced)
     }
 
     private fun goalSummary(goal: Goal, balanced: Boolean): String = when (goal) {
         Goal.HYPERTROPHY -> if (balanced) {
-            "Balanced for building size — keep progressing every group."
+            "Balanced for building size. Keep progressing every group."
         } else {
             "Building size: bring up the lagging groups first, so the physique grows in proportion."
         }
@@ -428,7 +428,18 @@ object PhysiqueAnalysis {
         Goal.MAKE_WEIGHT -> "Making weight: keep the muscle you have while the scale comes down."
     }
 
-    private fun why(goal: Goal, group: MuscleGroup): String = when (goal) {
+    /**
+     * The specific reason a group is behind, in one line. Every weak point used to say "It
+     * reads behind the rest of your physique", word for word, which told the reader nothing
+     * the heading had not.
+     */
+    private fun gap(score: Double?, mean: Double): String = when {
+        score == null -> "Measured behind the balanced proportion for your frame."
+        score < mean - 0.02 -> "${pct(score)}/100, below your average of ${pct(mean)}."
+        else -> "${pct(score)}/100, short of developed (60)."
+    }
+
+    private fun why(goal: Goal, group: MuscleGroup, gap: String): String = when (goal) {
         Goal.STRENGTH -> when (group) {
             MuscleGroup.LEGS -> "Your legs drive the squat and the deadlift."
             MuscleGroup.V_TAPER -> "Your lats and upper back hold the bar in the deadlift and " +
@@ -439,15 +450,14 @@ object PhysiqueAnalysis {
             MuscleGroup.ABS -> "A strong trunk is what lets you brace under a heavy bar."
         }
         Goal.CUT, Goal.MAKE_WEIGHT -> if (group == MuscleGroup.ABS) {
-            "Your midsection still reads soft — this is where the cut shows last."
+            "Your midsection still reads soft. This is where a cut shows last."
         } else {
-            "It reads behind the rest; train it hard through the deficit so you lose fat here, " +
-                "not muscle."
+            "$gap Train it hard through the deficit so you lose fat here, not muscle."
         }
         Goal.HYPERTROPHY, Goal.RECOMP -> if (group == MuscleGroup.ABS) {
             "Your abs don't show yet; they need both muscle and a lower body fat."
         } else {
-            "It reads behind the rest of your physique."
+            gap
         }
     }
 
@@ -459,7 +469,7 @@ object PhysiqueAnalysis {
         MuscleGroup.ARMS -> "Curls and triceps extensions or close-grip press, 8–14 sets " +
             "each a week on top of your pressing and pulling."
         MuscleGroup.ABS -> if (goal == Goal.CUT || goal == Goal.MAKE_WEIGHT) {
-            "Keep the deficit going — abs show when body fat drops. Add hanging leg raises " +
+            "Keep the deficit going. Abs show as body fat drops. Add hanging leg raises " +
                 "and cable crunches to thicken them."
         } else {
             "Hanging leg raises and weighted cable crunches, 6–10 sets a week. They show as " +
