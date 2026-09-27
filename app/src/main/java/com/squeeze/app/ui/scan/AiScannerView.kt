@@ -639,7 +639,7 @@ fun PhysiqueCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PulsingDot(active = false)
                 Text(
-                    "AI physique analysis",
+                    "Physique analysis",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 10.dp),
@@ -651,6 +651,15 @@ fun PhysiqueCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            val muscles = report.muscles
+            if (muscles != null && muscles.assessments.isNotEmpty()) {
+                MuscleBreakdown(
+                    muscles,
+                    hiddenNote = report.hidden.takeIf { it.isNotEmpty() }?.let { hidden ->
+                        "Not judged from the photo: ${hidden.joinToString { it.label.lowercase() }}, covered or out of frame."
+                    },
+                )
+            } else {
             report.scores.forEach { score ->
                 Column {
                     WeightBar(
@@ -745,6 +754,8 @@ fun PhysiqueCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+
             }
 
             if (measured.isNotEmpty()) {

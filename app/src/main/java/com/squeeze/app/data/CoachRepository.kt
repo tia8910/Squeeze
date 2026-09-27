@@ -386,15 +386,31 @@ class CoachRepository @Inject constructor(
         val measuredScores = circumferences
             ?.let { com.squeeze.core.bodycomp.MeasuredParts.scores(it, sex) }
             .orEmpty()
-        return PhysiqueAnalysis.report(
+        val fused = PhysiqueFusion.fuse(history)
+        val report = PhysiqueAnalysis.report(
             scores = newest.scores,
             goal = chosen,
             hidden = newest.hidden,
             measuredStrong = strong,
             measuredWeak = weak,
             measuredScores = measuredScores,
-            fused = PhysiqueFusion.fuse(history),
-        )
+            fused = fused,
+        ) ?: return null
+        // The per-muscle verdict: lifts against strength standards, girth proportions and
+        // the fused photo readings, each weighted by how far it can be trusted.
+        val muscles = runCatching {
+            com.squeeze.core.program.MuscleProfiler.assess(
+                sex = sex,
+                goal = chosen,
+                bodyweightKg = measurementDao.latestWeightKg(),
+                sets = allSets(),
+                today = epochDay,
+                circumferences = circumferences,
+                photo = fused.mapValues { (_, f) -> com.squeeze.core.program.PhotoReading(f.score, f.sd, f.reads) },
+                hiddenInPhoto = newest.hidden,
+            )
+        }.getOrNull()
+        return report.copy(muscles = muscles)
     }
 
     /** The saved physique read for [epochDay], with its hidden groups; null if none. */
@@ -450,6 +466,19 @@ class CoachRepository @Inject constructor(
      */
     suspend fun aiWeakPoints(goal: Goal): List<WeakPoint> {
         val report = latestReport(goal) ?: return emptyList()
+        // The per-muscle verdict first: it is built on lifts and girths as well as photos,
+        // and it names the exact muscle, so "arms" becomes biceps or triceps as the evidence says.
+        report.muscles?.takeIf { it.weaknesses.isNotEmpty() }?.let { profile ->
+            return profile.weaknesses.map { focus ->
+                val a = profile.assessments.first { it.group == focus.group }
+                WeakPoint(
+                    group = focus.group,
+                    severity = (1.0 - a.score).coerceIn(0.0, 1.0),
+                    finding = "${a.label}: ${focus.why}",
+                    prescription = focus.how,
+                )
+            }
+        }
         // The fused scores, so one unlucky photograph cannot reshuffle the training block.
         val scores = report.scores.associate { it.group to it.score }
         return report.focus.flatMap { advice ->
@@ -469,9 +498,11 @@ class CoachRepository @Inject constructor(
 
     /** The groups the AI flagged, by name, for the nutrition plan's explanation. */
     private suspend fun aiWeakGroupNames(goal: Goal): List<String> {
-        return latestReport(goal)?.weaknesses
-            ?.map { it.label.lowercase() }
-            .orEmpty()
+        val report = latestReport(goal) ?: return emptyList()
+        report.muscles?.takeIf { it.weaknesses.isNotEmpty() }?.let { profile ->
+            return profile.weaknesses.map { com.squeeze.core.program.BlockOverview.label(it.group).lowercase() }
+        }
+        return report.weaknesses.map { it.label.lowercase() }
     }
 
     /**

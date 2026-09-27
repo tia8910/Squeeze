@@ -239,6 +239,12 @@ data class PhysiqueReport(
     val raw: Map<MuscleGroup, Double> = emptyMap(),
     /** How many scans the scores rest on; 1 for a first scan. */
     val reads: Int = 1,
+    /**
+     * Ten muscles judged on lifts, proportions and this photo history together, when the
+     * app has built it. When present it is the verdict: strengths, weak points and training
+     * priorities come from it, so the screen cannot show two lists that disagree.
+     */
+    val muscles: com.squeeze.core.program.MuscleProfile? = null,
 )
 
 /**
