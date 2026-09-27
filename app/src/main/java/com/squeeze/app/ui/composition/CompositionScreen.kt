@@ -54,6 +54,7 @@ import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Profile
 import com.squeeze.core.trend.RepeatabilityScore
+import com.squeeze.core.trend.TrendChange
 import com.squeeze.core.trend.TrendFactor
 import com.squeeze.core.trend.TrendFactors
 import com.squeeze.core.trend.TrendPoint
@@ -270,6 +271,7 @@ private fun FilteredTrend(
                 unitSuffix = factor.unitSuffix,
                 points = points,
                 lineColor = colour,
+                minSpan = factor.minSpan,
             )
         } else {
             // Said rather than left blank. An empty space where a chart belongs reads as a
@@ -363,25 +365,51 @@ private fun HeroCard(
         if (trend.size >= 2) {
             Sparkline(
                 values = trend.map { it.level },
-                modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                minSpan = TrendFactor.BODY_FAT.minSpan,
             )
+            // The two ends named, so the line is read as numbers rather than as a mood.
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text(
+                    text = "%s · %.1f%%".format(heroDate(trend.first().epochDay), trend.first().level),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subColour,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "%s · %.1f%%".format(heroDate(trend.last().epochDay), trend.last().level),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subColour,
+                )
+            }
         } else {
             Spacer(Modifier.height(16.dp))
         }
 
+        val change = TrendChange.of(trend)
         NoticePill(
-            text = if (latest.isChangeSignificant) {
-                val direction = if (latest.weeklyChange < 0) "down" else "up"
-                "%.2f points per week %s — larger than your noise".format(
-                    abs(latest.weeklyChange),
-                    direction,
-                )
-            } else {
-                "No confirmed change yet"
+            text = when {
+                latest.isChangeSignificant -> {
+                    val direction = if (latest.weeklyChange < 0) "Down" else "Up"
+                    "%s %.2f points a week — a real change".format(direction, abs(latest.weeklyChange))
+                }
+                change != null ->
+                    "%+.1f since %s — within noise, no real change yet".format(
+                        change.delta,
+                        heroDate(change.fromDay),
+                    )
+                else -> "No confirmed change yet"
             },
         )
     }
 }
+
+private fun heroDate(epochDay: Long): String =
+    if (epochDay == LocalDate.now().toEpochDay()) {
+        "Today"
+    } else {
+        LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("d MMM"))
+    }
 
 /**
  * The raw log, newest first.
