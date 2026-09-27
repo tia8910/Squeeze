@@ -32,8 +32,10 @@ private val LightColors = lightColorScheme(
 
     secondary = Brand.Navy,
     onSecondary = Color.White,
-    secondaryContainer = Brand.Sunken,
-    onSecondaryContainer = Brand.Navy,
+    // Material draws a selected chip and the current navigation tab in secondaryContainer.
+    // It was Brand.Sunken, a hair off white, so selection was invisible on the white ground.
+    secondaryContainer = Brand.Selected,
+    onSecondaryContainer = Brand.BlueDeep,
 
     tertiary = Brand.BlueDeep,
     onTertiary = Color.White,
@@ -80,8 +82,8 @@ private val DarkColors = darkColorScheme(
 
     secondary = Color(0xFFCFE0FF),
     onSecondary = Brand.Navy,
-    secondaryContainer = Brand.DarkSunken,
-    onSecondaryContainer = Color(0xFFCFE0FF),
+    secondaryContainer = Brand.DarkSelected,
+    onSecondaryContainer = Color(0xFFE3ECFF),
 
     tertiary = Brand.DarkBlue,
     onTertiary = Color(0xFF04122B),

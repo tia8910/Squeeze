@@ -719,7 +719,7 @@ private fun InfoCard(body: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Text(body, Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
@@ -1081,7 +1081,7 @@ private fun ResultStep(
 
         // What the AI made of each muscle group, read against the user's goal. Straight after
         // the figure because it is the other half of the same look at the photograph.
-        state.physique?.let { PhysiqueCard(it, previous = state.previousPhysique) }
+        state.physique?.let { PhysiqueCard(it) }
 
         // **Directly under the headline, and only when the outline could not answer.**
         //

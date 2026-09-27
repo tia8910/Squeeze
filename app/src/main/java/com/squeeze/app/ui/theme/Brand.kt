@@ -48,6 +48,16 @@ object Brand {
     /** `.stat` background. A hair off white — enough to separate, not enough to read as grey. */
     val Sunken = Color(0xFFFAFBFE)
 
+    /**
+     * The fill behind whatever is selected: a chosen chip, the current tab.
+     *
+     * Its own colour because selection used to borrow [Sunken], which is built to be barely
+     * visible — so on the white ground a selected "Week 1" or "Training day" chip looked the
+     * same as the ones beside it. This tint is clearly blue against white and still carries
+     * [BlueDeep] text at well over 4.5:1.
+     */
+    val Selected = Color(0xFFD6E4FF)
+
     /** `.row` background. Deliberately a step darker than [Sunken]. */
     val RowFill = Color(0xFFF7F9FD)
 
@@ -82,6 +92,8 @@ object Brand {
     val DarkBlue = Color(0xFF4C8CFF)
     /** The dark counterpart to [Ice]: a blue-tinted sunken fill for notices and chips. */
     val DarkIce = Color(0xFF13233F)
+    /** The dark counterpart to [Selected]: clearly lifted off [DarkGround] and [DarkCard]. */
+    val DarkSelected = Color(0xFF1F3F7A)
 
     val Success = Color(0xFF16A34A)
     val Warning = Color(0xFFF59E0B)

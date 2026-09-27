@@ -303,6 +303,29 @@ object MeasuredParts {
         return strong to weak
     }
 
+    /**
+     * Scores, on the AI's 0-to-1 scale, for the groups a measurement reads more directly than
+     * a photograph does. Today that is the V-taper, from chest-to-waist.
+     *
+     * Anchored on [BodyFindings]' own taper conventions so the bar and the findings agree: a
+     * ratio at the flat-torso line scores at the lagging edge ([PhysiqueAnalysis.LAGGING_BELOW]),
+     * a ratio at the marked-taper line at the developed edge ([PhysiqueAnalysis.DEVELOPED_AT]),
+     * linear between and beyond, and clamped short of 0 and 1 because a girth from a photograph
+     * is itself a measurement with error.
+     */
+    fun scores(c: Circumferences, sex: Sex): Map<com.squeeze.core.scan.MuscleGroup, Double> {
+        val chest = c.chestCm ?: return emptyMap()
+        val waist = c.waistCm?.takeIf { it > 0 } ?: return emptyMap()
+        val ratio = chest / waist
+        val flat = if (sex == Sex.FEMALE) BodyFindings.FEMALE_FLAT_TAPER else BodyFindings.MALE_FLAT_TAPER
+        val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
+        val lo = com.squeeze.core.scan.PhysiqueAnalysis.LAGGING_BELOW
+        val hi = com.squeeze.core.scan.PhysiqueAnalysis.DEVELOPED_AT
+        val score = lo + (ratio - flat) / (marked - flat) * (hi - lo)
+        if (!score.isFinite()) return emptyMap()
+        return mapOf(com.squeeze.core.scan.MuscleGroup.V_TAPER to score.coerceIn(0.05, 0.95))
+    }
+
     fun toScan(group: MuscleGroup): com.squeeze.core.scan.MuscleGroup? = when (group) {
         MuscleGroup.CHEST -> com.squeeze.core.scan.MuscleGroup.CHEST
         MuscleGroup.BACK -> com.squeeze.core.scan.MuscleGroup.V_TAPER

@@ -93,14 +93,7 @@ class ClipAppearance @Inject constructor(
             regions.mapNotNull { (group, boxes) ->
                 val wordings = pairs[group] ?: return@mapNotNull null
                 onGroup(group)
-                val embeddings = boxes.mapNotNull { box ->
-                    val input = crop(photo, box) ?: return@mapNotNull null
-                    try {
-                        embed(loaded, input)
-                    } finally {
-                        if (input !== photo) input.recycle()
-                    }
-                }
+                val embeddings = boxes.mapNotNull { box -> embedViews(loaded, photo, box) }
                 MuscleScorer.score(embeddings, wordings)?.let {
                     onScored(group, it)
                     group to it
@@ -135,6 +128,59 @@ class ClipAppearance @Inject constructor(
             val loaded = session ?: load() ?: return null
             embed(loaded, photo)
         }.getOrNull()
+    }
+
+    /**
+     * One crop's embedding, averaged over a few views of it.
+     *
+     * A single crop's reading depends on things that have nothing to do with the muscle:
+     * exactly where the pose model put the box, and which way the photograph faces. Measured
+     * on a real scan, mirroring moved the shoulders from 27 to 16, and jittering the box by
+     * the pose model's own jitter moved the chest anywhere from 23 to 48. Averaging the crop,
+     * its mirror image and a slightly wider and narrower box roughly halved that spread for
+     * shoulders, chest, arms and back width, at the cost of four passes per crop instead of
+     * one.
+     */
+    private fun embedViews(session: OrtSession, photo: Bitmap, box: CropRegion): DoubleArray? {
+        val views = VIEW_SCALES.flatMap { scale ->
+            val base = crop(photo, box.scaled(scale)) ?: return@flatMap emptyList()
+            if (scale == 1.0) listOf(base, mirror(base)) else listOf(base)
+        }
+        val embeddings = views.mapNotNull { view ->
+            try {
+                embed(session, view)
+            } finally {
+                if (view !== photo) view.recycle()
+            }
+        }.mapNotNull { unit(it) }
+        if (embeddings.isEmpty()) return null
+        val size = embeddings.first().size
+        return DoubleArray(size) { i -> embeddings.sumOf { it[i] } / embeddings.size }
+    }
+
+    private fun unit(v: DoubleArray): DoubleArray? {
+        val norm = kotlin.math.sqrt(v.sumOf { it * it })
+        if (norm == 0.0 || !norm.isFinite()) return null
+        return DoubleArray(v.size) { v[it] / norm }
+    }
+
+    private fun mirror(bitmap: Bitmap): Bitmap {
+        val flip = android.graphics.Matrix().apply { preScale(-1f, 1f) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, flip, true)
+    }
+
+    private fun CropRegion.scaled(factor: Double): CropRegion {
+        if (factor == 1.0) return this
+        val cx = (left + right) / 2.0
+        val cy = (top + bottom) / 2.0
+        val hw = (right - left) / 2.0 * factor
+        val hh = (bottom - top) / 2.0 * factor
+        return CropRegion(
+            left = (cx - hw).coerceIn(0.0, 1.0),
+            top = (cy - hh).coerceIn(0.0, 1.0),
+            right = (cx + hw).coerceIn(0.0, 1.0),
+            bottom = (cy + hh).coerceIn(0.0, 1.0),
+        )
     }
 
     private fun crop(photo: Bitmap, region: CropRegion): Bitmap? {
@@ -272,6 +318,9 @@ class ClipAppearance @Inject constructor(
         const val MUSCLES_ASSET = "clip_muscles.json"
         const val INPUT_NAME = "pixel_values"
         const val SIZE = 224
+
+        /** The crop as placed (plus its mirror image), a little wider, and a little tighter. */
+        val VIEW_SCALES = listOf(1.0, 1.12, 0.9)
         val MEAN = floatArrayOf(0.48145466f, 0.4578275f, 0.40821073f)
         val STD = floatArrayOf(0.26862954f, 0.26130258f, 0.27577711f)
     }

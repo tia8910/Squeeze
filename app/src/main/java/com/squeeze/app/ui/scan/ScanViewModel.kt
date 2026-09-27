@@ -34,6 +34,7 @@ import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
 import com.squeeze.core.bodycomp.MeasuredParts
+import com.squeeze.core.scan.PhysiqueObservation
 import com.squeeze.core.scan.PhysiqueRegions
 import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.model.Goal
@@ -286,8 +287,8 @@ data class ScanUiState(
      * Null when the model did not run — see [appearance] for when that is.
      */
     val physique: PhysiqueReport? = null,
-    /** The last saved physique read before today, and its day, for "since last scan". */
-    val previousPhysique: Pair<Long, Map<MuscleGroup, Double>>? = null,
+    /** Groups this photograph read less reliably than usual, saved with its raw scores. */
+    val physiqueNoise: Map<MuscleGroup, Double> = emptyMap(),
     /** What the scanner screen draws while the models run; null outside [ScanStep.ANALYSING]. */
     val scanner: AiScanner? = null,
 ) {
@@ -751,6 +752,8 @@ class ScanViewModel @Inject constructor(
         val allRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
         val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys)
         val muscleRegions = allRegions - hidden
+        // A phone held over the chest, or only raised arms to read: kept, but trusted less.
+        val physiqueNoise = front.geometry?.let(PhysiqueRegions::noise).orEmpty()
         var live = scanner?.copy(
             stage = ScannerStage.MUSCLES,
             reading = reading,
@@ -775,9 +778,17 @@ class ScanViewModel @Inject constructor(
                     )
                 }
                 val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
-                val (measuredStrong, measuredWeak) =
-                    MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
-                PhysiqueAnalysis.report(scores, goal, hidden, measuredStrong, measuredWeak)
+                // This photograph joins every earlier one rather than overruling them: a
+                // single photograph's read of a group swings by tens of points with light,
+                // pose and framing, and muscle does not. See PhysiqueFusion.
+                val today = LocalDate.now().toEpochDay()
+                val current = PhysiqueObservation(today, scores, hidden, physiqueNoise)
+                coach.fusedPhysiqueReport(today, current, result.circumferences, goal)
+                    ?: run {
+                        val (measuredStrong, measuredWeak) =
+                            MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
+                        PhysiqueAnalysis.report(scores, goal, hidden, measuredStrong, measuredWeak)
+                    }
             }
 
         // The verdict stays up for a moment, beside the bodies it was weighed against,
@@ -793,7 +804,7 @@ class ScanViewModel @Inject constructor(
             step = ScanStep.RESULT,
             scanner = null,
             physique = physique,
-            previousPhysique = physique?.let { coach.physiqueBefore(LocalDate.now().toEpochDay()) },
+            physiqueNoise = physiqueNoise,
             appearance = appearance,
             profile = profile.toScanProfile(),
             result = result.copy(warnings = relevantWarnings),
@@ -941,8 +952,11 @@ class ScanViewModel @Inject constructor(
                 coach.savePhysique(
                     epochDay = LocalDate.now().toEpochDay(),
                     goal = report.goal,
-                    scores = report.scores.associate { it.group to it.score },
+                    // The photograph's own readings, not the fused or measured scores shown on
+                    // screen: saving those would feed the history back into itself.
+                    scores = report.raw,
                     hidden = report.hidden.toSet(),
+                    noise = _state.value.physiqueNoise,
                 )
             }
             _state.value = _state.value.copy(saved = true)

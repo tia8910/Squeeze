@@ -73,12 +73,18 @@ object PhysiqueRegions {
 
         // Each arm from shoulder to wrist, and only when the elbow is in the frame — an arm
         // the pose model placed off the edge of the photograph is a guess, not a crop.
+        //
+        // A relaxed arm is preferred to a raised one. In a mirror selfie one hand holds the
+        // phone at the face, and that arm is bent, foreshortened and half behind the phone;
+        // in the next scan the other hand may hold it. Reading whichever arms hang lets two
+        // scans compare like with like, and falls back to every arm only when none hangs.
         val margin = 0.12 * width
-        val arms = listOf(
+        val armPoints = listOf(
             Triple(pose.shoulderLeft, pose.elbowLeft, pose.wristLeft),
             Triple(pose.shoulderRight, pose.elbowRight, pose.wristRight),
-        ).mapNotNull { (shoulder, elbow, wrist) ->
-            if (elbow == null || !elbow.inFrame()) return@mapNotNull null
+        ).filter { (_, elbow, _) -> elbow != null && elbow.inFrame() }
+        val relaxed = armPoints.filterNot { (_, elbow, wrist) -> raised(elbow, wrist) }
+        val arms = relaxed.ifEmpty { armPoints }.mapNotNull { (shoulder, elbow, wrist) ->
             val points = listOfNotNull(shoulder, elbow, wrist)
             box(
                 points.minOf { it.x } - margin,
@@ -103,6 +109,43 @@ object PhysiqueRegions {
         }
         return out
     }
+
+    /**
+     * How much less than usual to trust each group in this photograph, from the pose alone.
+     *
+     * A hand inside the chest's crop is almost always holding the phone for a mirror shot,
+     * and the phone covers part of the chest; an arm read only because no arm hangs is bent
+     * and foreshortened. Neither is thrown away — [PhysiqueFusion] simply lets it move the
+     * estimate less. 1 is an ordinary read.
+     */
+    fun noise(pose: FrontPoseGeometry): Map<MuscleGroup, Double> {
+        val shoulderY = (pose.shoulderLeft.y + pose.shoulderRight.y) / 2.0
+        val hipY = (pose.hipLeft.y + pose.hipRight.y) / 2.0
+        val span = hipY - shoulderY
+        val left = min(pose.shoulderLeft.x, pose.shoulderRight.x)
+        val right = max(pose.shoulderLeft.x, pose.shoulderRight.x)
+        if (span <= 0.0 || right <= left) return emptyMap()
+        val out = mutableMapOf<MuscleGroup, Double>()
+
+        val overChest = listOfNotNull(pose.wristLeft, pose.wristRight).any {
+            it.inFrame() && it.x in left..right && it.y in (shoulderY - 0.1 * span)..(shoulderY + 0.5 * span)
+        }
+        if (overChest) out[MuscleGroup.CHEST] = OCCLUDED_NOISE
+
+        val arms = listOf(pose.elbowLeft to pose.wristLeft, pose.elbowRight to pose.wristRight)
+            .filter { (elbow, _) -> elbow != null && elbow.inFrame() }
+        if (arms.isNotEmpty() && arms.all { (elbow, wrist) -> raised(elbow, wrist) }) {
+            out[MuscleGroup.ARMS] = RAISED_ARM_NOISE
+        }
+        return out
+    }
+
+    /** A hand at or above its elbow: holding a phone, or flexing — either way not relaxed. */
+    private fun raised(elbow: PosePoint?, wrist: PosePoint?): Boolean =
+        elbow != null && wrist != null && wrist.inFrame() && wrist.y < elbow.y
+
+    private const val OCCLUDED_NOISE = 1.6
+    private const val RAISED_ARM_NOISE = 1.4
 
     private fun PosePoint.inFrame() = x in 0.0..1.0 && y in 0.0..1.0
 
@@ -150,8 +193,20 @@ object MuscleScorer {
     private fun dot(a: DoubleArray, b: DoubleArray) = a.indices.sumOf { a[it] * b[it] }
 }
 
-/** One group's reading. [score] runs 0 to 1: how much the model sides with "developed". */
-data class MuscleScore(val group: MuscleGroup, val score: Double, val development: Development)
+/**
+ * One group's reading. [score] runs 0 to 1: how much the model sides with "developed".
+ *
+ * @param fused the estimate across every scan so far, when there is a history; [score] is
+ *   then that estimate rather than this photograph's reading alone
+ * @param measured true when a measured proportion, not only the photograph, set the score
+ */
+data class MuscleScore(
+    val group: MuscleGroup,
+    val score: Double,
+    val development: Development,
+    val fused: FusedScore? = null,
+    val measured: Boolean = false,
+)
 
 /** What to do about one group, and why it matters for this user's goal. */
 data class FocusAdvice(val group: MuscleGroup, val why: String, val how: String)
@@ -180,6 +235,10 @@ data class PhysiqueReport(
     val strengthEvidence: Map<MuscleGroup, String> = emptyMap(),
     /** What the measurements add to a weak point, when they agree with the AI. */
     val weaknessEvidence: Map<MuscleGroup, String> = emptyMap(),
+    /** This photograph's own readings, before fusion or measurement — what gets saved. */
+    val raw: Map<MuscleGroup, Double> = emptyMap(),
+    /** How many scans the scores rest on; 1 for a first scan. */
+    val reads: Int = 1,
 )
 
 /**
@@ -245,11 +304,19 @@ object PhysiqueAnalysis {
         hidden: Set<MuscleGroup> = emptySet(),
         measuredStrong: Map<MuscleGroup, String> = emptyMap(),
         measuredWeak: Map<MuscleGroup, String> = emptyMap(),
+        measuredScores: Map<MuscleGroup, Double> = emptyMap(),
+        fused: Map<MuscleGroup, FusedScore> = emptyMap(),
     ): PhysiqueReport? {
         val read = scores
             .filterKeys { it !in hidden }
             .filterValues { it.isFinite() }
-            .map { (group, score) -> MuscleScore(group, score.coerceIn(0.0, 1.0), development(score)) }
+            .map { (group, raw) ->
+                val history = fused[group]
+                val ai = (history?.score ?: raw).coerceIn(0.0, 1.0)
+                val m = measuredScores[group]?.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0)
+                val score = if (m != null) MEASURED_WEIGHT * m + (1 - MEASURED_WEIGHT) * ai else ai
+                MuscleScore(group, score, development(score), history, measured = m != null)
+            }
             .sortedByDescending { it.score }
         if (read.isEmpty() && measuredStrong.isEmpty()) return null
 
@@ -280,9 +347,20 @@ object PhysiqueAnalysis {
             }
             .take(MAX_WEAKNESSES)
 
+        // A strength is never printed as lagging. The measured V-taper used to be listed as a
+        // strength under a 4/100 "Lagging" bar for the same group, which is the report
+        // contradicting itself; the tape wins the strength, so the bar may not call it weak.
+        val shown = read.map {
+            if (it.group in strengths && it.development == Development.LAGGING) {
+                it.copy(development = Development.AVERAGE)
+            } else {
+                it
+            }
+        }
+
         return PhysiqueReport(
             goal = goal,
-            scores = read,
+            scores = shown,
             strengths = strengths,
             weaknesses = weaknesses,
             focus = weaknesses.map { FocusAdvice(it, why(goal, it), how(goal, it)) },
@@ -290,6 +368,8 @@ object PhysiqueAnalysis {
             hidden = hidden.sortedBy { it.ordinal },
             strengthEvidence = evidence,
             weaknessEvidence = measuredWeak.filterKeys { it in weaknesses },
+            raw = scores.filterKeys { it !in hidden }.filterValues { it.isFinite() },
+            reads = fused.values.maxOfOrNull { it.reads } ?: 1,
         )
     }
 
@@ -302,6 +382,16 @@ object PhysiqueAnalysis {
         }
 
     private fun pct(v: Double) = (v * 100).toInt()
+
+    /**
+     * How much a measured proportion outweighs the photograph's impression of the same group.
+     *
+     * The model's "V-taper" wordings read about 3/100 on a man whose chest measured 1.62 times
+     * his waist, and barely moved under any change to the photograph — they carry almost no
+     * information about the torso's shape. A ratio of two widths from the same photograph
+     * does. The impression keeps a quarter so a mis-measured girth cannot take over entirely.
+     */
+    const val MEASURED_WEIGHT = 0.75
 
     private const val MAX_WEAKNESSES = 2
 

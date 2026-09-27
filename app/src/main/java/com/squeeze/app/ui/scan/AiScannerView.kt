@@ -57,12 +57,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.core.model.Goal
 import com.squeeze.core.scan.CropRegion
-import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.scan.Development
+import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
-import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.scan.PosePoint
+import kotlin.math.roundToInt
 
 /**
  * The scan, shown while it happens.
@@ -581,7 +582,7 @@ fun LiveScanSweep(modifier: Modifier = Modifier) {
 private fun MuscleProgress(scanner: AiScanner) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -625,7 +626,6 @@ private fun goalName(goal: Goal): String = when (goal) {
 fun PhysiqueCard(
     report: PhysiqueReport,
     modifier: Modifier = Modifier,
-    previous: Pair<Long, Map<MuscleGroup, Double>>? = null,
     /** Whole-body findings from the measurements — waist-to-height, body fat, lean mass. */
     measured: List<com.squeeze.core.bodycomp.BodyFinding> = emptyList(),
 ) {
@@ -658,14 +658,22 @@ fun PhysiqueCard(
                         weight = score.score.toFloat(),
                         strongest = score.development == Development.DEVELOPED,
                     )
-                    val change = previous?.second?.get(score.group)?.let { score.score - it }
-                    val since = previous?.first?.let {
+                    // Change is printed only when it is more than a different photograph would
+                    // explain. "▼ 40 since 23 Sept" for the arms of a man whose weight had not
+                    // moved was the photograph changing, and printing it taught the user that
+                    // the numbers mean nothing.
+                    val fused = score.fused
+                    val since = fused?.since?.let {
                         java.time.LocalDate.ofEpochDay(it)
                             .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
                     }
-                    val moved = change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
-                        " · ${if (it > 0) "▲" else "▼"} ${(kotlin.math.abs(it) * 100).toInt()} since $since"
-                    }.orEmpty()
+                    val change = fused?.change
+                    val moved = when {
+                        since == null || change == null -> ""
+                        fused?.confirmed == true && kotlin.math.abs(change) >= 0.01 ->
+                            " · ${if (change > 0) "▲" else "▼"} ${(kotlin.math.abs(change) * 100).roundToInt()} since $since"
+                        else -> " · steady since $since"
+                    } + if (score.measured) " · from your measurements" else ""
                     Text(
                         score.development.label + moved,
                         style = MaterialTheme.typography.labelSmall,
@@ -678,6 +686,19 @@ fun PhysiqueCard(
                     )
                 }
             }
+
+            Text(
+                if (report.reads > 1) {
+                    "Each bar combines your last ${report.reads} scans, so one dim or awkward " +
+                        "photo cannot swing it. A change is shown only when it is bigger than " +
+                        "photo-to-photo noise."
+                } else {
+                    "First scan — a single photo can be off by 15 points either way. Scan " +
+                        "again in similar light and each bar will settle."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             if (report.hidden.isNotEmpty()) {
                 Text(
