@@ -1,5 +1,6 @@
 package com.squeeze.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.WindowManager
@@ -22,6 +23,8 @@ import com.squeeze.app.audio.LocalSoundEngine
 import com.squeeze.app.audio.SoundEngine
 import com.squeeze.app.data.settings.SecuritySettings
 import com.squeeze.app.data.settings.UiSettings
+import com.squeeze.app.notify.Notifier
+import com.squeeze.core.coach.StepId
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import com.squeeze.app.ui.SqueezeApp
@@ -71,6 +74,21 @@ class MainActivity : FragmentActivity() {
      */
     private var everUnlocked by mutableStateOf(false)
 
+    /** The step a tapped notification asked for, handed to the app once it is unlocked. */
+    private var openStep by mutableStateOf<StepId?>(null)
+
+    private fun readStep(intent: Intent?) {
+        val name = intent?.getStringExtra(Notifier.EXTRA_STEP) ?: return
+        openStep = runCatching { StepId.valueOf(name) }.getOrNull()
+        intent.removeExtra(Notifier.EXTRA_STEP)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        readStep(intent)
+    }
+
     /** Guards against stacking prompts when onStart runs again with one already showing. */
     private var promptShowing = false
 
@@ -88,6 +106,7 @@ class MainActivity : FragmentActivity() {
 
         applyScreenshotPolicy()
         applyAmbientPolicy()
+        readStep(intent)
 
         // With no enrolled biometric there is nothing to prompt for. Blocking access would
         // lock the user out of their own data with no recovery path, since there is no
@@ -114,7 +133,9 @@ class MainActivity : FragmentActivity() {
                         // Not composed at all before the first unlock: there is no state to
                         // preserve yet, and building the dashboard behind the gate would
                         // read the database before the user has proven the phone is theirs.
-                        if (everUnlocked) SqueezeApp()
+                        if (everUnlocked) {
+                            SqueezeApp(openStep = openStep, onStepOpened = { openStep = null })
+                        }
 
                         // LockScreen draws an opaque Surface over the full size, so nothing
                         // underneath is visible here or in the recents thumbnail.

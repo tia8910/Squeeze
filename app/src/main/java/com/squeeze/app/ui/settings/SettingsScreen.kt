@@ -1,5 +1,23 @@
 package com.squeeze.app.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.squeeze.app.notify.NotificationSettings
+import com.squeeze.app.notify.Notifier
+import com.squeeze.app.notify.ReminderScheduler
+import com.squeeze.core.coach.ReminderKind
+import com.squeeze.core.coach.ReminderSlot
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,6 +94,8 @@ fun SettingsScreen(
         )
 
         ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
+
+        NotificationsSection()
 
         SectionHeader(
             eyebrow = "Feedback",
@@ -236,3 +256,110 @@ private fun SettingToggle(
         }
     }
 }
+
+/**
+ * Which reminders arrive, and when.
+ *
+ * Self-contained — it reads and writes [NotificationSettings] and re-arms the alarms itself —
+ * because nothing else on this screen depends on it, and threading five more parameters
+ * through [SettingsScreen] for a section that owns its own state would only add places to
+ * get it wrong.
+ */
+@Composable
+private fun NotificationsSection() {
+    val context = LocalContext.current
+    val settings = remember { NotificationSettings(context) }
+    val enabled by settings.enabled.collectAsState()
+    val morning by settings.morningMinutes.collectAsState()
+    val evening by settings.eveningMinutes.collectAsState()
+    var allowed by remember { mutableStateOf(Notifier.canPost(context)) }
+
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        allowed = granted && Notifier.canPost(context)
+        if (allowed) ReminderScheduler.scheduleAll(context)
+    }
+    fun ensureAllowed() {
+        if (Notifier.canPost(context)) {
+            allowed = true
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            settings.permissionAsked = true
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            // Below Android 13 there is no prompt; the only switch is in system settings.
+            context.startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
+    SectionHeader(
+        eyebrow = "Reminders",
+        title = "Notifications",
+        caption = "At most one in the morning and one in the evening, only when there is " +
+            "something to do. Made on your phone from your own plan — nothing is sent anywhere.",
+    )
+
+    if (!allowed) {
+        BrandCard(Modifier.fillMaxWidth()) {
+            Text("Notifications are off for Squeeze", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Allow them to get today's session in the morning and your weekly check-in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SecondaryButton(
+                text = "Allow notifications",
+                onClick = { ensureAllowed() },
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+
+    listOf(
+        Triple(ReminderKind.WORKOUT, "Workout reminders", "Today's session in the morning, and a nudge in the evening if it is still open."),
+        Triple(ReminderKind.CHECK_IN, "Weekly check-in", "When a week has passed since your last scan — with tips for a photo that compares accurately."),
+        Triple(ReminderKind.WEEK_SUMMARY, "Sunday summary", "Sessions and sets done against the plan."),
+    ).forEach { (kind, title, description) ->
+        SettingToggle(
+            title = title,
+            description = description,
+            checked = kind in enabled,
+            onCheckedChange = { on ->
+                settings.setEnabled(kind, on)
+                if (on) ensureAllowed()
+            },
+        )
+    }
+
+    BrandCard(Modifier.fillMaxWidth()) {
+        Text("Morning", style = MaterialTheme.typography.titleSmall)
+        TimeChips(NotificationSettings.MORNING_CHOICES, morning) {
+            settings.setMorningMinutes(it)
+            ReminderScheduler.schedule(context, ReminderSlot.MORNING)
+        }
+        Text("Evening", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+        TimeChips(NotificationSettings.EVENING_CHOICES, evening) {
+            settings.setEveningMinutes(it)
+            ReminderScheduler.schedule(context, ReminderSlot.EVENING)
+        }
+    }
+}
+
+@Composable
+private fun TimeChips(choices: List<Int>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+    ) {
+        choices.forEach { minutes ->
+            FilterChip(
+                selected = minutes == selected,
+                onClick = { onSelect(minutes) },
+                label = { Text(NotificationSettings.format(minutes)) },
+            )
+        }
+    }
+}
+

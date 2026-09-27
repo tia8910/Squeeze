@@ -103,6 +103,40 @@ class CoachRepository @Inject constructor(
         )
     }
 
+    /**
+     * Everything a notification needs, read fresh at the moment it fires so it never
+     * describes a plan the user has since changed. See [com.squeeze.core.coach.ReminderPlanner].
+     */
+    suspend fun reminderFacts(): com.squeeze.core.coach.ReminderFacts {
+        val today = LocalDate.now()
+        val todayDay = today.toEpochDay()
+        val monday = today.with(java.time.DayOfWeek.MONDAY).toEpochDay()
+        val journey = journey()
+        val week = week()
+        val todays = todaysSessions(week).firstOrNull()
+        val loggedDays = (activityDao.since(monday).map { it.epochDay } + workoutDao.since(monday).map { it.epochDay })
+            .filter { it <= todayDay }
+            .toSet()
+        val measurements = measurementDao.since(Long.MIN_VALUE)
+        val lastScan = listOfNotNull(
+            physiqueDao.latest()?.epochDay,
+            measurements.filter { it.photoId != null }.maxOfOrNull { it.epochDay },
+        ).maxOrNull()
+        val volume = weeklyVolume()
+        return com.squeeze.core.coach.ReminderFacts(
+            isoDayOfWeek = today.dayOfWeek.value,
+            setupComplete = journey.setupComplete,
+            daysSinceScan = lastScan?.let { todayDay - it },
+            todaysSession = todays?.title,
+            todaysMinutes = todays?.minutes,
+            loggedToday = todayDay in loggedDays,
+            sessionsPlanned = week?.trainingDays ?: 0,
+            sessionsLogged = loggedDays.size,
+            setsPlanned = volume.sumOf { it.planned },
+            setsLogged = volume.sumOf { it.done },
+        )
+    }
+
     /** Hands today's first planned session to the log screen. */
     suspend fun prepareTodaysSession() {
         val session = todaysSessions(week()).firstOrNull() ?: return

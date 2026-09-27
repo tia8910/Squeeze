@@ -105,7 +105,12 @@ private const val LABEL_ROUTE = "label"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
+fun SqueezeApp(
+    viewModel: SqueezeViewModel = hiltViewModel(),
+    /** The step a tapped notification asks for, or null. */
+    openStep: StepId? = null,
+    onStepOpened: () -> Unit = {},
+) {
     val landingSeen by viewModel.landingSeen.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -240,6 +245,20 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
             }
         }
         val nextStep = state.summary?.journey?.next
+
+        // A tapped notification lands exactly where the dashboard's "next" would have sent
+        // the user, through the same router.
+        LaunchedEffect(openStep) {
+            openStep?.let {
+                goToStep(it)
+                onStepOpened()
+            }
+        }
+
+        // Ask for notifications once, at the first moment they have something to say: when
+        // setup is finished and there is a week to remind about. Asking on first launch, before
+        // the app has shown what it would send, is how the permission gets denied for good.
+        AskForNotificationsOnce(ready = state.summary?.journey?.setupComplete == true)
 
         // Anything that changes the plan re-reads the journey, so the next step is always
         // the true one.
@@ -505,3 +524,22 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
         }
     }
 }
+
+@Composable
+private fun AskForNotificationsOnce(ready: Boolean) {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) com.squeeze.app.notify.ReminderScheduler.scheduleAll(context)
+    }
+    LaunchedEffect(ready) {
+        if (!ready) return@LaunchedEffect
+        val settings = com.squeeze.app.notify.NotificationSettings(context)
+        if (settings.permissionAsked || com.squeeze.app.notify.Notifier.canPost(context)) return@LaunchedEffect
+        settings.permissionAsked = true
+        launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
