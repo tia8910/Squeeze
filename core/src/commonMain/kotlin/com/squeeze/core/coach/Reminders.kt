@@ -1,10 +1,12 @@
 package com.squeeze.core.coach
 
+import com.squeeze.core.text.grouped
+
 /** The two moments of the day the app may speak up. */
 enum class ReminderSlot { MORNING, EVENING }
 
 /** The kinds of notification, each one switchable on its own in Settings. */
-enum class ReminderKind { WORKOUT, CHECK_IN, WEEK_SUMMARY }
+enum class ReminderKind { WORKOUT, CHECK_IN, WEEK_SUMMARY, STEPS }
 
 /**
  * One notification, ready to post.
@@ -41,6 +43,9 @@ data class ReminderFacts(
     val sessionsLogged: Int,
     val setsPlanned: Int,
     val setsLogged: Int,
+    /** Today's steps from a watch or the phone, via Health Connect; null when not connected. */
+    val steps: Long? = null,
+    val stepGoal: Long = com.squeeze.core.health.ActivityInsights.DEFAULT_STEP_GOAL,
 )
 
 /**
@@ -71,6 +76,7 @@ object ReminderPlanner {
             ReminderSlot.EVENING -> listOfNotNull(
                 weekSummary(f).takeIf { f.isoDayOfWeek == SUMMARY_DAY },
                 unloggedSession(f),
+                stepsNudge(f),
             )
         }
         return candidates.firstOrNull { it.kind in enabled }
@@ -101,6 +107,26 @@ object ReminderPlanner {
             opens = StepId.TODAYS_SESSION,
         )
     }
+
+    /**
+     * Only when the gap is a walk someone would actually take. At 19:30 with 1,500 steps, a
+     * seventy-minute walk is not a suggestion anyone acts on, and a nag that is always ignored
+     * teaches the user to ignore the app.
+     */
+    private fun stepsNudge(f: ReminderFacts): Reminder? {
+        val steps = f.steps ?: return null
+        val walk = com.squeeze.core.health.ActivityInsights.walkMinutesToGoal(steps, f.stepGoal)
+        if (walk == 0 || walk > MAX_WALK_MINUTES) return null
+        return Reminder(
+            kind = ReminderKind.STEPS,
+            title = "${(steps).grouped()} steps — a $walk-minute walk reaches ${(f.stepGoal).grouped()}",
+            body = "Walking is the cheapest fat loss there is, and it barely touches recovery.",
+            publicTitle = "A short walk closes today's steps",
+            opens = null,
+        )
+    }
+
+    private const val MAX_WALK_MINUTES = 45
 
     private fun checkIn(f: ReminderFacts): Reminder? {
         val days = f.daysSinceScan ?: return null

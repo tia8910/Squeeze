@@ -67,6 +67,7 @@ class CoachRepository @Inject constructor(
     private val composition: BodyCompositionRepository,
     private val workoutDao: WorkoutDao,
     private val activityDao: ActivityDao,
+    private val health: com.squeeze.app.health.HealthConnectManager,
 ) {
 
     /**
@@ -123,17 +124,21 @@ class CoachRepository @Inject constructor(
             measurements.filter { it.photoId != null }.maxOfOrNull { it.epochDay },
         ).maxOrNull()
         val volume = weeklyVolume()
+        val synced = health.day()
         return com.squeeze.core.coach.ReminderFacts(
             isoDayOfWeek = today.dayOfWeek.value,
             setupComplete = journey.setupComplete,
             daysSinceScan = lastScan?.let { todayDay - it },
             todaysSession = todays?.title,
             todaysMinutes = todays?.minutes,
-            loggedToday = todayDay in loggedDays,
+            // A workout the watch recorded counts: nobody should be nagged to log a session
+            // their wrist already logged.
+            loggedToday = todayDay in loggedDays || com.squeeze.core.health.ActivityInsights.watchWorkoutDone(synced),
             sessionsPlanned = week?.trainingDays ?: 0,
             sessionsLogged = loggedDays.size,
             setsPlanned = volume.sumOf { it.planned },
             setsLogged = volume.sumOf { it.done },
+            steps = synced?.steps,
         )
     }
 
@@ -275,8 +280,27 @@ class CoachRepository @Inject constructor(
                 netKcal = kcal,
             ),
         )
+        // Shared with the watch app, Google Fit and the rest, when the user allowed it.
+        health.writeWorkout(sport, title, minutes)
         return kcal
     }
+
+    /**
+     * After a measurement is saved: the weight, and the body fat as the app now estimates it
+     * (the filtered, calibrated figure on the dashboard, not the raw reading), written to
+     * Health Connect so a smart-scale or watch app shows the same numbers.
+     */
+    suspend fun shareBody(weightKg: Double?) {
+        val profile = profileDao.get()?.toDomain()
+        val bodyFat = profile?.let { runCatching { composition.snapshot(it).latest?.level }.getOrNull() }
+        health.writeBody(weightKg, bodyFat)
+    }
+
+    /** Today from the user's watch, phone and nutrition apps; null when not connected. */
+    suspend fun activityToday(): com.squeeze.core.health.DailyActivity? = health.day()
+
+    /** The last week, oldest first, for steps and the resting-pulse baseline. */
+    suspend fun activityWeek(): List<com.squeeze.core.health.DailyActivity> = health.recent(7)
 
     suspend fun recentSessions(days: Long = 14): List<ActivitySessionEntity> =
         activityDao.since(LocalDate.now().toEpochDay() - days)

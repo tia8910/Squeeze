@@ -947,6 +947,8 @@ class ScanViewModel @Inject constructor(
             )
 
             frontBitmap = null
+            // Weight and the resulting body fat, to Health Connect when the user allowed it.
+            coach.shareBody(weight)
             // The AI's physique read goes where training and nutrition can use it.
             _state.value.physique?.let { report ->
                 coach.savePhysique(

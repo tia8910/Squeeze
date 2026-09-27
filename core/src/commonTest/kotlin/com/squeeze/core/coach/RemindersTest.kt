@@ -83,4 +83,15 @@ class RemindersTest {
         )
         slots.forEach { r -> assertFalse(assertNotNull(r).publicTitle.any { it.isDigit() }, r.publicTitle) }
     }
+
+    @Test
+    fun `an evening steps nudge only when the walk is short enough to take`() {
+        val done = facts.copy(loggedToday = true)
+        val r = assertNotNull(ReminderPlanner.plan(ReminderSlot.EVENING, done.copy(steps = 5_600), all))
+        assertEquals(ReminderKind.STEPS, r.kind)
+        assertTrue(r.title.contains("25-minute walk"))
+        assertNull(ReminderPlanner.plan(ReminderSlot.EVENING, done.copy(steps = 1_000), all))
+        assertNull(ReminderPlanner.plan(ReminderSlot.EVENING, done.copy(steps = 9_000), all))
+        assertNull(ReminderPlanner.plan(ReminderSlot.EVENING, done.copy(steps = null), all))
+    }
 }
