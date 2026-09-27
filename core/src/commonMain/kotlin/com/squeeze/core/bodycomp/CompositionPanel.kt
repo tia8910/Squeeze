@@ -254,7 +254,16 @@ object CompositionAnalyser {
         }
 
         val hip = circumferences.hipCm
-        if (waist != null && hip != null) {
+        val hipSuspect = waist != null && hip != null &&
+            !com.squeeze.core.scan.PlausibleRanges.plausibleHip(waist, hip, profile.sex == Sex.FEMALE)
+        if (hipSuspect) {
+            // A hip this much wider than the waist is loose clothing or hands measured as hip;
+            // printing its ratio as "Measured" would present an error as a fact.
+            missing += MissingInput(
+                input = "A retake in fitted clothing, hands away from your hips",
+                unlocks = "Waist-to-hip (this photo's hip read too wide to be real)",
+            )
+        } else if (waist != null && hip != null) {
             shape += Metric(
                 name = "Waist-to-hip",
                 value = waist / hip,

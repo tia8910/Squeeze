@@ -81,6 +81,9 @@ object RecordHeadline {
     fun format(value: Double, unit: String): String {
         val text = when {
             unit == "kcal/day" -> kotlin.math.round(value).toLong().grouped()
+            // Masses and percentages always carry one decimal, so a column of them lines up:
+            // "9.30 kg" beside "60.7 kg" read as a different kind of number.
+            unit == "kg" || unit == "%" -> value.fixed(1)
             abs(value) >= 100 -> value.fixed(0)
             abs(value) >= 10 -> value.fixed(1)
             // ABSI lives around 0.08: two decimals printed 0.067 as "0.07", which could not be

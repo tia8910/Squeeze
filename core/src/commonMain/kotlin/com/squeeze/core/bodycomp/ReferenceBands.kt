@@ -15,6 +15,12 @@ data class ReferenceBand(
     val position: BandPosition,
     val label: String,
     val detail: String,
+    /**
+     * Whether the reading deserves attention. Separate from [position] because direction is
+     * not the verdict: "Athletic" body fat and "Well trained" FFMI sit off the middle and are
+     * good news, and were drawn in the warning colour because the chip read the position.
+     */
+    val caution: Boolean = position != BandPosition.NORMAL,
 )
 
 /**
@@ -70,7 +76,8 @@ object ReferenceBands {
             percent <= athletic -> ReferenceBand(
                 BandPosition.LOW,
                 "Athletic",
-                "Lean — typical of people who train and manage their diet.",
+                "Lean, typical of people who train and manage their diet.",
+                caution = false,
             )
 
             percent <= fitness -> ReferenceBand(
@@ -129,6 +136,7 @@ object ReferenceBands {
                 BandPosition.HIGH,
                 "Well trained",
                 "Typical after years of consistent training.",
+                caution = false,
             )
 
             else -> ReferenceBand(
@@ -149,7 +157,8 @@ object ReferenceBands {
         value < 0.40 -> ReferenceBand(
             BandPosition.LOW,
             "Slim",
-            "Below the usual range; fine on its own.",
+            "Below the usual range, and fine on its own.",
+            caution = false,
         )
 
         value < 0.50 -> ReferenceBand(

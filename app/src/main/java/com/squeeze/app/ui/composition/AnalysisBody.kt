@@ -167,10 +167,7 @@ private fun MetricGroup(title: String, metrics: List<Metric>) {
 @Composable
 private fun BandTag(band: ReferenceBand) {
     val dark = LocalIsDarkTheme.current
-    val colour = when (band.position) {
-        BandPosition.NORMAL -> if (dark) Brand.DarkBlue else Brand.BlueDeep
-        BandPosition.LOW, BandPosition.HIGH -> Brand.Warning
-    }
+    val colour = if (band.caution) Brand.Warning else if (dark) Brand.DarkBlue else Brand.BlueDeep
 
     Box(
         Modifier

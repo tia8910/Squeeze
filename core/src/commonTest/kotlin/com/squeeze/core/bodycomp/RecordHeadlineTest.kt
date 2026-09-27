@@ -97,6 +97,7 @@ class RecordHeadlineTest {
         assertEquals("2,450 kcal/day", RecordHeadline.format(2450.4, "kcal/day"))
         // ABSI sits near 0.08; two decimals would print 0.067 as 0.07.
         assertEquals("0.067", RecordHeadline.format(0.0674, ""))
+        assertEquals("9.3 kg", RecordHeadline.format(9.31, "kg"))
         // A resting energy figure is printed whole even below a hundred: the equation has no
         // more precision at 90 kcal than at 900.
         assertEquals("90 kcal/day", RecordHeadline.format(90.4, "kcal/day"))

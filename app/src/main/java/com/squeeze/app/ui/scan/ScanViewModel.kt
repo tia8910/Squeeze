@@ -892,6 +892,8 @@ class ScanViewModel @Inject constructor(
         val abdominal = _state.value.abdominalBodyFatPercent
         val result = _state.value.result ?: return
 
+        val legsCovered = _state.value.physique?.hidden?.contains(com.squeeze.core.scan.MuscleGroup.LEGS) == true
+
         viewModelScope.launch {
             val c = edited
 
@@ -921,9 +923,12 @@ class ScanViewModel @Inject constructor(
                     waistCm = c.waistCm,
                     hipCm = c.hipCm,
                     chestCm = c.chestCm,
-                    thighCm = c.thighCm,
+                    // Legs the photo showed under clothing are not measured: a thigh traced
+                    // through loose trousers is the trousers. The physique analysis already
+                    // refuses to judge covered legs; the girths now follow the same rule.
+                    thighCm = c.thighCm.takeUnless { legsCovered },
                     armCm = c.armCm,
-                    calfCm = c.calfCm,
+                    calfCm = c.calfCm.takeUnless { legsCovered },
                     chestMm = null,
                     abdomenMm = null,
                     thighMm = null,
