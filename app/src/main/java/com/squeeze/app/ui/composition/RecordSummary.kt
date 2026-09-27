@@ -83,7 +83,7 @@ fun RecordSummary(
 
         if (reference != null) {
             Text(
-                text = "A reference body at about ${reference.bandPercent}% — not you, and " +
+                text = "A reference body at about ${reference.bandPercent}%. Not you, and " +
                     "not built from your measurements. It is here for one purpose: if this " +
                     "looks nothing like you, the scan is wrong.",
                 style = MaterialTheme.typography.bodySmall,

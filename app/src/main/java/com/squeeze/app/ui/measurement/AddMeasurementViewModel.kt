@@ -80,6 +80,7 @@ data class MeasurementForm(
 @HiltViewModel
 class AddMeasurementViewModel @Inject constructor(
     private val measurementDao: MeasurementDao,
+    private val coach: com.squeeze.app.data.CoachRepository,
 ) : ViewModel() {
 
     private val _form = MutableStateFlow(MeasurementForm())
@@ -97,8 +98,10 @@ class AddMeasurementViewModel @Inject constructor(
         if (!form.hasAnything) return
 
         viewModelScope.launch {
-            measurementDao.insert(form.toEntity(LocalDate.now().toEpochDay()))
+            val entity = form.toEntity(LocalDate.now().toEpochDay())
+            measurementDao.insert(entity)
             _saved.value = true
+            coach.shareBody(entity.weightKg)
         }
     }
 }

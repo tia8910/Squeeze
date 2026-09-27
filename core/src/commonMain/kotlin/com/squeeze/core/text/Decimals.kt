@@ -63,3 +63,20 @@ object Decimals {
 
 /** Shorthand for [Decimals.fixed]; reads better inside a string template. */
 fun Double.fixed(digits: Int): String = Decimals.fixed(this, digits)
+
+/**
+ * A whole number with thousands separators — 8000 as "8,000" — for steps and calories.
+ * Common code has no String.format, and a hand-rolled grouping is shorter than a dependency.
+ */
+fun Long.grouped(): String {
+    val digits = kotlin.math.abs(this).toString()
+    val out = StringBuilder()
+    digits.forEachIndexed { i, c ->
+        if (i > 0 && (digits.length - i) % 3 == 0) out.append(',')
+        out.append(c)
+    }
+    return (if (this < 0) "-" else "") + out
+}
+
+fun Int.grouped(): String = toLong().grouped()
+

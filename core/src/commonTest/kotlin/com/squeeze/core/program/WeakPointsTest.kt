@@ -146,7 +146,7 @@ class WeakPointsTest {
 
         assertNotNull(advice)
         assertTrue(advice.contains("left"))
-        assertTrue(advice.contains("unilaterally"))
+        assertTrue(advice.contains("one side at a time"))
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.squeeze.core.bodycomp
 
 import com.squeeze.core.text.fixed
+import com.squeeze.core.text.grouped
 import kotlin.math.abs
 
 /**
@@ -79,9 +80,15 @@ object RecordHeadline {
      */
     fun format(value: Double, unit: String): String {
         val text = when {
-            unit == "kcal/day" -> value.fixed(0)
+            unit == "kcal/day" -> kotlin.math.round(value).toLong().grouped()
+            // Masses and percentages always carry one decimal, so a column of them lines up:
+            // "9.30 kg" beside "60.7 kg" read as a different kind of number.
+            unit == "kg" || unit == "%" -> value.fixed(1)
             abs(value) >= 100 -> value.fixed(0)
             abs(value) >= 10 -> value.fixed(1)
+            // ABSI lives around 0.08: two decimals printed 0.067 as "0.07", which could not be
+            // compared with the 0.080 average the description quotes.
+            abs(value) > 0 && abs(value) < 0.1 -> value.fixed(3)
             else -> value.fixed(2)
         }
         return if (unit.isEmpty()) text else "$text $unit"

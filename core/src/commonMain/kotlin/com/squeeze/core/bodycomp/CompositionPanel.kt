@@ -100,8 +100,7 @@ object CompositionAnalyser {
                 value = bodyFatPercent,
                 unit = "%",
                 confidence = Confidence.ESTIMATED,
-                detail = "Merged from every method your measurements support, weighted by how " +
-                    "precise each one is.",
+                detail = "Combined from every method this entry supports, weighted by precision.",
                 band = ReferenceBands.bodyFat(bodyFatPercent, profile.sex, age),
             )
         }
@@ -114,8 +113,7 @@ object CompositionAnalyser {
                 value = partition.fatMassKg,
                 unit = "kg",
                 confidence = Confidence.ESTIMATED,
-                detail = "Bodyweight multiplied by your body fat estimate, so it carries the " +
-                    "same uncertainty as that estimate.",
+                detail = "Weight × body fat. As uncertain as the body fat figure.",
             )
 
             composition += Metric(
@@ -123,8 +121,7 @@ object CompositionAnalyser {
                 value = partition.leanMassKg,
                 unit = "kg",
                 confidence = Confidence.ESTIMATED,
-                detail = "Everything that is not fat: muscle, bone, organs and water. This is " +
-                    "the number to watch during a cut — holding it is the whole point.",
+                detail = "Muscle, bone, organs and water. Hold this steady on a cut.",
             )
 
             val ffmi = partition.leanMassKg / (heightM * heightM)
@@ -133,8 +130,7 @@ object CompositionAnalyser {
                 value = ffmi,
                 unit = "",
                 confidence = Confidence.ESTIMATED,
-                detail = "Fat-free mass index — lean mass scaled for height, so it can be " +
-                    "compared between people.",
+                detail = "Fat-free mass ÷ height². Comparable between people.",
                 band = ReferenceBands.ffmi(ffmi, profile.sex),
             )
 
@@ -145,8 +141,7 @@ object CompositionAnalyser {
                 value = ffmi + 6.1 * (1.8 - heightM),
                 unit = "",
                 confidence = Confidence.ESTIMATED,
-                detail = "FFMI adjusted to a 1.8 m reference height, which removes most of the " +
-                    "advantage raw FFMI gives to taller people.",
+                detail = "FFMI adjusted to a 1.8 m height (Kouri 1995), so tall and short compare fairly.",
             )
         }
 
@@ -169,10 +164,8 @@ object CompositionAnalyser {
                 value = skeletalMuscle,
                 unit = "kg",
                 confidence = Confidence.ROUGH,
-                detail = "From arm, thigh and calf girth (Lee 2000). The equation expects " +
-                    "girths corrected for skinfold thickness; without skinfolds these include " +
-                    "the fat over the muscle, so the figure runs high. Track its direction " +
-                    "rather than its value.",
+                detail = "Lee 2000, from arm, thigh and calf girths. Runs high without " +
+                    "skinfolds, so track the direction, not the value.",
             )
         } else {
             missing += MissingInput(
@@ -199,12 +192,12 @@ object CompositionAnalyser {
                 value = whtr,
                 unit = "",
                 confidence = Confidence.DIRECT,
+                // The band says where the value sits; this says what the measure is, so the
+                // two lines never repeat each other.
                 detail = if (whtr >= 0.5) {
-                    "At or above 0.5. Keeping your waist under half your height is the " +
-                        "simplest single screen for central fat, and this is over it."
+                    "Waist ÷ height. Over 0.5; aim to bring it under."
                 } else {
-                    "Under 0.5, which is the usual target. Waist under half your height is " +
-                        "the simplest single screen for central fat."
+                    "Waist ÷ height. Under 0.5, the target for belly fat."
                 },
                 band = ReferenceBands.waistToHeight(whtr),
             )
@@ -220,9 +213,8 @@ object CompositionAnalyser {
                     value = absi,
                     unit = "",
                     confidence = Confidence.ESTIMATED,
-                    detail = "A Body Shape Index. Waist adjusted for height and weight, so it " +
-                        "isolates how central your fat is rather than how much there is. " +
-                        "Around 0.08 is typical; higher means more centrally carried.",
+                    detail = "A Body Shape Index (Krakauer 2012): waist corrected for height and " +
+                        "weight. Adults average about 0.080; higher means more fat at the middle.",
                 )
 
                 shape += Metric(
@@ -230,9 +222,7 @@ object CompositionAnalyser {
                     value = bmi,
                     unit = "",
                     confidence = Confidence.DIRECT,
-                    detail = "Included for reference only. BMI cannot tell muscle from fat, " +
-                        "which is why a lean, muscular person is routinely classed overweight " +
-                        "by it. The figures above are better answers to the same question.",
+                    detail = "For reference only. BMI can't tell muscle from fat.",
                     band = ReferenceBands.bmi(bmi),
                 )
             }
@@ -250,9 +240,10 @@ object CompositionAnalyser {
                     value = bri,
                     unit = "",
                     confidence = Confidence.ESTIMATED,
-                    detail = "Body Roundness Index, from waist and height. Treats your torso " +
-                        "as an ellipse: 1 is a line, higher is rounder. Most adults fall " +
-                        "between 2 and 7.",
+                    // Not "1 is a line": the formula gives a negative value for a line.
+                    // US adults (NHANES) average about 5.
+                    detail = "Body Roundness Index (Thomas 2013), from waist and height. " +
+                        "Adults average about 5; lower is slimmer.",
                 )
             }
         } else {
@@ -263,29 +254,44 @@ object CompositionAnalyser {
         }
 
         val hip = circumferences.hipCm
-        if (waist != null && hip != null) {
+        val hipSuspect = waist != null && hip != null &&
+            !com.squeeze.core.scan.PlausibleRanges.plausibleHip(waist, hip, profile.sex == Sex.FEMALE)
+        if (hipSuspect) {
+            // A hip this much wider than the waist is loose clothing or hands measured as hip;
+            // printing its ratio as "Measured" would present an error as a fact.
+            missing += MissingInput(
+                input = "A retake in fitted clothing, hands away from your hips",
+                unlocks = "Waist-to-hip (this photo's hip read too wide to be real)",
+            )
+        } else if (waist != null && hip != null) {
             shape += Metric(
                 name = "Waist-to-hip",
                 value = waist / hip,
                 unit = "",
                 confidence = Confidence.DIRECT,
-                detail = "Where fat sits rather than how much there is. Both numbers come " +
-                    "from the same photo at the same scale, so scale error cancels — this is " +
-                    "one of the most trustworthy things a scan produces.",
+                detail = "Where fat sits, not how much. Both from one photo, so scale error cancels.",
                 band = ReferenceBands.waistToHip(waist / hip, profile.sex),
             )
         }
 
         val chest = circumferences.chestCm
         if (waist != null && chest != null) {
-            shape += Metric(
-                name = "Chest-to-waist",
-                value = chest / waist,
-                unit = "",
-                confidence = Confidence.DIRECT,
-                detail = "The V-taper. Rises when you build your upper back and chest, and " +
-                    "when you lose from the waist — so it moves for two different good reasons.",
-            )
+            if (com.squeeze.core.scan.PlausibleRanges.plausibleTaper(chest, waist)) {
+                shape += Metric(
+                    name = "Chest-to-waist",
+                    value = chest / waist,
+                    unit = "",
+                    confidence = Confidence.DIRECT,
+                    detail = "The V-taper. Rises as your upper body grows or your waist shrinks.",
+                )
+            } else {
+                // Not shown as a figure: a chest this far beyond the waist is an arm counted as
+                // chest, and printing it as "Measured" would present an error as a fact.
+                missing += MissingInput(
+                    input = "A retake with arms slightly away from your sides",
+                    unlocks = "Chest-to-waist (this photo's chest read too wide to be real)",
+                )
+            }
         }
 
         // --- Energy ----------------------------------------------------------------------
@@ -301,18 +307,18 @@ object CompositionAnalyser {
                 value = bmr,
                 unit = "kcal/day",
                 confidence = Confidence.ESTIMATED,
-                detail = "Katch-McArdle, driven by your lean mass rather than your weight. " +
-                    "What your body costs to run at complete rest, before any activity.",
+                detail = "Calories at complete rest (Katch-McArdle, from lean mass).",
             )
 
+            // Named as the generic figure it is. The Fuel tab's maintenance uses the user's
+            // actual training week and weight trend, so the two differ, and an unlabelled
+            // second "maintenance" read as the app contradicting itself.
             energy += Metric(
-                name = "Maintenance, lightly active",
+                name = "Maintenance at light activity",
                 value = bmr * 1.375,
                 unit = "kcal/day",
                 confidence = Confidence.ROUGH,
-                detail = "Resting energy times a light-activity factor. Activity multipliers " +
-                    "are a broad guess for any individual — treat this as a starting point to " +
-                    "adjust from once you see how your weight actually responds.",
+                detail = "Resting × 1.375. A generic guide; your Fuel plan uses your real week.",
             )
         }
 

@@ -67,11 +67,11 @@ object JourneyPlanner {
     fun plan(f: JourneyFacts): Journey {
         val setup = listOf(
             JourneyStep(
-                StepId.AI_SCAN, "AI body scan", "Your weight and one photo — body fat, lean mass and weak points.",
+                StepId.AI_SCAN, "AI body scan", "Your weight and one photo give body fat, lean mass and weak points.",
                 "Start scan", "Your calories and training priorities", done = f.daysSinceScan != null,
             ),
             JourneyStep(
-                StepId.CHOOSE_SPORTS, "Choose your sports", "Gym, calisthenics, Pilates, running — one or a mix.",
+                StepId.CHOOSE_SPORTS, "Choose your sports", "Gym, calisthenics, Pilates, running. One or a mix.",
                 "Build my week", "Your weekly programme", done = f.hasWeek,
             ),
             JourneyStep(
@@ -82,11 +82,11 @@ object JourneyPlanner {
 
         val next = setup.firstOrNull { !it.done } ?: when {
             f.todaysSession != null && !f.loggedToday -> JourneyStep(
-                StepId.TODAYS_SESSION, f.todaysSession, "Log it as you go — your next session and calories adjust.",
+                StepId.TODAYS_SESSION, f.todaysSession, "Log it as you go. Your next session and calories adjust.",
                 "Start workout", "Progression and nutrition", done = false,
             )
             (f.daysSinceScan ?: 0) >= CHECK_IN_EVERY_DAYS -> JourneyStep(
-                StepId.WEEKLY_CHECK_IN, "Weekly check-in", "${f.daysSinceScan} days since your last scan — weight and photo.",
+                StepId.WEEKLY_CHECK_IN, "Weekly check-in", "${f.daysSinceScan} days since your last scan. Weight and photo.",
                 "Start check-in", "Updated calories and weak points", done = false,
             )
             else -> null

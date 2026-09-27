@@ -45,8 +45,8 @@ object ArmClearance {
         if (clipped <= TOLERATED_CLIPPED_FRACTION) return null
 
         return "Both of your arms were against your sides, so neither edge of your waist " +
-            "was visible. One arm touching is fine — the app measures the other side and " +
-            "mirrors it — but with both there is nothing left to measure from. Hold your " +
+            "was visible. One arm touching is fine, because the app measures the other side and " +
+            "mirrors it, but with both there is nothing left to measure from. Hold your " +
             "arms about a hand's width clear of your body, palms forward, and scan again."
     }
 }

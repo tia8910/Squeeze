@@ -104,7 +104,7 @@ object WeakPointAnalysis {
                         group = MuscleGroup.TRICEPS,
                         severity = it,
                         finding = "Most of an upper arm's girth is triceps, not biceps.",
-                        prescription = "Give triceps at least as many sets as biceps — they " +
+                        prescription = "Give triceps at least as many sets as biceps: they " +
                             "are the larger of the two and the one usually under-trained.",
                     ),
                 )
@@ -130,7 +130,7 @@ object WeakPointAnalysis {
                         severity = it * 0.8,
                         finding = "Thigh girth is mostly quadriceps, so hamstrings can lag " +
                             "without changing this measurement much.",
-                        prescription = "Include a hip hinge and a knee flexion movement — " +
+                        prescription = "Include a hip hinge and a knee flexion movement: " +
                             "hamstrings need both, and squats train neither well.",
                     ),
                 )
@@ -147,7 +147,7 @@ object WeakPointAnalysis {
                             "of your thighs, against about " +
                             "${(CALF_TO_THIGH * 100).fixed(0)}%.",
                         prescription = "Calves tolerate and need more frequency than anything " +
-                            "else — three short sessions a week beats one long one, with a " +
+                            "else: three short sessions a week beats one long one, with a " +
                             "pause at the bottom of each rep.",
                     ),
                 )
@@ -198,7 +198,7 @@ object WeakPointAnalysis {
                             finding = "Your arms measure less than your neck. On a balanced " +
                                 "build neck, upper arm and calf come out close to equal.",
                             prescription = "Arms are the lagging part relative to the rest " +
-                                "of you — add direct work before adding more pressing.",
+                                "of you. Add direct work before adding more pressing.",
                         ),
                     )
                 }
@@ -227,7 +227,7 @@ object WeakPointAnalysis {
 
         val bigger = if (leftCm > rightCm) "left" else "right"
         return "Your $bigger $part measures ${difference.fixed(0)}% larger. " +
-            "Train unilaterally for a block — " +
+            "Train one side at a time for a block: " +
             "start each set with the smaller side and match its reps on the bigger one."
     }
 

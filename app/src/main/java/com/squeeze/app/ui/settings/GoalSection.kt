@@ -69,7 +69,7 @@ enum class GoalOption(
     RECOMP(
         Goal.RECOMP,
         "Both at once",
-        "Hold your weight while the percentage falls — muscle up, fat down. Slower than " +
+        "Hold your weight while the percentage falls: muscle up, fat down. Slower than " +
             "either alone, and the only goal that needs both numbers to be checkable.",
         wantsBodyFat = true,
         wantsWeight = true,

@@ -106,7 +106,7 @@ fun MachineScanScreen(
         state.match?.let { match ->
             val top = match.candidates.firstOrNull()
             val headline = when {
-                match.noMachine -> "No gym equipment found in this photo. Get the whole machine in frame and try again — or pick it below."
+                match.noMachine -> "No gym equipment found in this photo. Get the whole machine in frame and try again, or pick it below."
                 match.confident && top != null -> "Identified: ${top.first.name} (${(top.second * 100).toInt()}% sure). Not this one? Pick below."
                 top != null -> "Best guess: ${top.first.name} (${(top.second * 100).toInt()}%). Not this one? Pick below."
                 else -> null
@@ -142,7 +142,7 @@ private fun GuideCard(guide: MachineGuide, state: MachineScanUiState) {
             Text("Works: ${guide.muscles}", style = MaterialTheme.typography.bodyMedium)
             if (state.weakPoint) {
                 Text(
-                    "★ Your AI scan flagged this area as a weak point — one extra set is built in.",
+                    "★ Your AI scan flagged this area as a weak point, so one extra set is built in.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )

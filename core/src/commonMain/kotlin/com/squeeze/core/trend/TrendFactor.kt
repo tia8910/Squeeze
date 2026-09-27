@@ -11,11 +11,15 @@ package com.squeeze.core.trend
  *
  * @param label what the chart is titled and what the filter chip reads
  * @param unitSuffix appended to the plotted value, so "%" and " kg" render correctly
+ * @param minSpan the smallest vertical range a chart of this factor may show. Without it a
+ *   chart scales itself to whatever the data did, so 15.2 → 15.8 % — well inside one scan's
+ *   noise — was drawn as a line climbing the full height of the card. The floor is about
+ *   the size of an ordinary scan-to-scan wobble, so noise looks like noise.
  */
-enum class TrendFactor(val label: String, val unitSuffix: String) {
-    BODY_FAT("Body fat", "%"),
-    WEIGHT("Weight", " kg"),
-    MUSCLE("Muscle", " kg"),
+enum class TrendFactor(val label: String, val unitSuffix: String, val minSpan: Double) {
+    BODY_FAT("Body fat", "%", 3.0),
+    WEIGHT("Weight", " kg", 2.0),
+    MUSCLE("Muscle", " kg", 2.0),
 }
 
 /**

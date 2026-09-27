@@ -57,12 +57,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.core.model.Goal
 import com.squeeze.core.scan.CropRegion
-import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.scan.Development
+import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
-import com.squeeze.core.scan.FrontPoseGeometry
+import com.squeeze.core.scan.PhysiqueReport
 import com.squeeze.core.scan.PosePoint
+import kotlin.math.roundToInt
 
 /**
  * The scan, shown while it happens.
@@ -439,7 +440,7 @@ private fun AiVerdict(scanner: AiScanner) {
                     )
                     Text(
                         "Abdominal definition, how the lower stomach sits, how much muscle " +
-                            "shows through — what a coach reads at a glance.",
+                            "shows through: what a coach reads at a glance.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -549,7 +550,7 @@ fun AiLiveBadge(hint: String?, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    hint ?: "Framing looks good — hold still.",
+                    hint ?: "Framing looks good. Hold still.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -581,7 +582,7 @@ fun LiveScanSweep(modifier: Modifier = Modifier) {
 private fun MuscleProgress(scanner: AiScanner) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -625,7 +626,6 @@ private fun goalName(goal: Goal): String = when (goal) {
 fun PhysiqueCard(
     report: PhysiqueReport,
     modifier: Modifier = Modifier,
-    previous: Pair<Long, Map<MuscleGroup, Double>>? = null,
     /** Whole-body findings from the measurements — waist-to-height, body fat, lean mass. */
     measured: List<com.squeeze.core.bodycomp.BodyFinding> = emptyList(),
 ) {
@@ -639,7 +639,7 @@ fun PhysiqueCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PulsingDot(active = false)
                 Text(
-                    "AI physique analysis",
+                    "Physique analysis",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 10.dp),
@@ -651,6 +651,15 @@ fun PhysiqueCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            val muscles = report.muscles
+            if (muscles != null && muscles.assessments.isNotEmpty()) {
+                MuscleBreakdown(
+                    muscles,
+                    hiddenNote = report.hidden.takeIf { it.isNotEmpty() }?.let { hidden ->
+                        "Not judged from the photo: ${hidden.joinToString { it.label.lowercase() }}, covered or out of frame."
+                    },
+                )
+            } else {
             report.scores.forEach { score ->
                 Column {
                     WeightBar(
@@ -658,14 +667,22 @@ fun PhysiqueCard(
                         weight = score.score.toFloat(),
                         strongest = score.development == Development.DEVELOPED,
                     )
-                    val change = previous?.second?.get(score.group)?.let { score.score - it }
-                    val since = previous?.first?.let {
+                    // Change is printed only when it is more than a different photograph would
+                    // explain. "▼ 40 since 23 Sept" for the arms of a man whose weight had not
+                    // moved was the photograph changing, and printing it taught the user that
+                    // the numbers mean nothing.
+                    val fused = score.fused
+                    val since = fused?.since?.let {
                         java.time.LocalDate.ofEpochDay(it)
                             .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
                     }
-                    val moved = change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
-                        " · ${if (it > 0) "▲" else "▼"} ${(kotlin.math.abs(it) * 100).toInt()} since $since"
-                    }.orEmpty()
+                    val change = fused?.change
+                    val moved = when {
+                        since == null || change == null -> ""
+                        fused?.confirmed == true && kotlin.math.abs(change) >= 0.01 ->
+                            " · ${if (change > 0) "▲" else "▼"} ${(kotlin.math.abs(change) * 100).roundToInt()} since $since"
+                        else -> " · steady since $since"
+                    } + if (score.measured) " · from your measurements" else ""
                     Text(
                         score.development.label + moved,
                         style = MaterialTheme.typography.labelSmall,
@@ -679,10 +696,19 @@ fun PhysiqueCard(
                 }
             }
 
+            Text(
+                if (report.reads > 1) {
+                    "Each bar blends your last ${report.reads} scans, so one awkward photo can't swing it. Changes show only when they beat photo noise."
+                } else {
+                    "First scan. One photo can be 15 points out; scan again in similar light and the bars will settle."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (report.hidden.isNotEmpty()) {
                 Text(
-                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered by " +
-                        "clothing or out of frame in this photo. Scan with them bare to include them.",
+                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }}, covered or out of frame. Scan them bare to include them.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -691,7 +717,7 @@ fun PhysiqueCard(
             Text("Strengths", style = MaterialTheme.typography.titleSmall)
             if (report.strengths.isEmpty()) {
                 Text(
-                    "None stands out yet — that is normal early on, and it is what training fixes.",
+                    "None stands out yet. That's normal early on, and it's what training builds.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -730,6 +756,8 @@ fun PhysiqueCard(
                 }
             }
 
+            }
+
             if (measured.isNotEmpty()) {
                 Text("From your measurements", style = MaterialTheme.typography.titleSmall)
                 measured.forEach { finding ->
@@ -745,11 +773,7 @@ fun PhysiqueCard(
             }
 
             Text(
-                "The on-device model's impression of one front photograph, the way a coach " +
-                    "sizes you up at a glance — not a measurement. Flexing, a pump or harsh " +
-                    "light make a group look bigger, and it cannot see your back. Saving this " +
-                    "scan puts the weak points into your training block and your nutrition " +
-                    "plan; changing your goal re-ranks them.",
+                "A coach's first impression from one front photo, not a measurement. Flexing, a pump or harsh light inflate a group, and your back isn't visible. Saving puts the weak points into your training and nutrition.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

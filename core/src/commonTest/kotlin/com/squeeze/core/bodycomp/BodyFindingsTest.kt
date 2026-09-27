@@ -39,9 +39,10 @@ class BodyFindingsTest {
 
     @Test
     fun `the record from the screenshot reads as mostly good news`() {
-        // 68 kg, 1.75 m, waist 80 cm, chest 128 cm — waist-to-height 0.457, chest-to-waist
-        // 1.60, body fat in the fitness band, FFMI 18.5.
-        val findings = BodyFindings.from(panel(chestCm = 128.0), Sex.MALE)
+        // 68 kg, 1.75 m, waist 80 cm, chest 112 cm — waist-to-height 0.457, chest-to-waist
+        // 1.40, body fat in the fitness band, FFMI 18.5. (The original screenshot's 128 cm
+        // chest, 1.60× the waist, was an arm counted as chest; see the test below.)
+        val findings = BodyFindings.from(panel(chestCm = 112.0), Sex.MALE)
 
         assertTrue(findings.isNotEmpty())
         assertTrue(
@@ -119,7 +120,9 @@ class BodyFindingsTest {
         // congratulate the user on it.
         val findings = BodyFindings.from(panel(bodyFatPercent = 4.0), Sex.MALE)
 
-        val fat = findings.single { it.title == "Below the fat your body needs" }
+        // 4 % is inside the ACE essential range (2–5 %) for men, so it is named as that —
+        // still a weak point, never a trophy.
+        val fat = findings.single { it.title == "At essential-fat level" }
         assertEquals(FindingKind.WEAKNESS, fat.kind)
         assertFalse(
             findings.any { it.kind == FindingKind.STRENGTH && it.detail.contains("4.00") },
@@ -156,5 +159,13 @@ class BodyFindingsTest {
 
         assertTrue(asWoman.any { it.title == "Marked V-taper" }, titles(asWoman).toString())
         assertFalse(asMan.any { it.title == "Marked V-taper" }, titles(asMan).toString())
+    }
+
+    @Test
+    fun `a chest too wide to be real is not reported as a V-taper`() {
+        // 128 cm over an 80 cm waist is 1.60 — beyond almost any real torso, and what a mirror
+        // selfie produces when the phone arm is counted as chest.
+        val findings = BodyFindings.from(panel(chestCm = 128.0), Sex.MALE)
+        assertFalse(findings.any { it.title == "Marked V-taper" }, titles(findings).toString())
     }
 }

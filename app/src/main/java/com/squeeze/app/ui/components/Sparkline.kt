@@ -34,6 +34,9 @@ import androidx.compose.ui.unit.dp
  *
  * @param values in data order, oldest first. Fewer than two renders just the leading dot.
  * @param animated sweeps the line on the first time it appears.
+ * @param minSpan the smallest value range the height may represent. Without a floor any
+ *   wobble fills the whole height: 15.2 → 15.8 % body fat, inside one scan's noise, drew as
+ *   a steep climb across the hero card. With it, small moves look small.
  */
 @Composable
 fun Sparkline(
@@ -44,6 +47,7 @@ fun Sparkline(
     dotRadius: Dp = 5.dp,
     color: androidx.compose.ui.graphics.Color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
     animated: Boolean = true,
+    minSpan: Double = 0.0,
 ) {
     val progress = remember { Animatable(if (animated) 0f else 1f) }
 
@@ -70,8 +74,9 @@ fun Sparkline(
 
         if (right <= left || bottom <= top) return@Canvas
 
-        val min = values.min()
-        val max = values.max()
+        val pad = ((minSpan - (values.max() - values.min())) / 2.0).coerceAtLeast(0.0)
+        val min = values.min() - pad
+        val max = values.max() + pad
         val span = (max - min).takeIf { it > 1e-9 }
 
         fun pointAt(index: Int): Offset {

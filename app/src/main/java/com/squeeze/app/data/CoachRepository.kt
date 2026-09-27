@@ -37,6 +37,8 @@ import com.squeeze.core.nutrition.NutritionPlanner
 import com.squeeze.core.program.WeakPoint
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
+import com.squeeze.core.scan.PhysiqueFusion
+import com.squeeze.core.scan.PhysiqueObservation
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -65,6 +67,7 @@ class CoachRepository @Inject constructor(
     private val composition: BodyCompositionRepository,
     private val workoutDao: WorkoutDao,
     private val activityDao: ActivityDao,
+    private val health: com.squeeze.app.health.HealthConnectManager,
 ) {
 
     /**
@@ -101,6 +104,44 @@ class CoachRepository @Inject constructor(
         )
     }
 
+    /**
+     * Everything a notification needs, read fresh at the moment it fires so it never
+     * describes a plan the user has since changed. See [com.squeeze.core.coach.ReminderPlanner].
+     */
+    suspend fun reminderFacts(): com.squeeze.core.coach.ReminderFacts {
+        val today = LocalDate.now()
+        val todayDay = today.toEpochDay()
+        val monday = today.with(java.time.DayOfWeek.MONDAY).toEpochDay()
+        val journey = journey()
+        val week = week()
+        val todays = todaysSessions(week).firstOrNull()
+        val loggedDays = (activityDao.since(monday).map { it.epochDay } + workoutDao.since(monday).map { it.epochDay })
+            .filter { it <= todayDay }
+            .toSet()
+        val measurements = measurementDao.since(Long.MIN_VALUE)
+        val lastScan = listOfNotNull(
+            physiqueDao.latest()?.epochDay,
+            measurements.filter { it.photoId != null }.maxOfOrNull { it.epochDay },
+        ).maxOrNull()
+        val volume = weeklyVolume()
+        val synced = health.day()
+        return com.squeeze.core.coach.ReminderFacts(
+            isoDayOfWeek = today.dayOfWeek.value,
+            setupComplete = journey.setupComplete,
+            daysSinceScan = lastScan?.let { todayDay - it },
+            todaysSession = todays?.title,
+            todaysMinutes = todays?.minutes,
+            // A workout the watch recorded counts: nobody should be nagged to log a session
+            // their wrist already logged.
+            loggedToday = todayDay in loggedDays || com.squeeze.core.health.ActivityInsights.watchWorkoutDone(synced),
+            sessionsPlanned = week?.trainingDays ?: 0,
+            sessionsLogged = loggedDays.size,
+            setsPlanned = volume.sumOf { it.planned },
+            setsLogged = volume.sumOf { it.done },
+            steps = synced?.steps,
+        )
+    }
+
     /** Hands today's first planned session to the log screen. */
     suspend fun prepareTodaysSession() {
         val session = todaysSessions(week()).firstOrNull() ?: return
@@ -128,7 +169,7 @@ class CoachRepository @Inject constructor(
                 null
             } else {
                 todaysSessions(week).takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.title }
-                    ?: "Rest day — recovery is part of the plan"
+                    ?: "Rest day. Recovery is part of the plan."
             },
             sessionsDone = sessionsDone,
             sessionsPlanned = week?.days?.sumOf { it.sessions.size },
@@ -239,8 +280,27 @@ class CoachRepository @Inject constructor(
                 netKcal = kcal,
             ),
         )
+        // Shared with the watch app, Google Fit and the rest, when the user allowed it.
+        health.writeWorkout(sport, title, minutes)
         return kcal
     }
+
+    /**
+     * After a measurement is saved: the weight, and the body fat as the app now estimates it
+     * (the filtered, calibrated figure on the dashboard, not the raw reading), written to
+     * Health Connect so a smart-scale or watch app shows the same numbers.
+     */
+    suspend fun shareBody(weightKg: Double?) {
+        val profile = profileDao.get()?.toDomain()
+        val bodyFat = profile?.let { runCatching { composition.snapshot(it).latest?.level }.getOrNull() }
+        health.writeBody(weightKg, bodyFat)
+    }
+
+    /** Today from the user's watch, phone and nutrition apps; null when not connected. */
+    suspend fun activityToday(): com.squeeze.core.health.DailyActivity? = health.day()
+
+    /** The last week, oldest first, for steps and the resting-pulse baseline. */
+    suspend fun activityWeek(): List<com.squeeze.core.health.DailyActivity> = health.recent(7)
 
     suspend fun recentSessions(days: Long = 14): List<ActivitySessionEntity> =
         activityDao.since(LocalDate.now().toEpochDay() - days)
@@ -267,12 +327,19 @@ class CoachRepository @Inject constructor(
     }
 
 
-    /** Stores the AI's per-group scores from a saved scan. */
+    /**
+     * Stores the AI's per-group scores from a saved scan — this photograph's own readings,
+     * never the fused ones, so every later report can re-fuse the history from the source.
+     *
+     * @param noise groups this photograph read less reliably than usual (a phone over the
+     *   chest), stored as `GROUP=score@multiplier` so the fusion can weigh them later
+     */
     suspend fun savePhysique(
         epochDay: Long,
         goal: Goal,
         scores: Map<MuscleGroup, Double>,
         hidden: Set<MuscleGroup> = emptySet(),
+        noise: Map<MuscleGroup, Double> = emptyMap(),
     ) {
         if (scores.isEmpty()) return
         physiqueDao.upsert(
@@ -281,27 +348,82 @@ class CoachRepository @Inject constructor(
                 goal = goal.name,
                 // Hidden groups are stored as such, so a covered group stays unjudged later
                 // rather than being re-derived from a girth taken through clothing.
-                scores = (scores.entries.map { (g, s) -> "${g.name}=$s" } + hidden.map { "${it.name}=$HIDDEN" })
-                    .joinToString(","),
+                scores = (
+                    scores.entries.map { (g, s) ->
+                        "${g.name}=$s" + (noise[g]?.takeIf { it > 1.0 }?.let { "@$it" } ?: "")
+                    } + hidden.map { "${it.name}=$HIDDEN" }
+                    ).joinToString(","),
             ),
         )
+    }
+
+    /** Every saved read up to and including [epochDay], oldest first, for fusion. */
+    suspend fun physiqueHistory(epochDay: Long): List<PhysiqueObservation> =
+        physiqueDao.upTo(epochDay).map { it.toObservation() }
+
+    /**
+     * A report whose scores rest on every scan up to [epochDay], not on one photograph —
+     * see [PhysiqueFusion] for why a single photograph cannot carry the verdict alone.
+     *
+     * @param current this photograph's read when it is not saved yet; it replaces any saved
+     *   read for the same day, as saving it would
+     */
+    suspend fun fusedPhysiqueReport(
+        epochDay: Long,
+        current: PhysiqueObservation?,
+        circumferences: com.squeeze.core.model.Circumferences?,
+        goal: Goal? = null,
+    ): com.squeeze.core.scan.PhysiqueReport? {
+        val profile = profileDao.get() ?: return null
+        val chosen = goal ?: runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
+        val history = physiqueHistory(epochDay).filter { current == null || it.epochDay != current.epochDay } +
+            listOfNotNull(current)
+        val newest = history.maxByOrNull { it.epochDay } ?: return null
+        val sex = Sex.valueOf(profile.sex)
+        val (strong, weak) = circumferences
+            ?.let { com.squeeze.core.bodycomp.MeasuredParts.from(it, sex) }
+            ?: (emptyMap<MuscleGroup, String>() to emptyMap())
+        val measuredScores = circumferences
+            ?.let { com.squeeze.core.bodycomp.MeasuredParts.scores(it, sex) }
+            .orEmpty()
+        val fused = PhysiqueFusion.fuse(history)
+        val report = PhysiqueAnalysis.report(
+            scores = newest.scores,
+            goal = chosen,
+            hidden = newest.hidden,
+            measuredStrong = strong,
+            measuredWeak = weak,
+            measuredScores = measuredScores,
+            fused = fused,
+        ) ?: return null
+        // The per-muscle verdict: lifts against strength standards, girth proportions and
+        // the fused photo readings, each weighted by how far it can be trusted.
+        val muscles = runCatching {
+            com.squeeze.core.program.MuscleProfiler.assess(
+                sex = sex,
+                goal = chosen,
+                bodyweightKg = measurementDao.latestWeightKg(),
+                sets = allSets(),
+                today = epochDay,
+                circumferences = circumferences,
+                photo = fused.mapValues { (_, f) -> com.squeeze.core.program.PhotoReading(f.score, f.sd, f.reads) },
+                hiddenInPhoto = newest.hidden,
+            )
+        }.getOrNull()
+        return report.copy(muscles = muscles)
     }
 
     /** The saved physique read for [epochDay], with its hidden groups; null if none. */
     suspend fun physiqueOn(epochDay: Long): PhysiqueRead? =
         physiqueDao.on(epochDay)?.let { PhysiqueRead(decode(it), decodeHidden(it)) }
 
-    /** The full report for a saved read: AI scores, hidden groups and the day's measurements. */
-    suspend fun physiqueReport(read: PhysiqueRead, circumferences: com.squeeze.core.model.Circumferences?): com.squeeze.core.scan.PhysiqueReport? {
-        val profile = profileDao.get() ?: return null
-        val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
-        val (strong, weak) = circumferences
-            ?.let { com.squeeze.core.bodycomp.MeasuredParts.from(it, Sex.valueOf(profile.sex)) }
-            ?: (emptyMap<MuscleGroup, String>() to emptyMap())
-        return PhysiqueAnalysis.report(read.scores, goal, read.hidden, strong, weak)
-    }
+    /** The full report for a saved read: fused AI scores, hidden groups and the day's measurements. */
+    suspend fun physiqueReport(
+        epochDay: Long,
+        circumferences: com.squeeze.core.model.Circumferences?,
+    ): com.squeeze.core.scan.PhysiqueReport? = fusedPhysiqueReport(epochDay, null, circumferences)
 
-    /** The latest read, as a report with the latest measurements folded in. */
+    /** The latest read, fused with every read before it, with the latest measurements folded in. */
     private suspend fun latestReport(goal: Goal): com.squeeze.core.scan.PhysiqueReport? {
         val entity = physiqueDao.latest() ?: return null
         val latest = measurementDao.since(Long.MIN_VALUE)
@@ -313,13 +435,7 @@ class CoachRepository @Inject constructor(
                 thighCm = it.thighCm, armCm = it.armCm, calfCm = it.calfCm,
             )
         }
-        val profile = profileDao.get()
-        val (strong, weak) = if (c != null && profile != null) {
-            com.squeeze.core.bodycomp.MeasuredParts.from(c, Sex.valueOf(profile.sex))
-        } else {
-            emptyMap<MuscleGroup, String>() to emptyMap()
-        }
-        return PhysiqueAnalysis.report(decode(entity), goal, decodeHidden(entity), strong, weak)
+        return fusedPhysiqueReport(entity.epochDay, null, c, goal)
     }
 
     /** The most recent physique read, or null before the first AI scan. */
@@ -349,8 +465,22 @@ class CoachRepository @Inject constructor(
      * new one.
      */
     suspend fun aiWeakPoints(goal: Goal): List<WeakPoint> {
-        val scores = latestPhysique() ?: return emptyList()
         val report = latestReport(goal) ?: return emptyList()
+        // The per-muscle verdict first: it is built on lifts and girths as well as photos,
+        // and it names the exact muscle, so "arms" becomes biceps or triceps as the evidence says.
+        report.muscles?.takeIf { it.weaknesses.isNotEmpty() }?.let { profile ->
+            return profile.weaknesses.map { focus ->
+                val a = profile.assessments.first { it.group == focus.group }
+                WeakPoint(
+                    group = focus.group,
+                    severity = (1.0 - a.score).coerceIn(0.0, 1.0),
+                    finding = "${a.label}: ${focus.why}",
+                    prescription = focus.how,
+                )
+            }
+        }
+        // The fused scores, so one unlucky photograph cannot reshuffle the training block.
+        val scores = report.scores.associate { it.group to it.score }
         return report.focus.flatMap { advice ->
             val score = scores[advice.group] ?: 0.0
             trainingGroups(advice.group).map { group ->
@@ -368,9 +498,11 @@ class CoachRepository @Inject constructor(
 
     /** The groups the AI flagged, by name, for the nutrition plan's explanation. */
     private suspend fun aiWeakGroupNames(goal: Goal): List<String> {
-        return latestReport(goal)?.weaknesses
-            ?.map { it.label.lowercase() }
-            .orEmpty()
+        val report = latestReport(goal) ?: return emptyList()
+        report.muscles?.takeIf { it.weaknesses.isNotEmpty() }?.let { profile ->
+            return profile.weaknesses.map { com.squeeze.core.program.BlockOverview.label(it.group).lowercase() }
+        }
+        return report.weaknesses.map { it.label.lowercase() }
     }
 
     /**
@@ -446,8 +578,18 @@ class CoachRepository @Inject constructor(
         read.scores.split(",").mapNotNull { pair ->
             val (name, value) = pair.split("=").takeIf { it.size == 2 } ?: return@mapNotNull null
             val group = runCatching { MuscleGroup.valueOf(name) }.getOrNull() ?: return@mapNotNull null
-            value.toDoubleOrNull()?.let { group to it }
+            value.substringBefore("@").toDoubleOrNull()?.let { group to it }
         }.toMap()
+
+    private fun decodeNoise(read: PhysiqueReadEntity): Map<MuscleGroup, Double> =
+        read.scores.split(",").mapNotNull { pair ->
+            val (name, value) = pair.split("=").takeIf { it.size == 2 } ?: return@mapNotNull null
+            val group = runCatching { MuscleGroup.valueOf(name) }.getOrNull() ?: return@mapNotNull null
+            value.substringAfter("@", "").toDoubleOrNull()?.let { group to it }
+        }.toMap()
+
+    private fun PhysiqueReadEntity.toObservation() =
+        PhysiqueObservation(epochDay, decode(this), decodeHidden(this), decodeNoise(this))
 
     private fun trainingGroups(group: MuscleGroup): List<TrainingGroup> = when (group) {
         MuscleGroup.SHOULDERS -> listOf(TrainingGroup.SHOULDERS)

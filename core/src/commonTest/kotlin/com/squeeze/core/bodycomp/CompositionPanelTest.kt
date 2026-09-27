@@ -127,7 +127,7 @@ class CompositionPanelTest {
             "the reading below the threshold should not warn: ${below.detail}",
         )
         assertTrue(
-            above.detail.contains("over it"),
+            above.detail.contains("Over 0.5"),
             "the reading above the threshold should say so: ${above.detail}",
         )
     }
@@ -203,5 +203,14 @@ class CompositionPanelTest {
         if (roundness != null) {
             assertTrue(roundness.value.isFinite(), "body roundness returned ${roundness.value}")
         }
+    }
+
+    @Test
+    fun `a hip too wide for the waist is not printed as a measured ratio`() {
+        // The 27 Sept photo: 72.8 cm waist over a 104.6 cm hip (0.70) on a lean man, from
+        // loose cargo trousers and hands at the sides.
+        val panel = CompositionAnalyser.analyse(profile, full.copy(waistCm = 72.8, hipCm = 104.6), 13.3, 70.0, year)
+        assertTrue(panel.shape.none { it.name == "Waist-to-hip" })
+        assertTrue(panel.missing.any { it.unlocks.startsWith("Waist-to-hip") })
     }
 }

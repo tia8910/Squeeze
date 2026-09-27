@@ -15,6 +15,34 @@ package com.squeeze.core.scan
  */
 object PlausibleRanges {
 
+    /**
+     * The widest chest-to-waist ratio accepted as a real torso.
+     *
+     * Trained men typically measure 1.25–1.45; competitive physique athletes reach about 1.5.
+     * A mirror selfie produced 1.62 — a 116.7 cm chest on a 70 kg man with a 72 cm waist —
+     * because the arm holding the phone sat against the torso and its width was counted as
+     * chest. Above this, the chest is treated as mis-measured rather than reported as a
+     * remarkable V-taper.
+     */
+    const val MAX_CHEST_TO_WAIST = 1.55
+
+    fun plausibleTaper(chestCm: Double, waistCm: Double): Boolean =
+        waistCm > 0 && chestCm / waistCm <= MAX_CHEST_TO_WAIST
+
+    /**
+     * The lowest waist-to-hip ratio accepted as a real body, by sex.
+     *
+     * Lean men sit around 0.85–0.90 and very few adults of either sex fall below these. A
+     * photo read a 104.6 cm hip under a 72.8 cm waist (0.70) on a lean 70 kg man: loose
+     * cargo trousers and hands at his sides were measured as hip. Below this, the hip is
+     * treated as mis-measured.
+     */
+    const val MIN_WAIST_TO_HIP_MALE = 0.75
+    const val MIN_WAIST_TO_HIP_FEMALE = 0.60
+
+    fun plausibleHip(waistCm: Double, hipCm: Double, female: Boolean): Boolean =
+        hipCm > 0 && waistCm / hipCm >= (if (female) MIN_WAIST_TO_HIP_FEMALE else MIN_WAIST_TO_HIP_MALE)
+
     private val ranges: Map<ScanSite, ClosedFloatingPointRange<Double>> = mapOf(
         ScanSite.NECK to 25.0..55.0,
         ScanSite.CHEST to 60.0..160.0,
@@ -84,6 +112,18 @@ object PlausibleRanges {
         // A chest is never smaller than the neck it sits below.
         if (neck != null && chest != null && chest <= neck) {
             bad += ScanSite.CHEST
+        }
+
+        // An arm counted as chest: wider than any real torso tapers.
+        if (chest != null && waist != null && !plausibleTaper(chest, waist)) {
+            bad += ScanSite.CHEST
+        }
+
+        // A hip far wider than any real body's, relative to the waist: loose trousers or
+        // hands at the sides. Sex-agnostic here, so only the limit no adult falls below.
+        val hip = measurements[ScanSite.HIP]
+        if (waist != null && hip != null && !plausibleHip(waist, hip, female = true)) {
+            bad += ScanSite.HIP
         }
 
         // Nor is a neck ever larger than the waist beneath it.

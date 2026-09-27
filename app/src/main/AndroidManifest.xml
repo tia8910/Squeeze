@@ -28,6 +28,30 @@
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!-- Local reminders only: composed on the device from the local database and posted by
+         the system. Nothing is fetched or sent — see the note on INTERNET above. Boot is
+         needed because the system clears alarms on restart; they are re-armed then. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Health Connect: the on-device store that watches (Wear OS, Galaxy Watch via Samsung
+         Health, Fitbit, Garmin), Google Fit and nutrition apps write to. Reached over IPC,
+         like Play Billing, so it needs no network. Each type is granted separately. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" />
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" />
+
+    <!-- Lets the app find the Health Connect app on Android 13 and below. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <!-- Play Billing merges com.android.vending.BILLING in from the library manifest. -->
 
     <application
@@ -53,6 +77,39 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Health Connect's "privacy policy" link opens this. Android 13 and below use the
+             rationale action; Android 14+ the permission-usage alias below. -->
+        <activity
+            android:name=".health.HealthPrivacyActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Squeeze">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".health.HealthPrivacyActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
+        <receiver
+            android:name=".notify.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -2,6 +2,8 @@ package com.squeeze.app
 
 import android.app.Application
 import com.squeeze.app.billing.BillingManager
+import com.squeeze.app.notify.Notifier
+import com.squeeze.app.notify.ReminderScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -16,5 +18,10 @@ class SqueezeApplication : Application() {
         // Billing reaches the Play Store over binder IPC rather than this process's network
         // stack, which is why it still works with no INTERNET permission declared.
         billingManager.start()
+
+        // Channels exist before the first notification, so they show in system settings from
+        // the start; alarms are re-armed on every launch in case the system dropped them.
+        Notifier.ensureChannels(this)
+        ReminderScheduler.scheduleAll(this)
     }
 }

@@ -54,6 +54,7 @@ import com.squeeze.core.bodycomp.GoalProgress
 import com.squeeze.core.bodycomp.PersonalCalibration
 import com.squeeze.core.model.Profile
 import com.squeeze.core.trend.RepeatabilityScore
+import com.squeeze.core.trend.TrendChange
 import com.squeeze.core.trend.TrendFactor
 import com.squeeze.core.trend.TrendFactors
 import com.squeeze.core.trend.TrendPoint
@@ -135,6 +136,9 @@ fun CompositionScreen(
         }
 
         HeroCard(latest, calibration, trend)
+
+        // Steps, activity and sleep from a watch or phone, when one is connected.
+        com.squeeze.app.health.TodayActivityCard()
 
         // Directly under the hero, above everything else. It is the only card here that
         // answers "so what": the number says where you are, this says whether that is
@@ -233,7 +237,7 @@ private fun FilteredTrend(
     if (factor == null) {
         InfoCard(
             "Scan or weigh in once more and the trend appears here. One reading is a " +
-                "point — the direction only exists once there are two.",
+                "point; a direction needs two.",
         )
         return
     }
@@ -270,13 +274,14 @@ private fun FilteredTrend(
                 unitSuffix = factor.unitSuffix,
                 points = points,
                 lineColor = colour,
+                minSpan = factor.minSpan,
             )
         } else {
             // Said rather than left blank. An empty space where a chart belongs reads as a
             // broken feature; naming what is missing turns it into an instruction.
             InfoCard(
                 "Only one ${factor.label.lowercase()} reading so far. One reading is a " +
-                    "point — the direction only exists once there are two.",
+                    "point; a direction needs two.",
             )
         }
     }
@@ -350,7 +355,7 @@ private fun HeroCard(
             text = if (calibration.isActive) {
                 "Calibrated to your own scan results."
             } else {
-                "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
+                "Uncalibrated. Add a DEXA or BodPod result to anchor it to your body."
             },
             style = MaterialTheme.typography.bodySmall,
             color = subColour,
@@ -363,25 +368,51 @@ private fun HeroCard(
         if (trend.size >= 2) {
             Sparkline(
                 values = trend.map { it.level },
-                modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                minSpan = TrendFactor.BODY_FAT.minSpan,
             )
+            // The two ends named, so the line is read as numbers rather than as a mood.
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text(
+                    text = "%s · %.1f%%".format(heroDate(trend.first().epochDay), trend.first().level),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subColour,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "%s · %.1f%%".format(heroDate(trend.last().epochDay), trend.last().level),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subColour,
+                )
+            }
         } else {
             Spacer(Modifier.height(16.dp))
         }
 
+        val change = TrendChange.of(trend)
         NoticePill(
-            text = if (latest.isChangeSignificant) {
-                val direction = if (latest.weeklyChange < 0) "down" else "up"
-                "%.2f points per week %s — larger than your noise".format(
-                    abs(latest.weeklyChange),
-                    direction,
-                )
-            } else {
-                "No confirmed change yet"
+            text = when {
+                latest.isChangeSignificant -> {
+                    val direction = if (latest.weeklyChange < 0) "Down" else "Up"
+                    "%s %.2f points a week. A real change.".format(direction, abs(latest.weeklyChange))
+                }
+                change != null ->
+                    "%+.1f since %s. Within noise, so no real change yet.".format(
+                        change.delta,
+                        heroDate(change.fromDay),
+                    )
+                else -> "No confirmed change yet"
             },
         )
     }
 }
+
+private fun heroDate(epochDay: Long): String =
+    if (epochDay == LocalDate.now().toEpochDay()) {
+        "Today"
+    } else {
+        LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("d MMM"))
+    }
 
 /**
  * The raw log, newest first.
@@ -493,12 +524,8 @@ private fun lastEntryLabel(measurements: List<MeasurementEntity>): String =
     }
 
 /** How this row was measured. Shown as a chip, because it qualifies everything beside it. */
-private fun sourceLabel(entry: MeasurementEntity): String = when (entry.source) {
-    "PHOTO" -> "Scan"
-    "PHOTO_FRONT_ONLY" -> "Front only"
-    "REFERENCE_SCAN" -> "Reference"
-    else -> "Tape"
-}
+private fun sourceLabel(entry: MeasurementEntity): String =
+    com.squeeze.core.model.SourceLabels.short(entry.source)
 
 /** The figures in this row, or null when it holds none worth a second line. */
 private fun entryFigures(entry: MeasurementEntity): String? {
@@ -616,7 +643,7 @@ private fun EmptyState(
         Text(
             text = "Two measurements are needed before a trend appears, and about three weeks " +
                 "before the app can tell a real change from measurement noise. A tape is more " +
-                "repeatable than any photo method — the scan is faster, the tape is more precise.",
+                "repeatable than any photo method: the scan is faster, the tape more precise.",
             style = MaterialTheme.typography.bodySmall,
             color = subColour,
         )

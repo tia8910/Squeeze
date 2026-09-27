@@ -103,7 +103,7 @@ object PostureAnalysis {
                     tilt = shoulderTilt,
                     level = "Shoulders sit level.",
                     tilted = "One shoulder sits higher. Common, and often just how you " +
-                        "stood — worth a look if it repeats across scans.",
+                        "stood. Worth a look if it repeats across scans.",
                 ),
                 notable = abs(shoulderTilt) >= NOTABLE_DEGREES,
             ),
