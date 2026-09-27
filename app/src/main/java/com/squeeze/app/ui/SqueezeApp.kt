@@ -387,7 +387,6 @@ fun SqueezeApp(
                         targetWeightKg = state.profile?.targetWeightKg,
                         targetEpochDay = state.profile?.targetEpochDay,
                         onGoalChange = viewModel::setGoal,
-                        onLabelPhotos = { navController.navigate(LABEL_ROUTE) },
                     )
                 }
 

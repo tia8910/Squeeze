@@ -137,6 +137,9 @@ fun CompositionScreen(
 
         HeroCard(latest, calibration, trend)
 
+        // Steps, activity and sleep from a watch or phone, when one is connected.
+        com.squeeze.app.health.TodayActivityCard()
+
         // Directly under the hero, above everything else. It is the only card here that
         // answers "so what": the number says where you are, this says whether that is
         // enough and what to change if it is not.

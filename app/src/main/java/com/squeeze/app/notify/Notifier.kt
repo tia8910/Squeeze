@@ -101,6 +101,8 @@ object Notifier {
             "When a week has passed since your last scan, with tips for a photo that compares accurately."
         ReminderKind.WEEK_SUMMARY -> "Weekly summary" to
             "Sunday evening: sessions and sets done against the plan."
+        ReminderKind.STEPS -> "Steps" to
+            "Evening, when a short walk would reach your step goal (needs a watch or phone connected through Health Connect)."
     }
 
     private const val NOTIFICATION_BASE = 4100

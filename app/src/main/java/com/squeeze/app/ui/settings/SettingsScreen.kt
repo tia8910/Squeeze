@@ -62,7 +62,6 @@ fun SettingsScreen(
     targetWeightKg: Double?,
     targetEpochDay: Long?,
     onGoalChange: (Goal, Double?, Double?, Long?) -> Unit,
-    onLabelPhotos: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -87,87 +86,47 @@ fun SettingsScreen(
             onGoalChange = onGoalChange,
         )
 
-        SectionHeader(
-            eyebrow = "Look and feel",
-            title = "Appearance",
-            caption = "The app follows your system theme unless you tell it otherwise.",
-        )
-
-        ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
+        // Order: who you are, what the app connects to and tells you, how it looks and
+        // sounds, then privacy. The scan-labelling tool is gone from here: it builds a
+        // training set, which is not something a person tracking their body came to do.
+        com.squeeze.app.health.ConnectedAppsSection()
 
         NotificationsSection()
 
         SectionHeader(
-            eyebrow = "Feedback",
-            title = "Sound",
-            caption = "Short cues, played over your music rather than interrupting it.",
+            eyebrow = "Look and sound",
+            title = "App",
         )
+
+        ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
 
         SettingToggle(
             title = "Sound effects",
-            description = "A short chime when a measurement saves, when a photo is captured, " +
-                "and on the celebration screen. These play over your music rather than " +
-                "interrupting it, and stay silent when your phone is on silent or vibrate.",
+            description = "A short chime on save and capture. Silent when your phone is.",
             checked = soundEnabled,
             onCheckedChange = onSoundEnabledChange,
         )
 
         SettingToggle(
-            title = "Motivational background music",
-            // Stated plainly because this is the toggle that can take something away from
-            // the user. Someone who already has a playlist running needs to know why this
-            // one is different before they turn it on, not after.
-            description = "A slow, looping backing track while the app is open. It will not " +
-                "start if something else is already playing, and it stops as soon as another " +
-                "app wants the audio. Off by default so it never interrupts your own music.",
+            title = "Background music",
+            // Says it will not interrupt: this is the toggle that could take something away.
+            description = "A looping track while the app is open. Never interrupts your own music.",
             checked = ambientEnabled,
             onCheckedChange = onAmbientEnabledChange,
         )
 
-        Text(
-            text = "All sound is generated on the device as it plays. No audio files are " +
-                "bundled, downloaded or streamed.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        SectionHeader(
-            eyebrow = "Help the scan get better",
-            title = "Label your scans",
-            caption = "Answer three questions about a scan photo. Enough of them and the app " +
-                "can learn to read definition from a picture instead of inferring it from an " +
-                "outline. Nothing leaves this device.",
-        )
-
-        SecondaryButton(text = "Start labelling", onClick = onLabelPhotos)
-
         SectionHeader(
             eyebrow = "On this device",
             title = "Privacy",
-            caption = "Everything here is stored encrypted on your phone. The app holds no " +
-                "internet permission, so none of it can leave.",
+            caption = "Everything is stored encrypted on your phone. The app has no internet " +
+                "permission, so nothing can leave it.",
         )
 
         SettingToggle(
             title = "Block screenshots",
-            // Stated concretely rather than as a vague privacy promise, because the
-            // recents thumbnail is the part users do not know about and the part that
-            // actually leaks: they never chose to create it.
-            description = "Prevents screenshots and screen recording, and hides the app's " +
-                "contents in the recent-apps switcher. Turn this on if you do not want a " +
-                "preview of this app visible when switching between apps.",
+            description = "Stops screenshots and hides the app in the recent-apps view.",
             checked = blockScreenshots,
             onCheckedChange = onBlockScreenshotsChange,
-        )
-
-        Text(
-            text = "Your measurements and scan photos never leave this device — the app has " +
-                "no internet permission, so it cannot send them anywhere. Photos are stored " +
-                "encrypted in the app's private storage, are not visible in your gallery, and " +
-                "are deleted when you delete the measurement they belong to. This setting " +
-                "only controls what other apps can capture from the screen.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         AboutCard()
@@ -295,17 +254,16 @@ private fun NotificationsSection() {
     }
 
     SectionHeader(
-        eyebrow = "Reminders",
-        title = "Notifications",
-        caption = "At most one in the morning and one in the evening, only when there is " +
-            "something to do. Made on your phone from your own plan — nothing is sent anywhere.",
+        eyebrow = "Notifications",
+        title = "Reminders",
+        caption = "At most one in the morning and one in the evening — only when there's something to do.",
     )
 
     if (!allowed) {
         BrandCard(Modifier.fillMaxWidth()) {
-            Text("Notifications are off for Squeeze", style = MaterialTheme.typography.titleSmall)
+            Text("Notifications are off", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Allow them to get today's session in the morning and your weekly check-in.",
+                "Allow them to get these reminders.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -318,8 +276,9 @@ private fun NotificationsSection() {
     }
 
     listOf(
-        Triple(ReminderKind.WORKOUT, "Workout reminders", "Today's session in the morning, and a nudge in the evening if it is still open."),
-        Triple(ReminderKind.CHECK_IN, "Weekly check-in", "When a week has passed since your last scan — with tips for a photo that compares accurately."),
+        Triple(ReminderKind.WORKOUT, "Workouts", "Today's session in the morning; a nudge at night if it's not logged."),
+        Triple(ReminderKind.CHECK_IN, "Weekly scan", "A week after your last scan, with tips for a matching photo."),
+        Triple(ReminderKind.STEPS, "Steps", "In the evening, when a short walk would reach your goal."),
         Triple(ReminderKind.WEEK_SUMMARY, "Sunday summary", "Sessions and sets done against the plan."),
     ).forEach { (kind, title, description) ->
         SettingToggle(

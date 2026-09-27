@@ -178,6 +178,9 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
         )
     }
 
+    // What a food app logged today, against today's target.
+    com.squeeze.app.health.IntakeCard(targetKcal = day.calories, targetProteinG = day.proteinG)
+
     if (plan.adjustmentKcal != 0) {
         NoticePill(
             "Adjusted ${if (plan.adjustmentKcal > 0) "+" else ""}${plan.adjustmentKcal} kcal from your weight trend",
