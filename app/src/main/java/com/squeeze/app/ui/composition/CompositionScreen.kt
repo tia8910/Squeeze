@@ -521,12 +521,8 @@ private fun lastEntryLabel(measurements: List<MeasurementEntity>): String =
     }
 
 /** How this row was measured. Shown as a chip, because it qualifies everything beside it. */
-private fun sourceLabel(entry: MeasurementEntity): String = when (entry.source) {
-    "PHOTO" -> "Scan"
-    "PHOTO_FRONT_ONLY" -> "Front only"
-    "REFERENCE_SCAN" -> "Reference"
-    else -> "Tape"
-}
+private fun sourceLabel(entry: MeasurementEntity): String =
+    com.squeeze.core.model.SourceLabels.short(entry.source)
 
 /** The figures in this row, or null when it holds none worth a second line. */
 private fun entryFigures(entry: MeasurementEntity): String? {

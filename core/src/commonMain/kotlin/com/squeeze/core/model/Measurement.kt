@@ -229,3 +229,46 @@ enum class EstimationMethod(
      */
     PHOTO_ABDOMINAL_PROFILE(5.5, 1.0, "Abdominal profile"),
 }
+
+/**
+ * How a record was measured, in words — one place for every screen.
+ *
+ * It used to be two string `when`s in two screens, each ending in `else -> "Tape"`. When the
+ * trunk-framed photo source was added, one screen learned it and the other did not, so a
+ * photo scan sat in the history labelled "Tape" — the one label it must never carry, because
+ * its scale was inferred rather than measured. Matching on the enum here is exhaustive: a new
+ * source does not compile until it has a label, and an unrecognised stored value reads as
+ * unknown rather than as a tape measurement.
+ */
+object SourceLabels {
+
+    /** Chip-sized: the history list. */
+    fun short(source: String): String = when (parse(source)) {
+        MeasurementSource.TAPE -> "Tape"
+        MeasurementSource.PHOTO -> "Photo scan"
+        MeasurementSource.PHOTO_FRONT_ONLY -> "Photo · front"
+        MeasurementSource.PHOTO_TRUNK_SCALED -> "Photo · upper body"
+        MeasurementSource.BIA_SCALE -> "Smart scale"
+        MeasurementSource.REFERENCE_SCAN -> "DEXA / BodPod"
+        null -> "Unknown"
+    }
+
+    /** Full: a record's detail screen. */
+    fun long(source: String): String = when (parse(source)) {
+        MeasurementSource.TAPE -> "Tape measurement"
+        MeasurementSource.PHOTO -> "Photo scan, front and side"
+        MeasurementSource.PHOTO_FRONT_ONLY -> "Photo scan, front only"
+        MeasurementSource.PHOTO_TRUNK_SCALED -> "Photo scan, upper body (scale estimated)"
+        MeasurementSource.BIA_SCALE -> "Bioimpedance scale"
+        MeasurementSource.REFERENCE_SCAN -> "Reference scan (DEXA, BodPod or hydrostatic)"
+        null -> "Unknown method"
+    }
+
+    fun isPhoto(source: String): Boolean = when (parse(source)) {
+        MeasurementSource.PHOTO, MeasurementSource.PHOTO_FRONT_ONLY, MeasurementSource.PHOTO_TRUNK_SCALED -> true
+        else -> false
+    }
+
+    private fun parse(source: String): MeasurementSource? =
+        MeasurementSource.entries.firstOrNull { it.name == source }
+}

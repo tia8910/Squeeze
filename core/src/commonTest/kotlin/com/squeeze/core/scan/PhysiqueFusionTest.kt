@@ -95,7 +95,7 @@ class PhysiqueFusionTest {
 
     @Test
     fun `a marked measured taper is never a lagging back width, and the bar agrees with the strength`() {
-        val girths = Circumferences(chestCm = 105.0, waistCm = 65.0) // 1.62×
+        val girths = Circumferences(chestCm = 97.5, waistCm = 65.0) // 1.50×
         val measured = MeasuredParts.scores(girths, Sex.MALE)
         val (strong, weak) = MeasuredParts.from(girths, Sex.MALE)
         val report = assertNotNull(
@@ -103,9 +103,17 @@ class PhysiqueFusionTest {
         )
         val back = report.scores.first { it.group == MuscleGroup.V_TAPER }
         assertTrue(back.measured)
-        assertEquals(Development.DEVELOPED, back.development)
+        assertTrue(back.development != Development.LAGGING)
         assertTrue(MuscleGroup.V_TAPER in report.strengths)
         assertEquals(0.04, report.raw.getValue(MuscleGroup.V_TAPER), 1e-9)
+    }
+
+    @Test
+    fun `a chest too wide to be real gives back width no measured score and no strength`() {
+        // The real 27 Sept scan: 116.7 cm chest, 72 cm waist — 1.62×, the phone arm counted as chest.
+        val girths = Circumferences(chestCm = 116.7, waistCm = 72.0)
+        assertTrue(MeasuredParts.scores(girths, Sex.MALE).isEmpty())
+        assertFalse(MuscleGroup.V_TAPER in MeasuredParts.from(girths, Sex.MALE).first)
     }
 
     @Test

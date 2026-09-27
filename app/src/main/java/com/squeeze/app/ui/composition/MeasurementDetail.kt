@@ -195,7 +195,11 @@ fun MeasurementDetailDialog(
                     title = "Source",
                     rows = listOfNotNull(
                         "Method" to sourceLabel(entry.source),
-                        entry.note?.let { "Note" to it },
+                        // The scan writes "Photo scan (front only)" as its note, which only
+                        // repeated the method above it. A note the user typed still shows.
+                        entry.note
+                            ?.takeUnless { com.squeeze.core.model.SourceLabels.isPhoto(entry.source) && it.startsWith("Photo scan") }
+                            ?.let { "Note" to it },
                         if (entry.photoId != null) {
                             "Photograph" to "Stored, encrypted on this device"
                         } else {
@@ -330,13 +334,4 @@ private fun DetailGroup(
     }
 }
 
-private fun sourceLabel(source: String): String = when (source) {
-    "PHOTO" -> "Photo scan"
-    "PHOTO_FRONT_ONLY" -> "Photo scan, front only"
-    // Without this it fell through to "Tape measurement", which is the one label it must
-    // never carry: its scale was inferred rather than measured.
-    "PHOTO_TRUNK_SCALED" -> "Photo scan, trunk framing"
-    "REFERENCE_SCAN" -> "Reference scan"
-    "BIA_SCALE" -> "Bioimpedance scale"
-    else -> "Tape measurement"
-}
+private fun sourceLabel(source: String): String = com.squeeze.core.model.SourceLabels.long(source)

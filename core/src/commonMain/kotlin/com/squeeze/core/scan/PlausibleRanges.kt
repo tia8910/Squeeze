@@ -15,6 +15,20 @@ package com.squeeze.core.scan
  */
 object PlausibleRanges {
 
+    /**
+     * The widest chest-to-waist ratio accepted as a real torso.
+     *
+     * Trained men typically measure 1.25–1.45; competitive physique athletes reach about 1.5.
+     * A mirror selfie produced 1.62 — a 116.7 cm chest on a 70 kg man with a 72 cm waist —
+     * because the arm holding the phone sat against the torso and its width was counted as
+     * chest. Above this, the chest is treated as mis-measured rather than reported as a
+     * remarkable V-taper.
+     */
+    const val MAX_CHEST_TO_WAIST = 1.55
+
+    fun plausibleTaper(chestCm: Double, waistCm: Double): Boolean =
+        waistCm > 0 && chestCm / waistCm <= MAX_CHEST_TO_WAIST
+
     private val ranges: Map<ScanSite, ClosedFloatingPointRange<Double>> = mapOf(
         ScanSite.NECK to 25.0..55.0,
         ScanSite.CHEST to 60.0..160.0,
@@ -83,6 +97,11 @@ object PlausibleRanges {
 
         // A chest is never smaller than the neck it sits below.
         if (neck != null && chest != null && chest <= neck) {
+            bad += ScanSite.CHEST
+        }
+
+        // An arm counted as chest: wider than any real torso tapers.
+        if (chest != null && waist != null && !plausibleTaper(chest, waist)) {
             bad += ScanSite.CHEST
         }
 

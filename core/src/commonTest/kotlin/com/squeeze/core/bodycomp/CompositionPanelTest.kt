@@ -127,7 +127,7 @@ class CompositionPanelTest {
             "the reading below the threshold should not warn: ${below.detail}",
         )
         assertTrue(
-            above.detail.contains("over it"),
+            above.detail.contains("Over 0.5"),
             "the reading above the threshold should say so: ${above.detail}",
         )
     }

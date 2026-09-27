@@ -94,7 +94,9 @@ class RecordHeadlineTest {
     fun `precision follows magnitude`() {
         assertEquals("0.49", RecordHeadline.format(0.4899, ""))
         assertEquals("11.6 %", RecordHeadline.format(11.63, "%"))
-        assertEquals("2450 kcal/day", RecordHeadline.format(2450.4, "kcal/day"))
+        assertEquals("2,450 kcal/day", RecordHeadline.format(2450.4, "kcal/day"))
+        // ABSI sits near 0.08; two decimals would print 0.067 as 0.07.
+        assertEquals("0.067", RecordHeadline.format(0.0674, ""))
         // A resting energy figure is printed whole even below a hundred: the equation has no
         // more precision at 90 kcal than at 900.
         assertEquals("90 kcal/day", RecordHeadline.format(90.4, "kcal/day"))

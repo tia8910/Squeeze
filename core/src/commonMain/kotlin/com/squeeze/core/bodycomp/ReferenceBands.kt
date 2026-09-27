@@ -46,7 +46,10 @@ object ReferenceBands {
         // forty in the "high" band and tell them nothing useful.
         val drift = ((age - 30).coerceIn(0, 40)) * 0.1
 
-        val essential = if (sex == Sex.MALE) 5.0 else 13.0
+        // ACE: essential fat is 2–5 % in men and 10–13 % in women, so "below essential"
+        // starts under the bottom of that range. It was 5 and 13, which called a man at 4 %
+        // — inside the essential range — below it.
+        val essential = if (sex == Sex.MALE) 2.0 else 10.0
         val athletic = (if (sex == Sex.MALE) 13.0 else 20.0) + drift
         val fitness = (if (sex == Sex.MALE) 17.0 else 24.0) + drift
         val average = (if (sex == Sex.MALE) 24.0 else 31.0) + drift
@@ -55,33 +58,37 @@ object ReferenceBands {
             percent < essential -> ReferenceBand(
                 BandPosition.LOW,
                 "Below essential",
-                "Under the fat the body needs for normal function. Sustained, this is not a " +
-                    "target — it is a level competitors hold briefly and deliberately.",
+                "Under the fat the body needs to function. Not a target — check the scan.",
+            )
+
+            percent <= (if (sex == Sex.MALE) 5.0 else 13.0) -> ReferenceBand(
+                BandPosition.LOW,
+                "Essential fat only",
+                "Contest-level lean, held only briefly. Check the scan.",
             )
 
             percent <= athletic -> ReferenceBand(
                 BandPosition.LOW,
                 "Athletic",
-                "Lean. Typical of people who train seriously and manage intake.",
+                "Lean — typical of people who train and manage their diet.",
             )
 
             percent <= fitness -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Fitness",
-                "Leaner than average and comfortably sustainable.",
+                "Leaner than average, and sustainable.",
             )
 
             percent <= average -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Average",
-                "Within the ordinary range for the population.",
+                "The ordinary range for adults.",
             )
 
             else -> ReferenceBand(
                 BandPosition.HIGH,
                 "Above average",
-                "Above the population's typical range. Worth reading alongside your " +
-                    "waist-to-height, which tracks where the fat sits rather than how much.",
+                "Above the typical range. Read it with your waist-to-height.",
             )
         }
     }
@@ -103,38 +110,31 @@ object ReferenceBands {
             value < belowAverage -> ReferenceBand(
                 BandPosition.LOW,
                 "Below average",
-                "Less lean mass than typical for your height. A population comparison, not a " +
-                    "judgement of your training: resistance work moves this more reliably " +
-                    "than anything else, and it moves slowly.",
+                "Less lean mass than typical for your height. Strength training raises it.",
             )
 
             value < average -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Average",
-                "Around the adult average for your sex. This says how much lean mass you " +
-                    "carry, not how hard you train — someone lean enough to look muscular " +
-                    "often sits here, because visible muscle comes from low body fat as much " +
-                    "as from mass.",
+                "Typical for adults of your sex. Lean people often look muscular here.",
             )
 
             value < aboveAverage -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Above average",
-                "More lean mass than most untrained adults carry.",
+                "More lean mass than most untrained adults.",
             )
 
             value < excellent -> ReferenceBand(
                 BandPosition.HIGH,
                 "Well trained",
-                "The range reached by people who have trained consistently for years.",
+                "Typical after years of consistent training.",
             )
 
             else -> ReferenceBand(
                 BandPosition.HIGH,
                 "Exceptional — check your inputs",
-                "Above the level usually considered attainable drug-free. Before celebrating, " +
-                    "check your weight and body fat: this figure is derived from both, and an " +
-                    "underestimated body fat inflates it directly.",
+                "Above the usual drug-free limit. A too-low body fat reading inflates it — check both inputs.",
             )
         }
     }
@@ -149,30 +149,33 @@ object ReferenceBands {
         value < 0.40 -> ReferenceBand(
             BandPosition.LOW,
             "Slim",
-            "Below the usual range. Not a concern on its own.",
+            "Below the usual range; fine on its own.",
         )
 
         value < 0.50 -> ReferenceBand(
             BandPosition.NORMAL,
             "Healthy",
-            "Under the 0.5 boundary, which is the target this measure is built around.",
+            "The healthy range.",
         )
 
         value < 0.60 -> ReferenceBand(
             BandPosition.HIGH,
             "Increased",
-            "Over 0.5. The usual advice is to bring the waist under half your height.",
+            "Above the healthy range.",
         )
 
         else -> ReferenceBand(
             BandPosition.HIGH,
             "High",
-            "Well over the 0.5 boundary. This is the measure most worth moving.",
+            "Well above the healthy range — the measure most worth moving.",
         )
     }
 
     /** Waist-to-hip, from the WHO's thresholds for central adiposity. */
     fun waistToHip(value: Double, sex: Sex): ReferenceBand {
+        // WHO (2008): substantially increased risk from 0.90 in men and 0.85 in women. The
+        // male band between 0.90 and 1.00 was labelled "Moderate", which undersold the WHO's
+        // own cut-off; it is now "Increased".
         val moderate = if (sex == Sex.MALE) 0.90 else 0.80
         val high = if (sex == Sex.MALE) 1.00 else 0.85
 
@@ -180,20 +183,19 @@ object ReferenceBands {
             value < moderate -> ReferenceBand(
                 BandPosition.NORMAL,
                 "Low risk",
-                "Fat is not disproportionately carried around the middle.",
+                "Fat is not concentrated at the middle.",
             )
 
             value < high -> ReferenceBand(
-                BandPosition.NORMAL,
-                "Moderate",
-                "Somewhat more carried centrally than at the hips.",
+                if (sex == Sex.MALE) BandPosition.HIGH else BandPosition.NORMAL,
+                if (sex == Sex.MALE) "Increased" else "Moderate",
+                if (sex == Sex.MALE) "At or over the WHO's 0.90 cut-off for men." else "Slightly more at the middle than the hips.",
             )
 
             else -> ReferenceBand(
                 BandPosition.HIGH,
                 "High",
-                "Substantially more around the middle than the hips, which is the pattern " +
-                    "most associated with metabolic risk.",
+                "Over the WHO cut-off — the pattern most linked to metabolic risk.",
             )
         }
     }
@@ -211,16 +213,13 @@ object ReferenceBands {
         value < 30.0 -> ReferenceBand(
             BandPosition.HIGH,
             "Overweight by BMI",
-            "BMI cannot separate muscle from fat, so a lean, muscular person lands here " +
-                "routinely. Read your body fat and waist-to-height before drawing anything " +
-                "from this.",
+            "BMI can't tell muscle from fat; muscular people often land here.",
         )
 
         else -> ReferenceBand(
             BandPosition.HIGH,
             "Obese by BMI",
-            "Same caveat: BMI is blind to composition. The figures above are better answers " +
-                "to the same question.",
+            "BMI can't tell muscle from fat. Body fat and waist-to-height are better guides.",
         )
     }
 }

@@ -101,8 +101,7 @@ object BodyFindings {
             WeakPointAnalysis.strongPoints(girths, sex).take(MAX_PART_FINDINGS).forEach { group ->
                 findings += strength(
                     "${label(group)} ahead of the rest of you",
-                    "Measurably above the balanced proportion for your frame. Worth knowing " +
-                        "when you cut: this is the part with the most to lose.",
+                    "Above the balanced proportion for your frame.",
                 ).copy(part = true)
             }
 
@@ -124,20 +123,17 @@ object BodyFindings {
             when (metric.band?.label) {
                 "Healthy" -> findings += strength(
                     "Waist under half your height",
-                    "${metric.formatted()} — clear of the 0.5 boundary, which is the single " +
-                        "best screen there is for central fat.",
+                    "${metric.formatted()} — under the 0.5 line for belly fat.",
                 )
 
                 "Slim" -> findings += strength(
                     "Narrow waist for your height",
-                    "${metric.formatted()} — below the usual range, and well under the 0.5 " +
-                        "boundary.",
+                    "${metric.formatted()} — well under the 0.5 line.",
                 )
 
                 "Increased", "High" -> findings += weakness(
                     "Waist is over half your height",
-                    "${metric.formatted()} against a 0.5 target. Of everything on this " +
-                        "screen, this is the number most worth moving.",
+                    "${metric.formatted()} against a 0.5 target — the number most worth moving.",
                 )
             }
         }
@@ -156,14 +152,17 @@ object BodyFindings {
 
                 "Above average" -> findings += weakness(
                     "Body fat above the typical range",
-                    "${metric.formatted()}. Read it next to your waist-to-height, which says " +
-                        "where the fat sits rather than how much of it there is.",
+                    "${metric.formatted()}. Read it with your waist-to-height.",
+                )
+
+                "Essential fat only" -> findings += weakness(
+                    "At essential-fat level",
+                    "${metric.formatted()}. Contest-lean, not a place to stay — check the scan before acting on it.",
                 )
 
                 "Below essential" -> findings += weakness(
                     "Below the fat your body needs",
-                    "${metric.formatted()}. This is not a target — it is a level competitors " +
-                        "hold briefly and on purpose. Check the scan before acting on it.",
+                    "${metric.formatted()}. Not a target — check the scan before acting on it.",
                 )
             }
         }
@@ -172,15 +171,12 @@ object BodyFindings {
             when (metric.band?.label) {
                 "Low risk" -> findings += strength(
                     "Fat is not carried centrally",
-                    "Waist-to-hip ${metric.formatted()}. Both numbers come from one photo at " +
-                        "one scale, so scale error cancels — this is among the most " +
-                        "trustworthy things a scan produces.",
+                    "Waist-to-hip ${metric.formatted()}.",
                 )
 
                 "High" -> findings += weakness(
                     "Fat sits around the middle",
-                    "Waist-to-hip ${metric.formatted()}. This pattern matters more for " +
-                        "metabolic risk than the total does.",
+                    "Waist-to-hip ${metric.formatted()} — linked to metabolic risk more than the total is.",
                 )
             }
         }
@@ -192,15 +188,12 @@ object BodyFindings {
             when {
                 metric.value >= strong -> findings += strength(
                     "Marked V-taper",
-                    "Chest ${metric.formatted()} times your waist. It rises when you build " +
-                        "your upper back and chest and when you lose from the waist, so it " +
-                        "moves for two good reasons at once.",
+                    "Chest ${metric.formatted()}× your waist.",
                 ).copy(part = true)
 
                 metric.value < flat -> findings += weakness(
                     "Little taper through the torso",
-                    "Chest ${metric.formatted()} times your waist. Upper-back and shoulder " +
-                        "work moves this faster than anything done at the waist.",
+                    "Chest ${metric.formatted()}× your waist. Upper-back and shoulder work moves it fastest.",
                 ).copy(part = true)
             }
         }
@@ -220,15 +213,12 @@ object BodyFindings {
                     "Lean mass is the lever here",
                     "FFMI ${metric.formatted()}, " +
                         band.detail.replaceFirstChar { it.lowercase() } +
-                        " Resistance training moves this more reliably than anything else, " +
-                        "and it moves slowly enough to be worth starting now.",
+                        " Strength training is what raises it.",
                 )
 
                 "Exceptional — check your inputs" -> findings += weakness(
                     "This reading needs checking",
-                    "FFMI ${metric.formatted()}, above the level usually considered " +
-                        "attainable drug-free. It is derived from your weight and your body " +
-                        "fat, and an underestimated body fat inflates it directly.",
+                    "FFMI ${metric.formatted()}, above the usual drug-free limit. A too-low body fat reading inflates it.",
                 )
             }
         }
@@ -282,12 +272,17 @@ object MeasuredParts {
         sex: Sex,
     ): Pair<Map<com.squeeze.core.scan.MuscleGroup, String>, Map<com.squeeze.core.scan.MuscleGroup, String>> {
         val strong = linkedMapOf<com.squeeze.core.scan.MuscleGroup, String>()
+        // A chest too wide to be real (an arm counted as chest) says nothing about the chest
+        // or the back, so neither may become a measured strength from it.
+        val chestSuspect = c.chestCm != null && c.waistCm != null &&
+            !com.squeeze.core.scan.PlausibleRanges.plausibleTaper(c.chestCm, c.waistCm)
         WeakPointAnalysis.strongPoints(c, sex).forEach { g ->
-            toScan(g)?.let { if (it !in strong) strong[it] = "Measured ahead of the balanced proportion for your frame." }
+            if (chestSuspect && (g == MuscleGroup.CHEST || g == MuscleGroup.BACK)) return@forEach
+            toScan(g)?.let { if (it !in strong) strong[it] = "Measured above the balanced proportion for your frame." }
         }
         val chest = c.chestCm
         val waist = c.waistCm
-        if (chest != null && waist != null && waist > 0) {
+        if (chest != null && waist != null && com.squeeze.core.scan.PlausibleRanges.plausibleTaper(chest, waist)) {
             val ratio = chest / waist
             val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
             if (ratio >= marked) {
@@ -316,6 +311,8 @@ object MeasuredParts {
     fun scores(c: Circumferences, sex: Sex): Map<com.squeeze.core.scan.MuscleGroup, Double> {
         val chest = c.chestCm ?: return emptyMap()
         val waist = c.waistCm?.takeIf { it > 0 } ?: return emptyMap()
+        // A mis-measured chest must not become a confident back-width score.
+        if (!com.squeeze.core.scan.PlausibleRanges.plausibleTaper(chest, waist)) return emptyMap()
         val ratio = chest / waist
         val flat = if (sex == Sex.FEMALE) BodyFindings.FEMALE_FLAT_TAPER else BodyFindings.MALE_FLAT_TAPER
         val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
