@@ -26,11 +26,10 @@ fun secret(name: String, default: String = ""): String =
 
 
 /**
- * The Web OAuth client of the Google Cloud project shared with WalletLens (project
- * 630094688874). Squeeze's Android clients must be registered in the same project; see README
- * "Google Drive backup setup".
+ * Squeeze's own Web OAuth client, in Google Cloud project 630094688874. Squeeze's Android
+ * clients must be registered in the same project; see README "Google Drive backup setup".
  */
-val googleWebClientId = "630094688874-rilioqqic8004hk57skqi6oi2bs0g078.apps.googleusercontent.com"
+val googleWebClientId = "630094688874-c0sqt3r0be71qqm0hsi91df4afisvdts.apps.googleusercontent.com"
 
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()

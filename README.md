@@ -97,8 +97,8 @@ background, at most hourly. It needs a Google Cloud project you own:
      `app/debug.keystore`, used by every debug build including CI's);
    - release: package `com.squeeze.app`, SHA-1 of the release key, or Play's app-signing key
      from Play Console › App integrity.
-4. **Web client ID:** the build uses the WalletLens project's existing Web client
-   (`630094688874-rilioqqic8004hk57skqi6oi2bs0g078.apps.googleusercontent.com`, set as
+4. **Web client ID:** the build uses Squeeze's Web client
+   (`630094688874-c0sqt3r0be71qqm0hsi91df4afisvdts.apps.googleusercontent.com`, set as
    `googleWebClientId` in `app/build.gradle.kts`; override with `GOOGLE_WEB_CLIENT_ID`). So
    the Android clients in step 3 must be created **in that same project** (630094688874).
    It is not a secret. Note that Google's consent screen shows that project's app name.
