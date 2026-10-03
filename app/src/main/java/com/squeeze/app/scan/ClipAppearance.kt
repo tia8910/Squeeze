@@ -115,11 +115,18 @@ class ClipAppearance @Inject constructor(
         return MuscleGroup.entries.mapNotNull { group ->
             val pairs = groups.optJSONArray(group.name) ?: return@mapNotNull null
             group to (0 until pairs.length()).map { i ->
-                val embeddings = pairs.getJSONObject(i).getJSONArray("embeddings")
+                val pair = pairs.getJSONObject(i)
+                val embeddings = pair.getJSONArray("embeddings")
                 fun row(r: Int) = embeddings.getJSONArray(r).let { values ->
                     DoubleArray(values.length()) { values.getDouble(it) }
                 }
-                MusclePromptPair(developed = row(0), undeveloped = row(1))
+                MusclePromptPair(
+                    developed = row(0),
+                    undeveloped = row(1),
+                    mid = pair.optDouble("mid").takeIf { it.isFinite() },
+                    scale = pair.optDouble("scale").takeIf { it.isFinite() },
+                    skip = pair.optBoolean("skip", false),
+                )
             }
         }.toMap()
     }

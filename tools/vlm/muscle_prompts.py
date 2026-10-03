@@ -49,3 +49,85 @@ MUSCLE_PROMPTS = {
         ("well developed quadriceps", "average untrained thighs"),
     ],
 }
+
+
+# Per-wording calibration: [mid, scale] of the logit difference 100·(developed − undeveloped)·image,
+# or None for a wording dropped because it scored trained physiques no higher than average
+# ones. Fitted on six reference photographs (one bodybuilder; one lean, well-trained man at two
+# framings; one recreationally trained man, FFMI about 20, three times). The photographs are not
+# in this repository and must never be: they are people's bodies. The scorer maps each group so
+# the average reference reads 0.4 and the trained ones 0.8 — see MuscleScorer in the core
+# module. Change a wording and its calibration is void: refit before shipping.
+MUSCLE_CALIBRATION = {
+    "SHOULDERS": [
+        [
+            -4.115,
+            1.637
+        ],
+        [
+            2.973,
+            1.0
+        ],
+        [
+            -3.663,
+            1.065
+        ]
+    ],
+    "CHEST": [
+        [
+            -1.752,
+            1.538
+        ],
+        [
+            0.758,
+            1.827
+        ],
+        None
+    ],
+    "ARMS": [
+        [
+            -1.027,
+            2.091
+        ],
+        [
+            1.079,
+            1.994
+        ],
+        [
+            3.953,
+            1.0
+        ]
+    ],
+    "ABS": [
+        [
+            2.629,
+            1.0
+        ],
+        [
+            1.269,
+            3.277
+        ],
+        [
+            2.091,
+            2.949
+        ]
+    ],
+    "V_TAPER": [
+        None,
+        [
+            0.896,
+            1.264
+        ]
+    ],
+    "LEGS": [
+        [
+            2.115,
+            3.261
+        ],
+        [
+            1.113,
+            1.94
+        ],
+        None
+    ]
+}

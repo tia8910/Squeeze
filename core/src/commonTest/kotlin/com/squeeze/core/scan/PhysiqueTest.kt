@@ -163,6 +163,70 @@ class PhysiqueTest {
     }
 
     @Test
+    fun `a calibrated wording reads its own midpoint as halfway between average and trained`() {
+        val calibrated = MusclePromptPair(axis(0), axis(1), mid = 100.0, scale = 50.0)
+        val noise = MusclePromptPair(axis(2), axis(3), skip = true)
+        // axis(0): difference 100 = mid → halfway between 0.4 and 0.8.
+        assertEquals(0.6, assertNotNull(MuscleScorer.score(listOf(axis(0)), listOf(calibrated, noise))), 1e-9)
+        // axis(2): difference 0, two spreads below mid → under the average reading.
+        assertEquals(0.2, assertNotNull(MuscleScorer.score(listOf(axis(2)), listOf(calibrated, noise))), 1e-9)
+    }
+
+    @Test
+    fun `upper-arm crops are square in pixels whatever the photo's shape`() {
+        val aspect = 0.75
+        PhysiqueRegions.regions(pose(withLimbs = true), aspect).getValue(MuscleGroup.ARMS).forEach { r ->
+            assertEquals((r.right - r.left) * aspect, r.bottom - r.top, 1e-9)
+        }
+    }
+
+    // The scan that showed the problem: 16.6% body fat, chest visibly behind shoulders and arms.
+    // Uncalibrated it put arms last and abs first.
+    private val recomp = mapOf(
+        MuscleGroup.SHOULDERS to 0.44,
+        MuscleGroup.CHEST to 0.21,
+        MuscleGroup.ARMS to 0.42,
+        MuscleGroup.ABS to 0.31,
+        MuscleGroup.V_TAPER to 0.36,
+    )
+
+    @Test
+    fun `abs cannot read developed above the body fat they show at`() {
+        val report = assertNotNull(
+            PhysiqueAnalysis.report(mapOf(MuscleGroup.ABS to 0.9, MuscleGroup.CHEST to 0.5), Goal.RECOMP, bodyFatPercent = 16.6),
+        )
+        assertFalse(MuscleGroup.ABS in report.strengths)
+        assertTrue(MuscleGroup.ABS in report.weaknesses)
+        assertTrue(report.weaknessEvidence.getValue(MuscleGroup.ABS).contains("16.6"))
+    }
+
+    @Test
+    fun `the lagging chest leads, arms are not called weak, and a photo girth does not overrule the AI`() {
+        val report = assertNotNull(
+            PhysiqueAnalysis.report(
+                recomp, Goal.RECOMP,
+                measuredStrong = mapOf(MuscleGroup.V_TAPER to "Chest 1.4× your waist."),
+                bodyFatPercent = 16.6,
+                measuredFromPhoto = true,
+            ),
+        )
+        assertEquals(listOf(MuscleGroup.CHEST, MuscleGroup.ABS), report.weaknesses)
+        assertFalse(MuscleGroup.ARMS in report.weaknesses)
+        assertTrue(report.strengths.isEmpty())
+    }
+
+    @Test
+    fun `average groups within noise of each other are not ranked into weak points`() {
+        val even = mapOf(
+            MuscleGroup.SHOULDERS to 0.43,
+            MuscleGroup.CHEST to 0.40,
+            MuscleGroup.ARMS to 0.41,
+            MuscleGroup.V_TAPER to 0.38,
+        )
+        assertTrue(assertNotNull(PhysiqueAnalysis.report(even, Goal.HYPERTROPHY)).weaknesses.isEmpty())
+    }
+
+    @Test
     fun `nothing is hidden without a part mask, and bare regions are kept`() {
         val all = MuscleGroup.entries.toSet()
         assertTrue(PhysiqueAnalysis.hiddenGroups(emptyMap(), all).isEmpty())

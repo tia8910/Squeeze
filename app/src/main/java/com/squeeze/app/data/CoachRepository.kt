@@ -307,30 +307,41 @@ class CoachRepository @Inject constructor(
                 goal = goal.name,
                 // Hidden groups are stored as such, so a covered group stays unjudged later
                 // rather than being re-derived from a girth taken through clothing.
-                scores = (scores.entries.map { (g, s) -> "${g.name}=$s" } + hidden.map { "${it.name}=$HIDDEN" })
-                    .joinToString(","),
+                scores = (scores.entries.map { (g, s) -> "${g.name}=$s" } + hidden.map { "${it.name}=$HIDDEN" } +
+                    "$VERSION_KEY=$CALIBRATED_VERSION").joinToString(","),
             ),
         )
     }
 
+    /**
+     * Reads scored before calibration had each group on its own wording's scale — arms could
+     * read lowest on someone whose arms were their best part — so they are not reused.
+     */
+    private fun PhysiqueReadEntity.calibrated(): Boolean = scores.contains("$VERSION_KEY=$CALIBRATED_VERSION")
+
     /** The saved physique read for [epochDay], with its hidden groups; null if none. */
     suspend fun physiqueOn(epochDay: Long): PhysiqueRead? =
-        physiqueDao.on(epochDay)?.let { PhysiqueRead(decode(it), decodeHidden(it)) }
+        physiqueDao.on(epochDay)?.takeIf { it.calibrated() }?.let { PhysiqueRead(decode(it), decodeHidden(it)) }
 
     /** The full report for a saved read: AI scores, hidden groups and the day's measurements. */
-    suspend fun physiqueReport(read: PhysiqueRead, circumferences: com.squeeze.core.model.Circumferences?): com.squeeze.core.scan.PhysiqueReport? {
+    suspend fun physiqueReport(read: PhysiqueRead, entry: com.squeeze.app.data.db.MeasurementEntity): com.squeeze.core.scan.PhysiqueReport? {
         val profile = profileDao.get() ?: return null
         val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
-        val (strong, weak) = circumferences
-            ?.let { com.squeeze.core.bodycomp.MeasuredParts.from(it, Sex.valueOf(profile.sex)) }
-            ?: (emptyMap<MuscleGroup, String>() to emptyMap())
-        return PhysiqueAnalysis.report(read.scores, goal, read.hidden, strong, weak)
+        val sex = Sex.valueOf(profile.sex)
+        val (strong, weak) = com.squeeze.core.bodycomp.MeasuredParts.from(entry.circumferences(), sex)
+        return PhysiqueAnalysis.report(
+            read.scores, goal, read.hidden, strong, weak,
+            bodyFatPercent = entry.bodyFatPercent(),
+            female = sex == Sex.FEMALE,
+            measuredFromPhoto = entry.fromPhoto(),
+        )
     }
 
     /** The latest read, as a report with the latest measurements folded in. */
     private suspend fun latestReport(goal: Goal): com.squeeze.core.scan.PhysiqueReport? {
-        val entity = physiqueDao.latest() ?: return null
-        val latest = measurementDao.since(Long.MIN_VALUE)
+        val entity = physiqueDao.latest()?.takeIf { it.calibrated() } ?: return null
+        val all = measurementDao.since(Long.MIN_VALUE)
+        val latest = all
             .filter { it.chestCm != null && it.waistCm != null }
             .maxByOrNull { it.epochDay }
         val c = latest?.let {
@@ -345,15 +356,21 @@ class CoachRepository @Inject constructor(
         } else {
             emptyMap<MuscleGroup, String>() to emptyMap()
         }
-        return PhysiqueAnalysis.report(decode(entity), goal, decodeHidden(entity), strong, weak)
+        return PhysiqueAnalysis.report(
+            decode(entity), goal, decodeHidden(entity), strong, weak,
+            bodyFatPercent = all.sortedByDescending { it.epochDay }.firstNotNullOfOrNull { it.bodyFatPercent() },
+            female = profile?.sex == Sex.FEMALE.name,
+            measuredFromPhoto = latest?.fromPhoto() ?: false,
+        )
     }
 
     /** The most recent physique read, or null before the first AI scan. */
-    suspend fun latestPhysique(): Map<MuscleGroup, Double>? = physiqueDao.latest()?.let(::decode)
+    suspend fun latestPhysique(): Map<MuscleGroup, Double>? =
+        physiqueDao.latest()?.takeIf { it.calibrated() }?.let(::decode)
 
     /** The read before [epochDay], for showing what moved since last time. */
     suspend fun physiqueBefore(epochDay: Long): Pair<Long, Map<MuscleGroup, Double>>? =
-        physiqueDao.before(epochDay)?.let { it.epochDay to decode(it) }
+        physiqueDao.before(epochDay)?.takeIf { it.calibrated() }?.let { it.epochDay to decode(it) }
 
     /** Remembers the programme's settings so nutrition and settings see the same ones. */
     suspend fun saveTrainingChoices(goal: Goal, trainingAge: TrainingAge, daysPerWeek: Int) {
@@ -490,6 +507,10 @@ class CoachRepository @Inject constructor(
 
         const val HIDDEN = "hidden"
 
+        /** Marks a read scored with calibrated wordings; see [calibrated]. */
+        const val VERSION_KEY = "VERSION"
+        const val CALIBRATED_VERSION = "2"
+
         /** Used for calorie estimates only until a first weight is logged. */
         const val DEFAULT_WEIGHT_KG = 75.0
     }
@@ -542,6 +563,19 @@ data class PendingLog(
     val intensity: Intensity,
     val exercises: List<PlannedItem> = emptyList(),
 )
+
+private fun com.squeeze.app.data.db.MeasurementEntity.circumferences() = com.squeeze.core.model.Circumferences(
+    neckCm = neckCm, waistCm = waistCm, hipCm = hipCm, chestCm = chestCm,
+    thighCm = thighCm, armCm = armCm, calfCm = calfCm,
+)
+
+/** A known body fat wins; otherwise the photo-based estimates this measurement carries. */
+private fun com.squeeze.app.data.db.MeasurementEntity.bodyFatPercent(): Double? =
+    referenceBodyFatPercent ?: listOfNotNull(visualBodyFatPercent, shapeBodyFatPercent)
+        .filter { it in 3.0..60.0 }.takeIf { it.isNotEmpty() }?.average()
+
+private fun com.squeeze.app.data.db.MeasurementEntity.fromPhoto() =
+    source.startsWith(com.squeeze.core.model.MeasurementSource.PHOTO.name)
 
 private fun ProfileEntity.toDomain() = Profile(
     heightCm = heightCm,

@@ -748,7 +748,8 @@ class ScanViewModel @Inject constructor(
         // and its score appears the moment it is known.
         // Only groups the photo actually shows: a region that is mostly clothing, by the part
         // model's reading, is skipped rather than judged — thighs in shorts are the shorts.
-        val allRegions = front.geometry?.let(PhysiqueRegions::regions).orEmpty()
+        val aspect = frontBitmap?.let { it.width.toDouble() / it.height } ?: 1.0
+        val allRegions = front.geometry?.let { PhysiqueRegions.regions(it, aspect) }.orEmpty()
         val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys)
         val muscleRegions = allRegions - hidden
         var live = scanner?.copy(
@@ -777,7 +778,19 @@ class ScanViewModel @Inject constructor(
                 val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
                 val (measuredStrong, measuredWeak) =
                     MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
-                PhysiqueAnalysis.report(scores, goal, hidden, measuredStrong, measuredWeak)
+                // Every body-fat reading this scan has, for the one physical limit on the read:
+                // abs do not show above roughly 12%, whatever the crop looks like.
+                val bodyFat = listOfNotNull(
+                    reading?.percent,
+                    shapeEstimate?.percent,
+                    BodyFatCalculator.navy(profile.toScanProfile(), result.circumferences)?.percent,
+                ).filter { it.isFinite() && it in 3.0..60.0 }.takeIf { it.isNotEmpty() }?.average()
+                PhysiqueAnalysis.report(
+                    scores, goal, hidden, measuredStrong, measuredWeak,
+                    bodyFatPercent = bodyFat,
+                    female = !isMale,
+                    measuredFromPhoto = true,
+                )
             }
 
         // The verdict stays up for a moment, beside the bodies it was weighed against,

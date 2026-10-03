@@ -20,7 +20,7 @@ import open_clip
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from prompts import PROMPT_SETS  # noqa: E402
-from muscle_prompts import MUSCLE_PROMPTS  # noqa: E402
+from muscle_prompts import MUSCLE_CALIBRATION, MUSCLE_PROMPTS  # noqa: E402
 from equipment_prompts import EQUIPMENT_PROMPTS  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -79,11 +79,16 @@ def main():
 
     groups = {}
     for group, pairs in MUSCLE_PROMPTS.items():
-        groups[group] = [
-            {"developed": strong, "undeveloped": weak,
-             "embeddings": embed(session, tokenizer, [strong, weak])}
-            for strong, weak in pairs
-        ]
+        calibration = MUSCLE_CALIBRATION.get(group, [None] * len(pairs))
+        groups[group] = []
+        for (strong, weak), fit in zip(pairs, calibration):
+            entry = {"developed": strong, "undeveloped": weak,
+                     "embeddings": embed(session, tokenizer, [strong, weak])}
+            if fit is None:
+                entry["skip"] = True
+            else:
+                entry["mid"], entry["scale"] = fit
+            groups[group].append(entry)
     write("clip_muscles.json", {
         "model": doc["model"],
         "logitScale": 100.0,

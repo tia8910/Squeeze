@@ -93,7 +93,7 @@ object PartMaskReader {
         val height = mask.height
         if (width <= 0 || height <= 0) return emptyMap()
         val labels = copyLabels(mask, width, height) ?: return emptyMap()
-        return com.squeeze.core.scan.PhysiqueRegions.regions(geometry).mapNotNull { (group, boxes) ->
+        return com.squeeze.core.scan.PhysiqueRegions.regions(geometry, width.toDouble() / height).mapNotNull { (group, boxes) ->
             val fractions = boxes.mapNotNull { BodyPartMap.regionSkinFraction(labels, width, height, it) }
             fractions.takeIf { it.isNotEmpty() }?.let { group to it.average() }
         }.toMap()

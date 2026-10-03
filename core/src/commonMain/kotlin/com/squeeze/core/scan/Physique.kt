@@ -25,8 +25,20 @@ enum class Development(val label: String) {
 
 /**
  * One wording of a group, developed against undeveloped, as the model embeds the two.
+ *
+ * @param mid where this wording's logit difference sits halfway between an average and a
+ *   well-trained physique, from the reference photographs; null for an uncalibrated wording
+ * @param scale half that gap, so (difference − mid) / scale reads −1 for average, +1 for trained
+ * @param skip true for a wording that failed calibration — it scored trained bodies no higher
+ *   than average ones, so it is noise and takes no part
  */
-class MusclePromptPair(val developed: DoubleArray, val undeveloped: DoubleArray)
+class MusclePromptPair(
+    val developed: DoubleArray,
+    val undeveloped: DoubleArray,
+    val mid: Double? = null,
+    val scale: Double? = null,
+    val skip: Boolean = false,
+)
 
 /**
  * Where on a front photograph each group is, from the pose landmarks.
@@ -38,7 +50,12 @@ class MusclePromptPair(val developed: DoubleArray, val undeveloped: DoubleArray)
  */
 object PhysiqueRegions {
 
-    fun regions(pose: FrontPoseGeometry): Map<MuscleGroup, List<CropRegion>> {
+    /**
+     * @param aspect the photograph's width over its height. Crops are square in pixels, not in
+     *   normalised units, because the model sees every crop squared: a tall thin box is padded
+     *   with black bars until the limb inside it is a sliver, and a sliver reads "skinny arm".
+     */
+    fun regions(pose: FrontPoseGeometry, aspect: Double = 1.0): Map<MuscleGroup, List<CropRegion>> {
         val shoulderY = (pose.shoulderLeft.y + pose.shoulderRight.y) / 2.0
         val hipY = (pose.hipLeft.y + pose.hipRight.y) / 2.0
         val span = hipY - shoulderY
@@ -71,21 +88,22 @@ object PhysiqueRegions {
             box(centre - width, shoulderY - 0.35 * span, centre + width, hipY + 0.15 * span),
         )
 
-        // Each arm from shoulder to wrist, and only when the elbow is in the frame — an arm
-        // the pose model placed off the edge of the photograph is a guess, not a crop.
-        val margin = 0.12 * width
+        // Each upper arm — shoulder to elbow, where the biceps and triceps are — in a square
+        // around its midpoint, and only when the elbow is in the frame. The whole arm hanging
+        // at the side is a tall strip; squared for the model it became a thin line and every
+        // arm read skinny. The upper arm squared reads the muscle, consistently: the same lean
+        // man scored 0.91 waist-up and 0.94 full length this way, 0.75 and 0.57 the old way.
         val arms = listOf(
-            Triple(pose.shoulderLeft, pose.elbowLeft, pose.wristLeft),
-            Triple(pose.shoulderRight, pose.elbowRight, pose.wristRight),
-        ).mapNotNull { (shoulder, elbow, wrist) ->
+            pose.shoulderLeft to pose.elbowLeft,
+            pose.shoulderRight to pose.elbowRight,
+        ).mapNotNull { (shoulder, elbow) ->
             if (elbow == null || !elbow.inFrame()) return@mapNotNull null
-            val points = listOfNotNull(shoulder, elbow, wrist)
-            box(
-                points.minOf { it.x } - margin,
-                points.minOf { it.y } - margin,
-                points.maxOf { it.x } + margin,
-                points.maxOf { it.y } + margin,
-            )
+            val cx = (shoulder.x + elbow.x) / 2.0
+            val cy = (shoulder.y + elbow.y) / 2.0
+            // Length in units of image height, so the square is square in pixels.
+            val length = sqrt(((elbow.x - shoulder.x) * aspect).let { it * it } + (elbow.y - shoulder.y).let { it * it })
+            val half = UPPER_ARM_HALF * length
+            box(cx - half / aspect, cy - half, cx + half / aspect, cy + half)
         }
         put(MuscleGroup.ARMS, *arms.toTypedArray())
 
@@ -117,15 +135,56 @@ object PhysiqueRegions {
     }
 
     private const val MIN_EDGE = 0.03
+
+    /** Half the upper-arm square's side, as a share of the shoulder-to-elbow length. */
+    private const val UPPER_ARM_HALF = 0.65
 }
 
 /**
- * How developed one group looks: the probability the model gives the developed side of each
- * wording, averaged over every wording and every crop of the group.
+ * How developed one group looks, 0 to 1.
+ *
+ * **Calibrated.** Each wording has a bias of its own: at the model's logit scale one shoulder
+ * wording gave every photograph 0.00–0.03 and one arm wording gave every photograph about
+ * 0.95, bodybuilder and beginner alike. Averaged raw, those constants set each group's level,
+ * so groups could not be compared — arms read lowest on a man whose arms were his best part.
+ * A calibrated wording instead contributes how far its logit difference sits from its own
+ * midpoint, in units of its own spread ([MusclePromptPair.mid], [MusclePromptPair.scale]); the
+ * average of those is mapped so an average trained man reads [AVERAGE_READS] and a lean,
+ * well-trained one [TRAINED_READS], the same for every group.
  */
 object MuscleScorer {
 
+    /** Where an average trained physique lands on every calibrated group. */
+    const val AVERAGE_READS = 0.4
+
+    /** Where a lean, well-trained physique lands. */
+    const val TRAINED_READS = 0.8
+
     fun score(crops: List<DoubleArray>, pairs: List<MusclePromptPair>): Double? {
+        val used = pairs.filter { !it.skip }
+        if (used.isNotEmpty() && used.all { it.mid != null && it.scale != null && it.scale > 0 }) {
+            return calibrated(crops, used)
+        }
+        return legacy(crops, pairs)
+    }
+
+    private fun calibrated(crops: List<DoubleArray>, pairs: List<MusclePromptPair>): Double? {
+        if (crops.isEmpty()) return null
+        val z = crops.flatMap { image ->
+            val unit = normalise(image) ?: return null
+            pairs.map { pair ->
+                if (pair.developed.size != unit.size || pair.undeveloped.size != unit.size) return null
+                val difference = AppearanceEstimator.LOGIT_SCALE * (dot(pair.developed, unit) - dot(pair.undeveloped, unit))
+                (difference - pair.mid!!) / pair.scale!!
+            }
+        }.average()
+        if (!z.isFinite()) return null
+        val middle = (AVERAGE_READS + TRAINED_READS) / 2
+        val half = (TRAINED_READS - AVERAGE_READS) / 2
+        return (middle + half * z).coerceIn(0.0, 1.0)
+    }
+
+    private fun legacy(crops: List<DoubleArray>, pairs: List<MusclePromptPair>): Double? {
         if (crops.isEmpty() || pairs.isEmpty()) return null
         val readings = crops.flatMap { image ->
             val unit = normalise(image) ?: return null
@@ -197,11 +256,22 @@ data class PhysiqueReport(
  */
 object PhysiqueAnalysis {
 
-    /** At or above this the model clearly sides with "developed". */
-    const val DEVELOPED_AT = 0.6
+    /**
+     * At or above this a group reads clearly past average — most of the way to the lean,
+     * well-trained reference ([MuscleScorer.TRAINED_READS]).
+     */
+    const val DEVELOPED_AT = 0.65
 
-    /** Below this it clearly sides with "undeveloped". */
-    const val LAGGING_BELOW = 0.35
+    /** Below this a group reads clearly behind an average trained physique. */
+    const val LAGGING_BELOW = 0.3
+
+    /**
+     * How far an average-reading group must trail the rest of the physique before it is called
+     * a weak point. Smaller gaps are within what the model's reading moves between two photos
+     * of the same body, and ranking inside that noise named a different "weakest" group every
+     * scan.
+     */
+    const val RELATIVE_GAP = 0.1
 
     fun development(score: Double): Development = when {
         score >= DEVELOPED_AT -> Development.DEVELOPED
@@ -217,8 +287,21 @@ object PhysiqueAnalysis {
      * strength even below [DEVELOPED_AT] — "your back is your best area" is true and useful
      * for someone whose whole physique is average.
      */
-    private const val RELATIVE_LEAD = 0.08
+    private const val RELATIVE_LEAD = 0.1
     private const val RELATIVE_MIN = 0.45
+
+    /**
+     * The most abs can read at a body fat, 0 to 1. Abdominal muscle shows through about 10–12%
+     * body fat in men and 18–20% in women, and not at all a few points above, however much of
+     * it there is. The model, looking at a crop of a stomach, does not know that; at 16.6% it
+     * called one stomach its owner's best feature.
+     */
+    fun absCeiling(bodyFatPercent: Double, female: Boolean): Double {
+        val clear = if (female) 19.0 else 11.0
+        val hidden = if (female) 26.0 else 17.0
+        val t = ((bodyFatPercent - clear) / (hidden - clear)).coerceIn(0.0, 1.0)
+        return 1.0 - t * 0.8
+    }
 
     /**
      * Strengths and weak points from everything known about this body.
@@ -245,11 +328,18 @@ object PhysiqueAnalysis {
         hidden: Set<MuscleGroup> = emptySet(),
         measuredStrong: Map<MuscleGroup, String> = emptyMap(),
         measuredWeak: Map<MuscleGroup, String> = emptyMap(),
+        bodyFatPercent: Double? = null,
+        female: Boolean = false,
+        measuredFromPhoto: Boolean = false,
     ): PhysiqueReport? {
+        val absCap = bodyFatPercent?.takeIf { it.isFinite() }?.let { absCeiling(it, female) }
         val read = scores
             .filterKeys { it !in hidden }
             .filterValues { it.isFinite() }
-            .map { (group, score) -> MuscleScore(group, score.coerceIn(0.0, 1.0), development(score)) }
+            .map { (group, raw) ->
+                val score = raw.coerceIn(0.0, 1.0).let { if (group == MuscleGroup.ABS && absCap != null) minOf(it, absCap) else it }
+                MuscleScore(group, score, development(score))
+            }
             .sortedByDescending { it.score }
         if (read.isEmpty() && measuredStrong.isEmpty()) return null
 
@@ -264,7 +354,13 @@ object PhysiqueAnalysis {
         }.forEach {
             evidence[it.group] = "Ahead of the rest of your physique (${pct(it.score)}/100 against an average of ${pct(mean)})."
         }
-        measuredStrong.filterKeys { it !in hidden }.forEach { (group, why) ->
+        // Girths a photo scan estimated are widths in one picture, and an arm resting against
+        // the ribs widens the chest; they count as a strength only where the AI's own read of
+        // the group does not contradict them. Tape measurements always count.
+        val scoreOfRead = read.associate { it.group to it.score }
+        measuredStrong.filterKeys { g ->
+            g !in hidden && (!measuredFromPhoto || (scoreOfRead[g] ?: 1.0) >= MuscleScorer.AVERAGE_READS)
+        }.forEach { (group, why) ->
             evidence[group] = evidence[group]?.let { "$it $why" } ?: why
         }
         val strengths = evidence.keys.toList()
@@ -272,11 +368,26 @@ object PhysiqueAnalysis {
         // Need: how far a group is from developed, weighted by how much the goal cares, with
         // a nudge when the measurements agree it is behind.
         val scoreOf = read.associate { it.group to it.score }
-        val candidates = (read.filter { it.development != Development.DEVELOPED }.map { it.group } +
-            measuredWeak.keys).distinct().filter { it !in strengths && it !in hidden }
+        // Lagging groups, and average ones clearly trailing the rest of this physique. Average
+        // groups within noise of each other are not ranked into "weak points": that only
+        // reported which wording happened to read lower in this photograph.
+        val trailing = read.filter { r ->
+            if (r.development == Development.LAGGING) return@filter true
+            if (r.development == Development.DEVELOPED) return@filter false
+            // What the goal is judged by stays in contention until it reads developed.
+            if (importance(goal, r.group) >= 1.0 && (goal == Goal.CUT || goal == Goal.MAKE_WEIGHT)) return@filter true
+            val others = read.filter { it.group != r.group }.map { it.score }
+            others.isNotEmpty() && r.score <= others.average() - RELATIVE_GAP
+        }.map { it.group }
+        // The same caution the other way: a photo girth does not make a group the AI reads
+        // above average into a weak point.
+        val weakMeasured = measuredWeak.filterKeys { g ->
+            !measuredFromPhoto || (scoreOf[g] ?: 0.0) <= MuscleScorer.AVERAGE_READS
+        }
+        val candidates = (trailing + weakMeasured.keys).distinct().filter { it !in strengths && it !in hidden }
         val weaknesses = candidates
             .sortedByDescending { g ->
-                importance(goal, g) * (1.0 - (scoreOf[g] ?: 0.4)) + if (g in measuredWeak) 0.1 else 0.0
+                importance(goal, g) * (1.0 - (scoreOf[g] ?: 0.4)) + if (g in weakMeasured) 0.1 else 0.0
             }
             .take(MAX_WEAKNESSES)
 
@@ -289,7 +400,12 @@ object PhysiqueAnalysis {
             summary = summary(goal, weaknesses.isEmpty(), strengths.isEmpty()),
             hidden = hidden.sortedBy { it.ordinal },
             strengthEvidence = evidence,
-            weaknessEvidence = measuredWeak.filterKeys { it in weaknesses },
+            weaknessEvidence = (weakMeasured + listOfNotNull(
+                bodyFatPercent?.takeIf { absCap != null && absCap < 1.0 }?.let {
+                    MuscleGroup.ABS to "At ${(it * 10).toInt() / 10.0}% body fat abs don't show yet, whatever is " +
+                        "underneath — they appear around ${if (female) "18–20" else "10–12"}%."
+                },
+            )).filterKeys { it in weaknesses },
         )
     }
 
@@ -318,6 +434,8 @@ object PhysiqueAnalysis {
     }
 
     private fun summary(goal: Goal, balanced: Boolean, noStrengths: Boolean): String = when {
+        balanced && noStrengths -> "Even: no group reads clearly ahead or behind the rest, so " +
+            "train everything in proportion and let the next scans show what moves."
         noStrengths && goal != Goal.CUT && goal != Goal.MAKE_WEIGHT ->
             "No group stands out yet — a full-body programme will build the base fastest, " +
                 "starting with the gaps below."

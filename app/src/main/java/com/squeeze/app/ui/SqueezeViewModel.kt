@@ -186,14 +186,7 @@ class SqueezeViewModel @Inject constructor(
     /** The AI physique analysis saved with [entry]'s scan, merged with its measurements. */
     suspend fun physiqueFor(entry: MeasurementEntity): com.squeeze.core.scan.PhysiqueReport? {
         val read = coach.physiqueOn(entry.epochDay) ?: return null
-        return coach.physiqueReport(
-            read,
-            com.squeeze.core.model.Circumferences(
-                neckCm = entry.neckCm, waistCm = entry.waistCm, hipCm = entry.hipCm,
-                chestCm = entry.chestCm, thighCm = entry.thighCm, armCm = entry.armCm,
-                calfCm = entry.calfCm,
-            ),
-        )
+        return coach.physiqueReport(read, entry)
     }
 
     /** Opens today's planned session in the log, then [then] navigates there. */
