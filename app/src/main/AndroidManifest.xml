@@ -3,23 +3,23 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      There is deliberately no INTERNET permission.
+      INTERNET exists for one feature: Google Drive backup, which the user turns on by
+      signing in with Google. Until they do, the app opens no connection at all.
 
-      This is the app's strongest guarantee, and it is the reason to read the permission
-      list rather than the marketing: without this permission the operating system will not
-      let the process open a socket, so no photograph and no measurement can leave the
-      device even if a bug, a dependency, or a future contributor tried to send one. The
-      claim is enforced rather than promised, and any user can check it.
+      What that permission does and does not change:
+        - Photographs never leave the device. Backup sends only the JSON written by
+          BackupCodec, which drops every photo reference; there is no code path that uploads
+          an image, and ScanPhotoStore keeps photos in encrypted app-private storage.
+        - The backup goes to the user's own Drive, in the hidden app-data folder that only
+          this app can read (scope drive.appdata, nothing else in their Drive), over TLS.
+        - Body scanning, the CLIP model and every other analysis remain on-device.
+        - Health Connect and Play Billing still work over IPC, not this process's network.
 
-      Everything the app does is compatible with that:
-        - Body scanning runs on models packaged in the APK; inference is local.
-        - Health Connect is an on-device datastore.
-        - Play Billing communicates with the Play Store app over binder IPC, not through
-          this process's network stack, so purchases still work.
-
-      Adding INTERNET later would silently void the guarantee. Anything that seems to need
-      it should be treated as a design question first.
+      Before this, the app had no INTERNET permission at all and the OS enforced "nothing
+      leaves". Anything else that seems to need the network is still a design question
+      first: keep it out of the photo path.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Photo capture for body scanning. Optional so the app still installs on devices
          without a camera, where uploading photos and tape entry both remain available. -->

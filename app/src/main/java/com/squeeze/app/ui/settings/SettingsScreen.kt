@@ -70,6 +70,16 @@ fun SettingsScreen(
         )
 
         SectionHeader(
+            eyebrow = "Account",
+            title = "Google Drive backup",
+            caption = "Sign in with Google and your data backs up to a private folder in your own Drive.",
+        )
+
+        BrandCard(Modifier.fillMaxWidth()) {
+            com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
+        }
+
+        SectionHeader(
             eyebrow = "Look and feel",
             title = "Appearance",
             caption = "The app follows your system theme unless you tell it otherwise.",
@@ -116,7 +126,7 @@ fun SettingsScreen(
             title = "Label your scans",
             caption = "Answer three questions about a scan photo. Enough of them and the app " +
                 "can learn to read definition from a picture instead of inferring it from an " +
-                "outline. Nothing leaves this device.",
+                "outline. Labels stay on this device.",
         )
 
         SecondaryButton(text = "Start labelling", onClick = onLabelPhotos)
@@ -124,8 +134,8 @@ fun SettingsScreen(
         SectionHeader(
             eyebrow = "On this device",
             title = "Privacy",
-            caption = "Everything here is stored encrypted on your phone. The app holds no " +
-                "internet permission, so none of it can leave.",
+            caption = "Everything here is stored encrypted on your phone. Photos never leave " +
+                "it; your data leaves only for your own Google Drive, and only if you sign in.",
         )
 
         SettingToggle(
@@ -141,8 +151,8 @@ fun SettingsScreen(
         )
 
         Text(
-            text = "Your measurements and scan photos never leave this device — the app has " +
-                "no internet permission, so it cannot send them anywhere. Photos are stored " +
+            text = "Your scan photos never leave this device, and your measurements leave it " +
+                "only for your own Google Drive, and only if you sign in for backup. Photos are stored " +
                 "encrypted in the app's private storage, are not visible in your gallery, and " +
                 "are deleted when you delete the measurement they belong to. This setting " +
                 "only controls what other apps can capture from the screen.",
@@ -203,8 +213,8 @@ private fun AboutCard() {
             )
         }
         Text(
-            text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
-                "under App info › Permissions.",
+            text = "Build ${BuildConfig.VERSION_CODE} · the network is used only for Google " +
+                "Drive backup, and only after you sign in.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),

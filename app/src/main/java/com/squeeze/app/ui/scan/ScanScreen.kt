@@ -705,8 +705,8 @@ private fun CameraPermissionRequired(onRequest: () -> Unit) {
         Text("Camera access", style = MaterialTheme.typography.titleMedium)
         Text(
             text = "Allow the camera to take the scan photos here, or upload two photos you " +
-                "already have. Either way the scan runs entirely on this device — this app " +
-                "has no internet permission at all, so nothing can be uploaded.",
+                "already have. Either way the scan runs entirely on this device, and photos " +
+                "are never uploaded — not even to your Google Drive backup.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )

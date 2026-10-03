@@ -65,6 +65,7 @@ class SqueezeViewModel @Inject constructor(
     private val uiSettings: UiSettings,
     private val photoStore: ScanPhotoStore,
     private val coach: com.squeeze.app.data.CoachRepository,
+    private val backup: com.squeeze.app.data.backup.BackupManager,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
@@ -178,6 +179,8 @@ class SqueezeViewModel @Inject constructor(
 
     init {
         refresh()
+        // A restore from Google Drive replaces the database underneath this screen.
+        viewModelScope.launch { backup.restores.collect { if (it > 0) refresh() } }
     }
 
     /** The AI physique analysis saved with [entry]'s scan, merged with its measurements. */

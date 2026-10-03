@@ -25,6 +25,9 @@ fun secret(name: String, default: String = ""): String =
     System.getenv(name) ?: localProperties.getProperty(name) ?: default
 
 
+/** Set this to the Web client ID once it exists; see README "Google Drive backup". */
+val googleWebClientId = ""
+
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()
 
@@ -58,9 +61,24 @@ android {
         // the right behaviour for a debug build with no Play Console behind it.
         buildConfigField("String", "PLAY_PUBLIC_KEY", "\"${secret("PLAY_PUBLIC_KEY")}\"")
 
+        // The *Web* OAuth client ID from the Google Cloud project, used by Sign in with
+        // Google for Drive backup. Not a secret (it ships in every APK that uses it), so it
+        // has a committed default; blank disables Google sign-in rather than breaking it.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${secret("GOOGLE_WEB_CLIENT_ID", googleWebClientId)}\"")
+
     }
 
     signingConfigs {
+        // A fixed debug key instead of each machine's auto-generated one, so the SHA-1
+        // registered for Google sign-in (Drive backup) matches every debug build, CI's
+        // included. It is debug-only and public by design: it proves nothing about who built
+        // the APK, and the release key stays secret.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             // Guarded: configuring a signing config with null paths fails the build outright,
             // so an unconfigured clone must skip it rather than half-populate it.
@@ -85,6 +103,7 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -108,8 +127,8 @@ android {
 }
 
 // Room exports its schema so migrations can be diffed and tested. Without a location set
-// the export is a build warning and the schema is silently lost, which matters here: this
-// app has no cloud backup, so a botched migration is unrecoverable data loss.
+// the export is a build warning and the schema is silently lost, which matters here: cloud
+// backup is optional, so for most users a botched migration is unrecoverable data loss.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
@@ -153,6 +172,12 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.androidx.exifinterface)
+
+    // Optional Google Drive backup: Sign in with Google, then drive.appdata authorisation.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+    implementation(libs.play.services.auth)
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)

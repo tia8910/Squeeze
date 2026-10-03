@@ -9,6 +9,9 @@ captures/
 *.apk
 *.aab
 *.keystore
+# Debug-only signing key, committed so the debug SHA-1 registered with Google sign-in
+# stays the same on every machine and CI run. Never used for release builds.
+!app/debug.keystore
 release-keys.properties
 keystore.properties
 *.jks

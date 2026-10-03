@@ -117,13 +117,19 @@ fun OnboardingScreen(
         )
 
         Text(
-            text = "These three decide how every measurement is calculated. Nothing here " +
-                "leaves your phone.",
+            text = "These three decide how every measurement is calculated.",
             style = MaterialTheme.typography.bodyMedium,
             color = sub,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
+
+        // Sign in first: a returning user restores everything here and never sees the form.
+        BrandCard(Modifier.fillMaxWidth()) {
+            com.squeeze.app.ui.backup.GoogleBackupCard(compact = true)
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         BrandCard(Modifier.fillMaxWidth()) {
             Text("Height", style = MaterialTheme.typography.titleSmall)

@@ -108,6 +108,9 @@ interface MesocycleDao {
     @Query("SELECT * FROM mesocycles ORDER BY createdEpochDay DESC")
     fun observeAll(): Flow<List<MesocycleEntity>>
 
+    @Query("SELECT * FROM mesocycles ORDER BY id ASC")
+    suspend fun all(): List<MesocycleEntity>
+
     @Query("UPDATE mesocycles SET isActive = 0")
     suspend fun clearActive()
 
@@ -168,6 +171,9 @@ interface DefinitionLabelDao {
 @Dao
 interface PhysiqueDao {
 
+    @Query("SELECT * FROM physique_reads ORDER BY epochDay ASC")
+    suspend fun all(): List<PhysiqueReadEntity>
+
     @Query("SELECT * FROM physique_reads ORDER BY epochDay DESC LIMIT 1")
     suspend fun latest(): PhysiqueReadEntity?
 
@@ -195,4 +201,7 @@ interface ActivityDao {
 
     @Delete
     suspend fun delete(session: ActivitySessionEntity)
+
+    @Query("DELETE FROM activity_sessions")
+    suspend fun deleteAll()
 }
