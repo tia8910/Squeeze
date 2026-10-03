@@ -122,16 +122,6 @@ fun SettingsScreen(
         )
 
         SectionHeader(
-            eyebrow = "Help the scan get better",
-            title = "Label your scans",
-            caption = "Answer three questions about a scan photo. Enough of them and the app " +
-                "can learn to read definition from a picture instead of inferring it from an " +
-                "outline. Labels stay on this device.",
-        )
-
-        SecondaryButton(text = "Start labelling", onClick = onLabelPhotos)
-
-        SectionHeader(
             eyebrow = "On this device",
             title = "Privacy",
             caption = "Everything here is stored encrypted on your phone. Photos never leave " +

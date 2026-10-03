@@ -9,7 +9,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.Icon
@@ -280,7 +287,7 @@ fun OnboardingScreen(
 private class Step(val title: String, val subtitle: String)
 
 private val STEPS = listOf(
-    Step("Welcome to Squeeze", "Sign in to back up and restore everything — or carry on without an account."),
+    Step("Welcome to Squeeze", "Your private AI body coach. Here's exactly what happens to your data."),
     Step("Your body", "Three details every measurement is calculated from."),
     Step("Your goal", "What you're training for shapes your plan, your food and your coaching."),
 )
@@ -298,8 +305,52 @@ private fun AccountStep() {
             FeaturePill("Smart plan", Icons.Rounded.FitnessCenter, Modifier.weight(1f))
             FeaturePill("Fuel", Icons.Rounded.Restaurant, Modifier.weight(1f))
         }
-        BrandCard(Modifier.fillMaxWidth().entrance(2)) {
+        PrivacyCard(Modifier.fillMaxWidth().entrance(2))
+        Spacer(Modifier.height(12.dp))
+        BrandCard(Modifier.fillMaxWidth().entrance(3)) {
             com.squeeze.app.ui.backup.GoogleBackupCard(compact = true)
+        }
+    }
+}
+
+/** What happens to your body data, said before anything is asked of you. */
+@Composable
+private fun PrivacyCard(modifier: Modifier = Modifier) {
+    val dark = LocalIsDarkTheme.current
+    val muted = if (dark) Brand.DarkMuted else Brand.Muted
+    BrandCard(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(Brand.IconBlueLight, Brand.BlueDeep))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.padding(start = 12.dp)) {
+                Text("Private by design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Your body is nobody else's business.", style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+        }
+        Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrivacyPoint(Icons.Rounded.PhoneAndroid, "Photos are analysed on this phone", "The AI runs on your phone. Your photos are never uploaded — not to us, not to Google.")
+            PrivacyPoint(Icons.Rounded.Lock, "Encrypted on your phone", "Everything is stored encrypted, and locked behind your fingerprint or face when your phone has one set up.")
+            PrivacyPoint(Icons.Rounded.CloudDone, "Backup only if you want it", "Sign in and your numbers back up to a hidden folder in your own Google Drive. Photos stay here.")
+            PrivacyPoint(Icons.Rounded.Block, "No ads, no tracking, no selling", "There are no analytics or ad networks in this app.")
+        }
+    }
+}
+
+@Composable
+private fun PrivacyPoint(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String) {
+    val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
+    Row {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp).padding(top = 2.dp))
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = muted)
         }
     }
 }
