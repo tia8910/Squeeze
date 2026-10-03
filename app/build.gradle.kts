@@ -25,8 +25,12 @@ fun secret(name: String, default: String = ""): String =
     System.getenv(name) ?: localProperties.getProperty(name) ?: default
 
 
-/** Set this to the Web client ID once it exists; see README "Google Drive backup". */
-val googleWebClientId = ""
+/**
+ * The Web OAuth client of the Google Cloud project shared with WalletLens (project
+ * 630094688874). Squeeze's Android clients must be registered in the same project; see README
+ * "Google Drive backup setup".
+ */
+val googleWebClientId = "630094688874-rilioqqic8004hk57skqi6oi2bs0g078.apps.googleusercontent.com"
 
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()
