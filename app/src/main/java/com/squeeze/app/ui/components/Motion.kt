@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -285,5 +287,31 @@ fun OrbitLoader(modifier: Modifier = Modifier, size: Dp = 40.dp) {
             val a = (angle + i * 120f) * PI.toFloat() / 180f
             drawCircle(blue.copy(alpha = 1f - i * 0.3f), radius = (4 - i).dp.toPx(), center = Offset(c.x + r * cos(a), c.y + r * sin(a)))
         }
+    }
+}
+
+/**
+ * Light / dark switch: a sun or moon that turns as it swaps. Reads the current rendering, so
+ * a user on "follow system" flips to the opposite of what they see.
+ */
+@Composable
+fun ThemeToggle(onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val dark = LocalIsDarkTheme.current
+    val turn by animateFloatAsState(if (dark) 180f else 0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "turn")
+    val source = remember { MutableInteractionSource() }
+    androidx.compose.material3.IconButton(
+        onClick = onToggle,
+        interactionSource = source,
+        modifier = modifier
+            .pressScale(source)
+            .clip(RoundedCornerShape(50))
+            .background(if (dark) Brand.DarkCard.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.85f)),
+    ) {
+        androidx.compose.material3.Icon(
+            if (dark) androidx.compose.material.icons.Icons.Rounded.LightMode else androidx.compose.material.icons.Icons.Rounded.DarkMode,
+            contentDescription = if (dark) "Switch to light mode" else "Switch to dark mode",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.graphicsLayer { rotationZ = turn },
+        )
     }
 }

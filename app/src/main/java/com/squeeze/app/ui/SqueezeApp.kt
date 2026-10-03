@@ -67,6 +67,7 @@ import com.squeeze.app.ui.components.pressScale
 import androidx.compose.ui.graphics.graphicsLayer
 import com.squeeze.core.model.Goal
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.app.ui.theme.ThemeMode
 import com.squeeze.app.ui.training.TrainingScreen
 import com.squeeze.app.ui.nutrition.NutritionScreen
 import com.squeeze.app.ui.log.WorkoutLogScreen
@@ -111,8 +112,13 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     val landingSeen by viewModel.landingSeen.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // Onboarding and the landing page offer the theme before the app is set up; the choice is
+    // the same setting as You › Appearance.
+    val renderingDark = LocalIsDarkTheme.current
+    val toggleTheme = { viewModel.setThemeMode(if (renderingDark) ThemeMode.LIGHT else ThemeMode.DARK) }
+
     if (!landingSeen) {
-        LandingScreen(onGetStarted = viewModel::markLandingSeen)
+        LandingScreen(onGetStarted = viewModel::markLandingSeen, onToggleTheme = toggleTheme)
         return
     }
 
@@ -134,6 +140,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     // fails after they have undressed and framed a photograph.
     if (state.profile == null) {
         OnboardingScreen(
+            onToggleTheme = toggleTheme,
             onComplete = { heightCm, birthYear, sex, goal, targetBodyFat, targetWeight, day ->
                 viewModel.updateProfile(
                     heightCm = heightCm,

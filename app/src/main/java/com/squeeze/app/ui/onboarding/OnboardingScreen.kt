@@ -92,6 +92,7 @@ fun OnboardingScreen(
         targetWeightKg: Double?,
         targetEpochDay: Long?,
     ) -> Unit,
+    onToggleTheme: () -> Unit = {},
 ) {
     var heightText by remember { mutableStateOf("") }
     var yearText by remember { mutableStateOf("") }
@@ -168,6 +169,8 @@ fun OnboardingScreen(
                     modifier = Modifier.weight(1f),
                 )
                 PageDots(count = STEPS.size, current = pager.currentPage)
+                Spacer(Modifier.width(10.dp))
+                com.squeeze.app.ui.components.ThemeToggle(onToggle = onToggleTheme)
             }
             val fill by animateFloatAsState((pager.currentPage + 1f) / STEPS.size, tween(500), label = "fill")
             LinearProgressIndicator(

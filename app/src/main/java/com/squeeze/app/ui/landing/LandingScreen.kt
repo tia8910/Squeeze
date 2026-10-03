@@ -90,7 +90,7 @@ private val features = listOf(
  * This is the only screen that gets to be loud. Everywhere else the data is the subject.
  */
 @Composable
-fun LandingScreen(onGetStarted: () -> Unit) {
+fun LandingScreen(onGetStarted: () -> Unit, onToggleTheme: () -> Unit = {}) {
     val markScale = remember { Animatable(0.82f) }
     val contentAlpha = remember { Animatable(0f) }
 
@@ -118,6 +118,9 @@ fun LandingScreen(onGetStarted: () -> Unit) {
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                com.squeeze.app.ui.components.ThemeToggle(onToggle = onToggleTheme)
+            }
             SqueezeLockup(
                 markSize = 84.dp,
                 modifier = Modifier.scale(markScale.value),
