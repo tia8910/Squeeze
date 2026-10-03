@@ -63,6 +63,8 @@ import com.squeeze.app.ui.onboarding.OnboardingScreen
 import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
 import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.components.pressScale
+import androidx.compose.ui.graphics.graphicsLayer
 import com.squeeze.core.model.Goal
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.training.TrainingScreen
@@ -259,7 +261,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 // Short fade with a slight rise: enough that a screen change registers,
                 // short enough that navigation never feels slower for it.
                 enterTransition = {
-                    fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 24 }
+                    fadeIn(tween(260)) + slideInVertically(tween(300)) { it / 18 } +
+                        androidx.compose.animation.scaleIn(tween(300), initialScale = 0.98f)
                 },
                 exitTransition = { fadeOut(tween(120)) },
                 popEnterTransition = { fadeIn(tween(220)) },
@@ -455,11 +458,28 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
             Destination.entries.forEach { destination ->
                 val selected = destination == active
 
-                val tint = when {
-                    selected -> MaterialTheme.colorScheme.primary
-                    dark -> Brand.DarkMuted
-                    else -> Brand.NavIdle
-                }
+                val tint by androidx.compose.animation.animateColorAsState(
+                    when {
+                        selected -> MaterialTheme.colorScheme.primary
+                        dark -> Brand.DarkMuted
+                        else -> Brand.NavIdle
+                    },
+                    label = "tint",
+                )
+                val pill by androidx.compose.animation.animateColorAsState(
+                    if (selected) {
+                        if (dark) Brand.DarkIce else Brand.Ice
+                    } else {
+                        Color.Transparent
+                    },
+                    label = "pill",
+                )
+                // The chosen tab's icon springs up a touch, so the change of tab is felt.
+                val lift by androidx.compose.animation.core.animateFloatAsState(
+                    if (selected) 1.15f else 1f,
+                    androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy),
+                    label = "lift",
+                )
 
                 // Ripple is suppressed and replaced by the pill, which is a clearer
                 // indication of state than a fading circle and, unlike a ripple, persists.
@@ -468,14 +488,9 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
+                        .pressScale(interaction)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (selected) {
-                                if (dark) Brand.DarkIce else Brand.Ice
-                            } else {
-                                Color.Transparent
-                            },
-                        )
+                        .background(pill)
                         .clickable(
                             interactionSource = interaction,
                             indication = null,
@@ -492,7 +507,7 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
                         // repeating it here would make a screen reader say it twice.
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(22.dp).graphicsLayer { scaleX = lift; scaleY = lift },
                     )
                     Text(
                         text = destination.label,

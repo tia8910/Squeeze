@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.data.db.MeasurementEntity
+import com.squeeze.app.ui.components.entrance
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.BandChip
 import com.squeeze.app.ui.components.BrandRow
@@ -539,7 +540,7 @@ private fun EmptyState(
     val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(1)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier
@@ -555,7 +556,14 @@ private fun EmptyState(
                 )
             }
 
-            Row(
+            if (!blocked) {
+                com.squeeze.app.ui.components.ScanPulse(
+                    size = 160.dp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp),
+                )
+            }
+
+            if (blocked) Row(
                 modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {

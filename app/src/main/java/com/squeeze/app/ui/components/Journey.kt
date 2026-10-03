@@ -1,6 +1,16 @@
 package com.squeeze.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,34 +53,57 @@ fun JourneyCard(
     val next = journey.next
 
     if (next != null) {
-        BrandCard(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        HeroCard(Modifier.fillMaxWidth().entrance(0)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        if (journey.setupComplete) "NEXT" else "STEP ${journey.setupDone + 1} OF ${journey.setup.size}",
+                        if (journey.setupComplete) "NEXT UP" else "STEP ${journey.setupDone + 1} OF ${journey.setup.size}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
+                        color = Color.White.copy(alpha = 0.75f),
                     )
-                    if (!journey.setupComplete) {
+                    Text(next.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                // Setup progress, or this week's sessions once set up.
+                val (done, total) = if (!journey.setupComplete) {
+                    journey.setupDone to journey.setup.size
+                } else {
+                    summary.sessionsDone to (summary.sessionsPlanned ?: 0)
+                }
+                if (total > 0) {
+                    ProgressRing(
+                        progress = done.toFloat() / total,
+                        size = 64.dp,
+                        stroke = 7.dp,
+                        track = Color.White.copy(alpha = 0.2f),
+                    ) {
+                        Text("$done/$total", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+            Text(
+                next.detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.88f),
+                modifier = Modifier.padding(top = 8.dp, bottom = 14.dp),
+            )
+            if (!journey.setupComplete) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 14.dp)) {
+                    journey.setup.forEach { step ->
                         Text(
-                            journey.setup.joinToString(" · ") { (if (it.done) "✓ " else "") + shortLabel(it.id) },
+                            (if (step.done) "✓ " else "") + shortLabel(step.id),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            color = if (step.done || step.id == next.id) Color.White else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = if (step.id == next.id) 0.22f else 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
                         )
                     }
                 }
-                if (!journey.setupComplete) {
-                    LinearProgressIndicator(
-                        progress = { journey.setupDone.toFloat() / journey.setup.size },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Text(next.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(next.detail, style = MaterialTheme.typography.bodyMedium)
-                PrimaryButton(text = next.action, onClick = { onStep(next.id) })
             }
+            HeroButton(text = next.action, onClick = { onStep(next.id) })
         }
     } else {
         NoticePill("You're all caught up today ✓")
@@ -101,7 +134,7 @@ fun JourneyCard(
         }
     }
     if (lines.isNotEmpty()) {
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(1)) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("TODAY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 lines.forEachIndexed { i, (label, body, onClick) ->
@@ -113,7 +146,7 @@ fun JourneyCard(
     }
 
     if (summary.tips.isNotEmpty()) {
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(2)) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("COACH TIPS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 summary.tips.forEach { tip ->
@@ -136,7 +169,27 @@ private fun TodayLine(label: String, body: String, onClick: () -> Unit) {
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                when (label) {
+                    "Train" -> Icons.Rounded.FitnessCenter
+                    "Eat" -> Icons.Rounded.Restaurant
+                    else -> Icons.Rounded.CenterFocusStrong
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Column(Modifier.padding(start = 12.dp).width(52.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
         Text(
             body,
             style = MaterialTheme.typography.bodyMedium,
