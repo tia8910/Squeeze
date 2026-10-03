@@ -46,6 +46,8 @@ data class NutritionInputs(
     val priorityGroups: List<String> = emptyList(),
     /** Foods the user picked on the nutrition page; the meal programme is built from them. */
     val favouriteFoods: Set<String> = emptySet(),
+    /** When the user usually trains; it places the around-training meal in the day. */
+    val trainingTime: com.squeeze.core.coach.TrainingTime? = null,
     /**
      * Exercise calories above resting, per day, averaged over the logged sessions of the last
      * two weeks. Null when too little has been logged to trust over the planned days.
@@ -303,7 +305,7 @@ object NutritionPlanner {
 
         // The week's meals, from the user's favourite foods, and the micronutrients they
         // supply on an average day of it.
-        val week = MealBuilder.week(trainingDay, restDay, days, input.favouriteFoods)
+        val week = MealBuilder.week(trainingDay, restDay, days, input.favouriteFoods, input.trainingTime)
         val meals = week.firstOrNull { "training" in it.name }?.meals ?: week.first().meals
         val microTargets = MicroTargets.targets(input.sex, input.ageYears, days, calories)
         val micros = microTargets.map { (nutrient, target) ->
@@ -316,6 +318,14 @@ object NutritionPlanner {
         if (input.favouriteFoods.isNotEmpty()) {
             reasoning += "Meals are built from your ${input.favouriteFoods.size} favourite foods, " +
                 "rotated across the week."
+        }
+        input.trainingTime?.let { t ->
+            reasoning += "You train in the ${t.label.lowercase()} (${t.window}), so the around-training meal " +
+                when (t) {
+                    com.squeeze.core.coach.TrainingTime.EARLY_MORNING -> "comes first and breakfast is your recovery meal."
+                    com.squeeze.core.coach.TrainingTime.NIGHT -> "comes last, after dinner — keep it light."
+                    else -> "sits right before your session."
+                }
         }
 
         return NutritionPlan(

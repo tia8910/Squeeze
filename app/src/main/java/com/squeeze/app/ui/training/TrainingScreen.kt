@@ -89,6 +89,7 @@ fun TrainingScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SportsSection(state, viewModel)
                     SetupSection(state, viewModel)
+                    TrainingTimeSection(state, viewModel)
                     Text(
                         "Goal: ${state.goal.label()} — change it in You.",
                         style = MaterialTheme.typography.bodySmall,
@@ -111,6 +112,12 @@ fun TrainingScreen(
 
             val todayIndex = java.time.LocalDate.now().dayOfWeek.value - 1
             TodayCard(week.days[todayIndex], onStart = { session -> viewModel.startLog(session); onLog() })
+
+            // Asked once for anyone whose week predates the question; afterwards it lives in
+            // the setup with the other choices.
+            if (state.trainingTime == null) {
+                BrandCard(Modifier.fillMaxWidth()) { TrainingTimeSection(state, viewModel) }
+            }
 
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 SectionHeader(
@@ -404,6 +411,32 @@ private fun SportsSection(state: TrainingUiState, viewModel: TrainingViewModel) 
                 }
             }
         }
+    }
+}
+
+/** When the user trains: it times their meals and today's tips. */
+@Composable
+private fun TrainingTimeSection(state: TrainingUiState, viewModel: TrainingViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("When do you usually train?", style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            com.squeeze.core.coach.TrainingTime.entries.forEach { t ->
+                FilterChip(
+                    selected = state.trainingTime == t,
+                    onClick = { viewModel.setTrainingTime(t) },
+                    label = { Text(t.label) },
+                )
+            }
+        }
+        Text(
+            state.trainingTime?.let { "${it.window} — your pre- and post-workout meals are timed around it." }
+                ?: "Your meals and daily tips are timed around it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

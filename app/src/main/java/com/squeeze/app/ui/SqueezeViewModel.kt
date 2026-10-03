@@ -129,6 +129,7 @@ class SqueezeViewModel @Inject constructor(
                     trainingDaysPerWeek = existing?.trainingDaysPerWeek,
                     disciplines = existing?.disciplines,
                     favouriteFoods = existing?.favouriteFoods,
+                    trainingTime = existing?.trainingTime,
                 ),
             )
             refresh()

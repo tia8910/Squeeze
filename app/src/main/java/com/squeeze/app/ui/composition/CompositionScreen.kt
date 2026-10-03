@@ -125,6 +125,7 @@ fun CompositionScreen(
                 onStartScan = onStartScan,
                 onAddMeasurement = onAddMeasurement,
                 measurements = measurements,
+                showScan = summary?.journey?.next?.id != com.squeeze.core.coach.StepId.AI_SCAN,
             )
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
@@ -525,6 +526,8 @@ private fun EmptyState(
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     measurements: List<MeasurementEntity>,
+    /** False when the journey card above already offers the scan, so it is not asked twice. */
+    showScan: Boolean = true,
 ) {
     // Entries can exist while no estimate does, when a scan saved some sites but not the
     // ones the equation needs. Saying "no measurements yet" then is simply false, and it
@@ -598,28 +601,18 @@ private fun EmptyState(
             )
         }
 
-        PrimaryButton(
-            text = "Scan with camera or photos",
-            onClick = onStartScan,
-            leading = {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
-        SecondaryButton(
-            text = "Enter tape measurements",
-            onClick = onAddMeasurement,
-            leading = {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
-
-        Text(
-            text = "Two measurements are needed before a trend appears, and about three weeks " +
-                "before the app can tell a real change from measurement noise. A tape is more " +
-                "repeatable than any photo method — the scan is faster, the tape is more precise.",
-            style = MaterialTheme.typography.bodySmall,
-            color = subColour,
-        )
+        if (showScan) {
+            PrimaryButton(
+                text = "Scan with camera or photos",
+                onClick = onStartScan,
+                leading = {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+                },
+            )
+        }
+        androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+            Text("Prefer a tape measure? Enter measurements instead")
+        }
     }
 }
 

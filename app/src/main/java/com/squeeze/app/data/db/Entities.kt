@@ -138,6 +138,8 @@ data class ProfileEntity(
     val disciplines: String? = null,
     /** Favourite foods, `|`-separated names from the food library; null until chosen. */
     val favouriteFoods: String? = null,
+    /** When the user usually trains, a `TrainingTime` name; null until asked. */
+    val trainingTime: String? = null,
 )
 
 /**

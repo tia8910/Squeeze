@@ -22,11 +22,12 @@ import com.squeeze.core.coach.JourneyStep
 import com.squeeze.core.coach.StepId
 
 /**
- * The top of the dashboard, in two cards and no more:
+ * The top of the dashboard, in three short cards:
  *
  *  1. **Next step** — the one thing to do now, with one button. During setup it also shows how
  *     far along the user is, as a thin bar rather than a checklist.
  *  2. **Today** — one line each for training, food and the physique focus, each tappable.
+ *  3. **Coach tips** — what today holds (session timing, rest day), then one for the goal.
  *
  * Everything else lives on its own tab; the dashboard's job is to say what to do and where.
  */
@@ -54,7 +55,7 @@ fun JourneyCard(
                     )
                     if (!journey.setupComplete) {
                         Text(
-                            journey.setup.joinToString("  ") { (if (it.done) "✓ " else "") + it.title.substringBefore(' ') },
+                            journey.setup.joinToString(" · ") { (if (it.done) "✓ " else "") + shortLabel(it.id) },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -110,6 +111,20 @@ fun JourneyCard(
             }
         }
     }
+
+    if (summary.tips.isNotEmpty()) {
+        BrandCard(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("COACH TIPS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                summary.tips.forEach { tip ->
+                    Row {
+                        Text("•", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(16.dp))
+                        Text(tip, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -151,4 +166,12 @@ fun NextStepBanner(step: JourneyStep, onGo: () -> Unit, modifier: Modifier = Mod
             modifier = Modifier.padding(start = 8.dp),
         )
     }
+}
+
+private fun shortLabel(id: StepId) = when (id) {
+    StepId.AI_SCAN -> "Scan"
+    StepId.CHOOSE_SPORTS -> "Sports"
+    StepId.PICK_FOODS -> "Foods"
+    StepId.TODAYS_SESSION -> "Train"
+    StepId.WEEKLY_CHECK_IN -> "Check-in"
 }

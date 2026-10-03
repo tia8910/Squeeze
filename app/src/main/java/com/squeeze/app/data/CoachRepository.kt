@@ -14,7 +14,10 @@ import com.squeeze.core.workout.Intensity
 import com.squeeze.core.workout.LoggedSet
 import com.squeeze.core.workout.PlannedItem
 import com.squeeze.core.workout.PlannedSession
+import com.squeeze.core.coach.CoachTips
 import com.squeeze.core.coach.Journey
+import com.squeeze.core.coach.TipContext
+import com.squeeze.core.coach.TrainingTime
 import com.squeeze.core.coach.JourneyFacts
 import com.squeeze.core.coach.JourneyPlanner
 import com.squeeze.core.workout.Sport
@@ -122,6 +125,18 @@ class CoachRepository @Inject constructor(
         val goal = profileDao.get()?.let { runCatching { Goal.valueOf(it.goal) }.getOrNull() } ?: Goal.HYPERTROPHY
         val report = latestReport(goal)
         val nutrition = nutritionPlan()
+        val trainingToday = todaysSessions(week).isNotEmpty()
+        val tips = CoachTips.today(
+            TipContext(
+                goal = goal,
+                trainingTime = trainingTime(),
+                trainingToday = trainingToday,
+                weakPoints = report?.weaknesses?.map { it.label }.orEmpty(),
+                microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
+                proteinG = nutrition?.plan?.trainingDay?.proteinG,
+                epochDay = LocalDate.now().toEpochDay(),
+            ),
+        )
         return DashboardSummary(
             journey = journey(),
             todaysTraining = if (week == null) {
@@ -142,6 +157,8 @@ class CoachRepository @Inject constructor(
             },
             microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
             goalRate = nutrition?.plan?.intendedKgPerWeek,
+            tips = tips,
+            trainingTime = trainingTime(),
         )
     }
 
@@ -167,6 +184,15 @@ class CoachRepository @Inject constructor(
     suspend fun saveFavouriteFoods(foods: Set<String>) {
         val existing = profileDao.get() ?: return
         profileDao.upsert(existing.copy(favouriteFoods = foods.joinToString("|")))
+    }
+
+    /** When the user usually trains, or null before they have said. */
+    suspend fun trainingTime(): TrainingTime? = profileDao.get()?.trainingTime
+        ?.let { runCatching { TrainingTime.valueOf(it) }.getOrNull() }
+
+    suspend fun saveTrainingTime(time: TrainingTime?) {
+        val existing = profileDao.get() ?: return
+        profileDao.upsert(existing.copy(trainingTime = time?.name))
     }
 
     // ── The week ─────────────────────────────────────────────────────────────────────────
@@ -417,6 +443,7 @@ class CoachRepository @Inject constructor(
             daysToDeadline = profile.targetEpochDay?.let { it - today },
             priorityGroups = aiWeakGroupNames(profile.goal),
             favouriteFoods = favouriteFoods(),
+            trainingTime = trainingTime(),
             loggedExerciseKcalPerDay = logged.takeIf { it.isNotEmpty() }?.let { s -> s.sumOf { it.netKcal } / 14.0 },
             loggedSessions = logged.size,
             plannedExerciseKcalPerDay = week?.netKcalPerDay(weightTrend.lastOrNull()?.level ?: latestWeight.weightKg!!),
@@ -492,6 +519,9 @@ data class DashboardSummary(
     val fuelToday: String?,
     val microGaps: List<String>,
     val goalRate: Double?,
+    /** Coaching tips for today: what today holds first, then one for the goal. */
+    val tips: List<String> = emptyList(),
+    val trainingTime: TrainingTime? = null,
 )
 
 /** A saved AI physique read: scores for the groups it could see, and the ones it could not. */

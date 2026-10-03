@@ -57,6 +57,8 @@ data class TrainingUiState(
     val volume: List<VolumeRow> = emptyList(),
     /** Planned exercise calories a day, for the link to nutrition. */
     val plannedKcalPerDay: Int? = null,
+    /** When the user usually trains; times meals and tips. */
+    val trainingTime: com.squeeze.core.coach.TrainingTime? = null,
 )
 
 /**
@@ -88,6 +90,7 @@ class TrainingViewModel @Inject constructor(
                     ?: TrainingAge.INTERMEDIATE,
                 daysPerWeek = profile?.trainingDaysPerWeek ?: _state.value.daysPerWeek,
                 disciplines = coach.disciplines(),
+                trainingTime = coach.trainingTime(),
             )
             refreshWeek()
         }
@@ -118,6 +121,13 @@ class TrainingViewModel @Inject constructor(
         _state.value = _state.value.copy(
             disciplines = if (discipline in current) current - discipline else current + discipline,
         )
+    }
+
+    /** Saved straight away: it changes the meal order and today's tips, not the week. */
+    fun setTrainingTime(time: com.squeeze.core.coach.TrainingTime) {
+        val next = time.takeIf { it != _state.value.trainingTime }
+        _state.value = _state.value.copy(trainingTime = next)
+        viewModelScope.launch { coach.saveTrainingTime(next) }
     }
 
     /**

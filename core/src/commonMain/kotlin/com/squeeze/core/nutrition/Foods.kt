@@ -1,5 +1,6 @@
 package com.squeeze.core.nutrition
 
+import com.squeeze.core.coach.TrainingTime
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -240,13 +241,37 @@ object MealBuilder {
     /** A single day, day 0 of the week. */
     fun build(day: Macros, favourites: Set<String> = emptySet()): List<Meal> = buildDay(day, favourites, 0)
 
-    /** Seven days rotating through the favourites. */
-    fun week(training: Macros, rest: Macros, trainingDays: Int, favourites: Set<String>): List<DayPlan> {
+    /**
+     * Seven days rotating through the favourites, with the around-training meal placed where
+     * the user's session actually falls in the day.
+     */
+    fun week(
+        training: Macros,
+        rest: Macros,
+        trainingDays: Int,
+        favourites: Set<String>,
+        trainingTime: TrainingTime? = null,
+    ): List<DayPlan> {
         val onDays = trainingDayIndices(trainingDays)
         return DAY_NAMES.mapIndexed { i, name ->
             val target = if (i in onDays) training else rest
-            DayPlan(name + if (i in onDays) " · training" else " · rest", buildDay(target, favourites, i))
+            DayPlan(name + if (i in onDays) " · training" else " · rest", order(buildDay(target, favourites, i), trainingTime))
         }
+    }
+
+    /**
+     * Meals in the order they are eaten. An early session makes the around-training meal the
+     * first of the day and a night session the last; otherwise it sits between the meals
+     * either side of the session. The macros do not change — only when they are eaten.
+     */
+    fun order(meals: List<Meal>, trainingTime: TrainingTime?): List<Meal> {
+        val sequence = when (trainingTime) {
+            TrainingTime.EARLY_MORNING -> listOf(MealSlot.AROUND_TRAINING, MealSlot.BREAKFAST, MealSlot.LUNCH, MealSlot.DINNER)
+            TrainingTime.MORNING -> listOf(MealSlot.BREAKFAST, MealSlot.AROUND_TRAINING, MealSlot.LUNCH, MealSlot.DINNER)
+            TrainingTime.NIGHT -> listOf(MealSlot.BREAKFAST, MealSlot.LUNCH, MealSlot.DINNER, MealSlot.AROUND_TRAINING)
+            TrainingTime.AFTERNOON, TrainingTime.EVENING, null -> return meals
+        }.map { it.label }
+        return meals.sortedBy { meal -> sequence.indexOf(meal.name).let { if (it < 0) sequence.size else it } }
     }
 
     /** Spreads training days across the week rather than stacking them. */
