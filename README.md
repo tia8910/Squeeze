@@ -98,10 +98,10 @@ background, at most hourly. It needs a Google Cloud project you own:
    - release: package `com.squeeze.app`, SHA-1 of the release key, or Play's app-signing key
      from Play Console › App integrity.
 4. **Web client ID:** the build uses Squeeze's Web client
-   (`630094688874-c0sqt3r0be71qqm0hsi91df4afisvdts.apps.googleusercontent.com`, set as
+   (`71286678065-4occld8qvre6itvgecp2mmrdeoqka9qe.apps.googleusercontent.com`, set as
    `googleWebClientId` in `app/build.gradle.kts`; override with `GOOGLE_WEB_CLIENT_ID`). So
-   the Android clients in step 3 must be created **in that same project** (630094688874).
-   It is not a secret. Note that Google's consent screen shows that project's app name.
+   the Android clients in step 3 must be created **in that same project** (71286678065).
+   It is not a secret. Google's consent screen shows that project's app name.
 
 With the ID blank, the Google button explains that sign-in is not set up in that build.
 

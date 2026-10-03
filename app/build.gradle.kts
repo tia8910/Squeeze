@@ -26,10 +26,11 @@ fun secret(name: String, default: String = ""): String =
 
 
 /**
- * Squeeze's own Web OAuth client, in Google Cloud project 630094688874. Squeeze's Android
- * clients must be registered in the same project; see README "Google Drive backup setup".
+ * The Web OAuth client of Squeeze's own Google Cloud project (71286678065), so Google's
+ * consent screen shows Squeeze's name. The Android clients must be registered in the same
+ * project; see README "Google Drive backup setup".
  */
-val googleWebClientId = "630094688874-c0sqt3r0be71qqm0hsi91df4afisvdts.apps.googleusercontent.com"
+val googleWebClientId = "71286678065-4occld8qvre6itvgecp2mmrdeoqka9qe.apps.googleusercontent.com"
 
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()
