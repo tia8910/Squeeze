@@ -146,9 +146,10 @@ jobs:
       - name: Build release bundle (R8)
         run: |
           set -o pipefail
-          ./gradlew :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee release.log || {
-            { grep -E "^e: |ERROR|Error:|Missing class" release.log || true; tail -n 25 release.log; } \
-              | grep -v "^\s*$" | tail -n 45 | while IFS= read -r line; do
+          ./gradlew :app:bundleRelease --no-daemon 2>&1 | tee release.log || {
+            # GitHub keeps ten annotations per step: spend them on the reason, not a trace.
+            awk '/What went wrong/{f=1;next} /\* Try:/{f=0} f' release.log \
+              | grep -v "^\s*$" | head -n 9 | while IFS= read -r line; do
               echo "::error::${line//%/%25}"
             done
             exit 1
