@@ -74,6 +74,10 @@ NUTRITION
 • Meals built from the foods you like, timed around your training
 • 11 micronutrients tracked so nothing runs short
 
+FREE AND PRO
+• The body scan, body fat trend and history are free
+• Squeeze Pro adds training, nutrition, coaching and backup: 7 days free, then monthly or yearly
+
 PRIVATE BY DESIGN
 • Photos are analysed on your phone and never uploaded
 • Everything is stored encrypted, behind your fingerprint or face lock
@@ -128,14 +132,30 @@ financial info (Play handles payment), device identifiers, analytics.
 
 **Camera permission:** used only to take scan photos and photograph gym machines.
 
-## 4. Monetisation
+## 4. Monetisation: Squeeze Pro subscription
 
-Create these in Play Console › Monetise › Products › In app products before testing purchases:
+The app is listed as **Free**. The body scan, body fat trend and history are free forever;
+training, workout logging, nutrition, machine scan, coach tips and Drive backup are Pro.
 
-| Product ID | Type |
-|---|---|
-| `squeeze_pro_lifetime` | One time, non consumable |
-| `squeeze_training_block` | One time, consumable |
+Play Console › Monetise with Play › Products › **Subscriptions** › Create subscription:
+
+1. **Product ID:** `squeeze_pro` (exactly; the app looks for this). Name: Squeeze Pro.
+2. Add two **base plans**, both *Auto-renewing*:
+
+   | Base plan ID | Billing period | Price |
+   |---|---|---|
+   | `monthly` | 1 month | $5.00 (or $4.99) |
+   | `yearly` | 1 year | $50.00 (or $49.99) |
+
+   Use "Set prices" to let Play convert to local currencies. Activate both plans.
+3. On **each** base plan, **Add offer**: ID `free-trial`, eligibility *New customer
+   acquisition: never had this subscription*, phase **Free trial, 7 days**. Activate it.
+
+The app reads prices and the trial from Play, so changing a price never needs a new release.
+Users manage or cancel in Google Play; the paywall links there.
+
+Payments need a **payments profile** (Play Console › Setup › Payments profile) and to test
+purchases add your account under Setup › License testing (test cards are never charged).
 
 ## 5. Testing track
 

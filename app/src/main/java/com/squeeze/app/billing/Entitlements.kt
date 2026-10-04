@@ -1,6 +1,7 @@
 package com.squeeze.app.billing
 
 import android.content.Context
+import com.squeeze.app.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,38 +10,35 @@ import javax.inject.Singleton
 
 /** Products this app sells. */
 object Products {
-    /** One-time purchase: unlocks programme generation. */
-    const val PRO_LIFETIME = "squeeze_pro_lifetime"
-
     /**
-     * Consumable: one generated training block.
-     *
-     * Sold per block rather than per month because a mesocycle is the unit lifters
-     * already think in, and because a consumable is the simplest Play Billing product to
-     * verify with no server — there is no renewal, grace period or account hold state to
-     * reconcile, and [BillingManager] can settle entitlement entirely from the Play
-     * Store's local cache.
+     * Squeeze Pro, the subscription. Configured in Play Console with two auto-renewing base
+     * plans, [MONTHLY] and [YEARLY], each carrying a 7-day free-trial offer for new
+     * subscribers. Prices come from Play at run time, never from this code.
      */
-    const val TRAINING_BLOCK = "squeeze_training_block"
+    const val PRO_SUBSCRIPTION = "squeeze_pro"
+    const val MONTHLY = "monthly"
+    const val YEARLY = "yearly"
 
-    val ONE_TIME = listOf(PRO_LIFETIME)
-    val CONSUMABLE = listOf(TRAINING_BLOCK)
+    /** Earlier one-time product: still honoured for anyone who bought it. */
+    const val PRO_LIFETIME = "squeeze_pro_lifetime"
 }
 
 /**
- * What the user currently owns.
+ * Whether this user has Pro.
  *
  * Cached in plain preferences on purpose. The threat here is piracy, not disclosure:
  * nothing sensitive is behind this gate, and a user who patches their entitlement has
- * cost a sale, not compromised anyone's data. Spending engineering effort hardening it
- * would be effort not spent on measurement accuracy, which is what people actually pay for.
+ * cost a sale, not compromised anyone's data.
  *
- * The cache exists so the app works offline and starts instantly; [BillingManager]
+ * The cache exists so the app starts instantly and works offline; [BillingManager]
  * reconciles it against the Play Store whenever it can reach it.
+ *
+ * Debug builds are always Pro: they are not installed from Play, so Play Billing cannot sell
+ * them anything, and every feature must stay testable. The paywall still opens from You.
  */
 @Singleton
 class Entitlements @Inject constructor(
-    private val context: Context,
+    context: Context,
 ) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -48,40 +46,35 @@ class Entitlements @Inject constructor(
     private val _state = MutableStateFlow(load())
     val state: StateFlow<EntitlementState> = _state.asStateFlow()
 
-    fun canGenerateProgram(): Boolean = _state.value.let { it.pro || it.blockCredits > 0 }
-
     /** Called by [BillingManager] after reconciling with the Play Store. */
-    fun update(pro: Boolean, blockCredits: Int) {
-        val next = EntitlementState(pro = pro, blockCredits = blockCredits)
-        prefs.edit()
-            .putBoolean(KEY_PRO, next.pro)
-            .putInt(KEY_CREDITS, next.blockCredits)
-            .apply()
+    fun update(pro: Boolean, plan: String?) {
+        val next = EntitlementState(pro = pro || BuildConfig.DEBUG, plan = plan, debugUnlocked = BuildConfig.DEBUG && !pro)
+        prefs.edit().putBoolean(KEY_PRO, pro).putString(KEY_PLAN, plan).apply()
         _state.value = next
     }
 
-    /** Spends one block credit when a programme is generated. Pro users are never charged. */
-    fun consumeBlockCredit(): Boolean {
-        val current = _state.value
-        if (current.pro) return true
-        if (current.blockCredits <= 0) return false
-        update(current.pro, current.blockCredits - 1)
-        return true
+    private fun load(): EntitlementState {
+        val paid = prefs.getBoolean(KEY_PRO, false)
+        return EntitlementState(
+            pro = paid || BuildConfig.DEBUG,
+            plan = prefs.getString(KEY_PLAN, null),
+            debugUnlocked = BuildConfig.DEBUG && !paid,
+        )
     }
-
-    private fun load() = EntitlementState(
-        pro = prefs.getBoolean(KEY_PRO, false),
-        blockCredits = prefs.getInt(KEY_CREDITS, 0),
-    )
 
     private companion object {
         const val PREFS = "squeeze_entitlements"
         const val KEY_PRO = "pro"
-        const val KEY_CREDITS = "block_credits"
+        const val KEY_PLAN = "plan"
     }
 }
 
+/**
+ * @param plan [Products.PRO_SUBSCRIPTION] or [Products.PRO_LIFETIME]; null when not Pro
+ * @param debugUnlocked Pro only because this is a debug build
+ */
 data class EntitlementState(
     val pro: Boolean = false,
-    val blockCredits: Int = 0,
+    val plan: String? = null,
+    val debugUnlocked: Boolean = false,
 )

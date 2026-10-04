@@ -71,6 +71,7 @@ class BackupManager @Inject constructor(
     private val codec: BackupCodec,
     private val drive: DriveClient,
     private val scope: CoroutineScope,
+    private val entitlements: com.squeeze.app.billing.Entitlements,
 ) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -187,6 +188,8 @@ class BackupManager @Inject constructor(
     fun backupIfDue() {
         val s = _status.value
         if (!s.configured || s.email == null || s.needsReconnect || s.working) return
+        // Automatic backup is part of Pro; a restore from onboarding stays open to everyone.
+        if (!entitlements.state.value.pro) return
         if (System.currentTimeMillis() - (s.lastBackupMs ?: 0L) < MIN_INTERVAL_MS) return
         scope.launch {
             val access = runCatching { authorize() }.getOrNull() ?: return@launch
