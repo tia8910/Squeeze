@@ -74,10 +74,6 @@ NUTRITION
 • Meals built from the foods you like, timed around your training
 • 11 micronutrients tracked so nothing runs short
 
-FREE AND PRO
-• The body scan, body fat trend and history are free
-• Squeeze Pro adds training, nutrition, coaching and backup: 7 days free, then monthly or yearly
-
 PRIVATE BY DESIGN
 • Photos are analysed on your phone and never uploaded
 • Everything is stored encrypted, behind your fingerprint or face lock
@@ -97,7 +93,10 @@ PRIVATE BY DESIGN
 
 **Ads:** No.
 
-**App access:** Choose *Yes, some parts are restricted*. Play reviewers cannot buy or start
+**App access (first release, Pro not on sale):** choose *All functionality is available
+without special access*. Everything is free in that build.
+
+**App access (once Pro is on sale):** Choose *Yes, some parts are restricted*. Play reviewers cannot buy or start
 free trials, so the app has a reviewer access code (only its hash is in this repository; the
 code itself is kept private). Add one instruction set, name "Squeeze Pro", username empty,
 password the access code, and this text:
@@ -143,6 +142,17 @@ financial info (Play handles payment), device identifiers, analytics.
 **Camera permission:** used only to take scan photos and photograph gym machines.
 
 ## 4. Monetisation: Squeeze Pro subscription
+
+**Launch free first.** `PRO_ON_SALE` in `app/build.gradle.kts` is `false`: every feature is
+free and nothing about Pro is shown. Once the app is approved and live:
+
+1. Create the subscription below and activate it.
+2. Change `PRO_ON_SALE` to `true`, raise `versionCode`, run Release, upload.
+3. Update App access (above) and add the FREE AND PRO lines to the full description:
+   "The body scan, body fat trend and history are free. Squeeze Pro adds training,
+   nutrition, coaching and backup: 7 days free, then monthly or yearly."
+
+Existing users see the Pro screen once after that update.
 
 The app is listed as **Free**. The body scan, body fat trend and history are free forever;
 training, workout logging, nutrition, machine scan, coach tips and Drive backup are Pro.

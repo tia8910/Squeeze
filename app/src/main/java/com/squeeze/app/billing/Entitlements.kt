@@ -86,9 +86,10 @@ class Entitlements @Inject constructor(
         val paid = prefs.getBoolean(KEY_PRO, false)
         val review = prefs.getBoolean(KEY_REVIEW, false)
         return EntitlementState(
-            pro = paid || review || BuildConfig.DEBUG,
+            pro = paid || review || BuildConfig.DEBUG || !BuildConfig.PRO_ON_SALE,
             plan = if (paid) prefs.getString(KEY_PLAN, null) else if (review) Products.REVIEW_ACCESS else null,
             debugUnlocked = BuildConfig.DEBUG && !paid && !review,
+            onSale = BuildConfig.PRO_ON_SALE,
         )
     }
 
@@ -104,9 +105,12 @@ class Entitlements @Inject constructor(
  * @param plan [Products.PRO_SUBSCRIPTION], [Products.PRO_LIFETIME] or [Products.REVIEW_ACCESS];
  *   null when not Pro
  * @param debugUnlocked Pro only because this is a debug build
+ * @param onSale whether Pro is sold yet; while false every feature is free and nothing
+ *   about Pro is shown
  */
 data class EntitlementState(
     val pro: Boolean = false,
     val plan: String? = null,
     val debugUnlocked: Boolean = false,
+    val onSale: Boolean = true,
 )

@@ -103,7 +103,7 @@ fun SettingsScreen(
             }
         }
 
-        ProCard(pro, onOpenPro)
+        if (pro.onSale) ProCard(pro, onOpenPro)
 
         ProfileSection(
             heightCm = heightCm,
