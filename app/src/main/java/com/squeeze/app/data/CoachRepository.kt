@@ -132,9 +132,7 @@ class CoachRepository @Inject constructor(
                 trainingTime = trainingTime(),
                 trainingToday = trainingToday,
                 weakPoints = report?.weaknesses?.map { it.label }.orEmpty(),
-                fuel = nutrition?.plan?.let { if (trainingToday) it.trainingDay else it.restDay },
-            trainingToday = trainingToday,
-            microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
+                microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
                 proteinG = nutrition?.plan?.trainingDay?.proteinG,
                 epochDay = LocalDate.now().toEpochDay(),
             ),
@@ -161,6 +159,8 @@ class CoachRepository @Inject constructor(
             goalRate = nutrition?.plan?.intendedKgPerWeek,
             tips = tips,
             trainingTime = trainingTime(),
+            fuel = nutrition?.plan?.let { if (trainingToday) it.trainingDay else it.restDay },
+            trainingToday = trainingToday,
         )
     }
 
