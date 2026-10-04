@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://squeeze.fit/sitemap.xml
