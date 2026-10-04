@@ -47,45 +47,8 @@ Upload the first AAB with Play App Signing on (the default). Then:
 
 ## 2. Store listing
 
-**App name:** Squeeze.fit
-
-**Short description (80 max):**
-Body scan, training and nutrition plans. Private: photos never leave your phone.
-
-**Full description:**
-
-Squeeze.fit reads your body from one photo, builds your training week and your meals, and
-coaches you set by set. Everything runs on your phone.
-
-BODY SCAN
-• Body fat and lean mass from a front photo and your weight
-• Physique analysis by muscle group: what is strong and what to bring up for your goal
-• Covered areas are left out, so shorts never count against your legs
-• A trend that separates real change from day to day noise
-
-TRAINING
-• Pick your sports: gym, calisthenics, running, Pilates, yoga and more, or combine them
-• A week built for your goal, experience and weak points
-• Log every set with progressive overload advice for the next one
-• Photograph a gym machine to see how to use it and what to do on it
-
-NUTRITION
-• Calories and macros from your body and your goal
-• Meals built from the foods you like, timed around your training
-• 11 micronutrients tracked so nothing runs short
-
-PRIVATE BY DESIGN
-• Photos are analysed on your phone and never uploaded
-• Everything is stored encrypted, behind your fingerprint or face lock
-• Optional backup to a hidden folder in your own Google Drive
-• No ads. No analytics. No tracking.
-
-**Category:** Health & Fitness
-**Contact email:** your support address
-**Privacy policy:** `https://<your website>/privacy`
-
-**Graphics:** icon 512×512, feature graphic 1024×500, at least 2 phone screenshots
-(the redesign mockup screens are a good guide for which to take).
+Name, short and full description, and every graphic are in [`store/`](../store/listing.md),
+ready to paste and upload. Privacy policy: `https://squeeze.fit/privacy`.
 
 ## 3. App content declarations
 
