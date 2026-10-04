@@ -32,3 +32,13 @@
 -dontwarn javax.annotation.**
 -dontwarn com.google.api.client.**
 -dontwarn org.joda.time.**
+
+# Compile-time annotation-processing types (javax.lang.model, javapoet, AutoValue) that
+# some libraries reference but never touch on Android.
+-dontwarn javax.lang.model.**
+-dontwarn javax.annotation.processing.**
+-dontwarn javax.tools.**
+-dontwarn com.squareup.javapoet.**
+-dontwarn com.google.auto.value.**
+-dontwarn com.google.auto.service.**
+-dontwarn autovalue.shaded.**
