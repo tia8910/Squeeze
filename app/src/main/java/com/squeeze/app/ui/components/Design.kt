@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -618,4 +619,51 @@ fun SegmentedControl(
             }
         }
     }
+}
+
+/**
+ * The app's filter chip: Material's, but a chosen chip is filled solid blue with a tick, so
+ * it reads as chosen at a glance. Material's default — a pale tint and the same label colour —
+ * left a ticked food looking almost identical to an unticked one.
+ */
+@Composable
+fun FilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    leadingIcon: @Composable (() -> Unit)? = null,
+) {
+    androidx.compose.material3.FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        modifier = modifier,
+        enabled = enabled,
+        leadingIcon = leadingIcon ?: if (selected) {
+            {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.height(18.dp),
+                )
+            }
+        } else {
+            null
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+            selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+            enabled = enabled,
+            selected = selected,
+            borderColor = lineColour(),
+            selectedBorderColor = Color.Transparent,
+        ),
+    )
 }
