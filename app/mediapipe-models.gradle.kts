@@ -117,3 +117,8 @@ val downloadVisionModels by tasks.registering {
 // Models must exist before assets are packaged, for every variant.
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(downloadVisionModels) }
+
+// Lint reads the assets folder too (release builds run "lint vital" before packaging), and
+// Gradle refuses a task that reads another task's output without declaring the order.
+tasks.matching { it.name.contains("Lint", ignoreCase = true) }
+    .configureEach { dependsOn(downloadVisionModels) }
