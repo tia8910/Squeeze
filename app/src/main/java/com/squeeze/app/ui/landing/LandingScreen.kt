@@ -1,6 +1,20 @@
 package com.squeeze.app.ui.landing
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.font.FontWeight
+import com.squeeze.app.ui.components.AuroraBackground
+import com.squeeze.app.ui.components.ScanPulse
+import com.squeeze.app.ui.components.entrance
+import kotlinx.coroutines.delay
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -76,72 +90,98 @@ private val features = listOf(
  * This is the only screen that gets to be loud. Everywhere else the data is the subject.
  */
 @Composable
-fun LandingScreen(onGetStarted: () -> Unit) {
+fun LandingScreen(onGetStarted: () -> Unit, onToggleTheme: () -> Unit = {}) {
     val markScale = remember { Animatable(0.82f) }
     val contentAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // The mark settles in first and the rest of the page follows it. The logo is
-        // artwork now rather than something drawn stroke by stroke, so the entrance is a
-        // scale rather than the mark assembling itself.
+        // The mark settles in first and the rest of the page follows it.
         markScale.animateTo(1f, tween(620, easing = FastOutSlowInEasing))
         contentAlpha.animateTo(1f, tween(600))
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 36.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(12.dp))
-
-        SqueezeLockup(
-            markSize = 108.dp,
-            modifier = Modifier.scale(markScale.value),
-        )
-
-        Spacer(Modifier.height(28.dp))
-
-        Text(
-            text = "Body composition built around controlled effort: squeeze, measure, " +
-                "improve. Everything is worked out on this phone and stays there.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Body,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.alpha(contentAlpha.value),
-        )
-
-        Spacer(Modifier.height(30.dp))
-
-        Column(
-            modifier = Modifier.fillMaxWidth().alpha(contentAlpha.value),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            // Two rows of two. The sheet's four-across grid is a desktop layout; at phone
-            // width its own breakpoint drops to two columns, which is what is used here.
-            features.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    pair.forEach { FeatureCard(it) }
-                }
-            }
+    // What the app does, one line at a time — the headline moves, the page does not.
+    val lines = listOf("Scan your body with AI.", "Train with a plan that adapts.", "Eat for your goal.", "Watch it all add up.")
+    var line by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(2_600)
+            line = (line + 1) % lines.size
         }
+    }
 
-        Spacer(Modifier.height(36.dp))
-
+    AuroraBackground(Modifier.fillMaxSize(), intense = true) {
         Column(
-            modifier = Modifier.fillMaxWidth().alpha(contentAlpha.value),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PrimaryButton(text = "Start tracking", onClick = onGetStarted)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                com.squeeze.app.ui.components.ThemeToggle(onToggle = onToggleTheme)
+            }
+            SqueezeLockup(
+                markSize = 84.dp,
+                modifier = Modifier.scale(markScale.value),
+            )
 
-            TextButton(onClick = onGetStarted) {
+            ScanPulse(size = 200.dp, modifier = Modifier.padding(top = 8.dp).alpha(contentAlpha.value))
+
+            AnimatedContent(
+                targetState = line,
+                transitionSpec = {
+                    (slideInVertically { it / 2 } + fadeIn(tween(400))) togetherWith
+                        (slideOutVertically { -it / 2 } + fadeOut(tween(300)))
+                },
+                label = "headline",
+            ) { i ->
                 Text(
-                    text = "Free. No account. No sign-up.",
+                    text = lines[i],
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            Text(
+                text = "Body composition, training and nutrition in one coach that " +
+                    "reads your body on this phone.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Body,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 10.dp).alpha(contentAlpha.value),
+            )
+
+            Spacer(Modifier.height(26.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                features.chunked(2).forEachIndexed { row, pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        pair.forEachIndexed { col, f -> FeatureCard(f, index = 2 + row * 2 + col) }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(30.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().entrance(6),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                PrimaryButton(text = "Get started", onClick = onGetStarted)
+
+                Text(
+                    text = "Free · photos never leave your phone · optional Google backup",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
         }
@@ -149,15 +189,16 @@ fun LandingScreen(onGetStarted: () -> Unit) {
 }
 
 @Composable
-private fun RowScope.FeatureCard(feature: Feature) {
+private fun RowScope.FeatureCard(feature: Feature, index: Int) {
     val shape = RoundedCornerShape(22.dp)
     val dark = LocalIsDarkTheme.current
 
     Column(
         modifier = Modifier
             .weight(1f)
+            .entrance(index)
             .clip(shape)
-            .background(if (dark) Brand.DarkCard else Brand.Card)
+            .background(if (dark) Brand.DarkCard.copy(alpha = 0.85f) else Brand.Card.copy(alpha = 0.9f))
             .border(1.dp, if (dark) Brand.DarkLine else Brand.Line, shape)
             .padding(horizontal = 14.dp, vertical = 18.dp),
     ) {

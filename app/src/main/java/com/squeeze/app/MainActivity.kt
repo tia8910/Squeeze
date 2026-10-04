@@ -60,6 +60,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var securitySettings: SecuritySettings
     @Inject lateinit var uiSettings: UiSettings
     @Inject lateinit var soundEngine: SoundEngine
+    @Inject lateinit var backupManager: com.squeeze.app.data.backup.BackupManager
 
     private var unlocked by mutableStateOf(false)
 
@@ -244,6 +245,10 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         soundEngine.stopAmbient()
+
+        // Leaving the app is the natural moment to back up: whatever was logged is done.
+        // A no-op unless the user signed in with Google, and at most hourly.
+        backupManager.backupIfDue()
 
         // Cover the UI the moment the app leaves the foreground, so handing someone the
         // phone does not hand them the measurement history, and so the recents thumbnail

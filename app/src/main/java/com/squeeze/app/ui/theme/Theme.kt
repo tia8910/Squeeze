@@ -124,14 +124,26 @@ private val DarkColors = darkColorScheme(
  * Tracking is scaled with the size rather than copied, since -5px at 74px and -5px at 48px
  * are very different tightnesses. The ratio (about -0.068em) is what stays constant.
  */
+/** Plus Jakarta Sans (SIL OFL, third_party/plus-jakarta-sans), bundled so it never fetches. */
+val Jakarta = androidx.compose.ui.text.font.FontFamily(
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_regular, FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_medium, FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_semibold, FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_bold, FontWeight.Bold),
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_extrabold, FontWeight.ExtraBold),
+    androidx.compose.ui.text.font.Font(com.squeeze.app.R.font.jakarta_extrabold, FontWeight.Black),
+)
+
+private fun TextStyle.jakarta() = copy(fontFamily = Jakarta)
+
 private val SqueezeTypography = Typography().run {
     copy(
         // `.metric` — the hero number, the whole point of the home screen.
         displayLarge = displayLarge.copy(
-            fontWeight = FontWeight.Black,
-            fontSize = 68.sp,
-            lineHeight = 72.sp,
-            letterSpacing = (-4).sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 64.sp,
+            lineHeight = 68.sp,
+            letterSpacing = (-2.5).sp,
         ),
         // `.wordmark` at the design's phone breakpoint.
         displayMedium = displayMedium.copy(
@@ -141,30 +153,30 @@ private val SqueezeTypography = Typography().run {
             letterSpacing = (-3.2).sp,
         ),
         displaySmall = displaySmall.copy(
-            fontWeight = FontWeight.Black,
-            fontSize = 36.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 34.sp,
             lineHeight = 40.sp,
-            letterSpacing = (-2).sp,
+            letterSpacing = (-1.2).sp,
         ),
         // `.celebrate h2`
         headlineMedium = headlineMedium.copy(
-            fontWeight = FontWeight.Black,
-            fontSize = 32.sp,
-            lineHeight = 38.sp,
-            letterSpacing = (-1.2).sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 28.sp,
+            lineHeight = 34.sp,
+            letterSpacing = (-0.6).sp,
         ),
         // `.panel h3`
         headlineSmall = headlineSmall.copy(
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 27.sp,
-            lineHeight = 33.sp,
-            letterSpacing = (-0.9).sp,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            letterSpacing = (-0.4).sp,
         ),
         // `.metric small` — the unit riding beside the hero number.
         titleLarge = titleLarge.copy(
-            fontWeight = FontWeight.Black,
-            fontSize = 25.sp,
-            lineHeight = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 22.sp,
+            lineHeight = 26.sp,
             letterSpacing = 0.sp,
         ),
         // `.stat b`, `.mini-brand`
@@ -189,9 +201,9 @@ private val SqueezeTypography = Typography().run {
             letterSpacing = 0.sp,
         ),
         bodyLarge = bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp),
-        bodyMedium = bodyMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
         // `.sub`, `.row`, `.feature p`
-        bodySmall = bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+        bodySmall = bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
         // `.nav`
         labelMedium = labelMedium.copy(
             fontWeight = FontWeight.Bold,
@@ -201,11 +213,29 @@ private val SqueezeTypography = Typography().run {
         ),
         // `.stat span`
         labelSmall = TextStyle(
-            fontWeight = FontWeight.Medium,
-            fontSize = 10.sp,
-            lineHeight = 13.sp,
-            letterSpacing = 0.2.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
+            letterSpacing = 0.4.sp,
         ),
+    )
+}.let { t ->
+    t.copy(
+        displayLarge = t.displayLarge.jakarta(),
+        displayMedium = t.displayMedium.jakarta(),
+        displaySmall = t.displaySmall.jakarta(),
+        headlineLarge = t.headlineLarge.jakarta(),
+        headlineMedium = t.headlineMedium.jakarta(),
+        headlineSmall = t.headlineSmall.jakarta(),
+        titleLarge = t.titleLarge.jakarta(),
+        titleMedium = t.titleMedium.jakarta(),
+        titleSmall = t.titleSmall.jakarta(),
+        bodyLarge = t.bodyLarge.jakarta(),
+        bodyMedium = t.bodyMedium.jakarta(),
+        bodySmall = t.bodySmall.jakarta(),
+        labelLarge = t.labelLarge.jakarta(),
+        labelMedium = t.labelMedium.jakarta(),
+        labelSmall = t.labelSmall.jakarta(),
     )
 }
 

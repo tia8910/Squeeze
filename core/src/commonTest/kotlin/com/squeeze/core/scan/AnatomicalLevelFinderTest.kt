@@ -228,6 +228,49 @@ class AnatomicalLevelFinderTest {
     }
 
     @Test
+    fun `the neck search may not skip the rows where a neck is narrowest`() {
+        // **The trim that cost every scan its tape reading.**
+        //
+        // The search used to run only over 0.35 to 0.80 of the chin-to-shoulder span, to keep
+        // the jaw above and the trapezius below out of it. But the search takes a *minimum*,
+        // so neither was ever going to be selected — and a neck is narrowest immediately under
+        // the jaw, which is precisely what the 0.35 cut removed.
+        //
+        // This figure puts its narrowest rows there. Under the old band the reading came from
+        // the lower neck instead, 36% wider, and a neck 36% too wide collapses `waist − neck`
+        // far enough that the Navy equation falls under two per cent and returns nothing. A
+        // competition-lean bodybuilder and a soft-midsectioned man both scanned at 11.6% — the
+        // method's constant — with a measured waist sitting unused.
+        val widths = DoubleArray(200)
+        for (row in 0..18) widths[row] = 0.10
+        for (row in 19..24) widths[row] = 0.055
+        for (row in 25..34) widths[row] = 0.075
+        for (row in 35..38) widths[row] = 0.20
+        for (row in 39..199) widths[row] = 0.26
+        val figure = WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199)
+        val poseAnchors = PoseAnchors(chinRow = 18, shoulderRow = 38, hipRow = 100, kneeRow = 160)
+
+        val neck = AnatomicalLevelFinder.detectSites(figure, poseAnchors)[ScanSite.NECK]
+
+        assertNotNull(neck)
+        assertTrue(
+            neck in 19..24,
+            "the neck must be read where it is narrowest, got row $neck at width " +
+                "${figure.torsoWidthAt(neck)}",
+        )
+
+        // The old band started at row 25, so it could only ever have returned 0.075 — a third
+        // wider than the neck actually is. Asserted as the property rather than the constant:
+        // a minimum over the whole span can never exceed a minimum over part of it.
+        val trimmed = AnatomicalLevelFinder.detectSites(figure, poseAnchors)[ScanSite.NECK]
+        assertNotNull(trimmed)
+        assertTrue(
+            figure.torsoWidthAt(trimmed) <= figure.torsoWidthAt(25),
+            "widening the search must not widen the neck",
+        )
+    }
+
+    @Test
     fun `hipsInFrame skips hip and thigh detection`() {
         val sites = AnatomicalLevelFinder.detectSites(
             humanFigure(), anchors(), hipsInFrame = false,

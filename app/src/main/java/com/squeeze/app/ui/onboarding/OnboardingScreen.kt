@@ -1,6 +1,37 @@
 package com.squeeze.app.ui.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import com.squeeze.app.ui.components.AuroraBackground
+import com.squeeze.app.ui.components.PageDots
+import com.squeeze.app.ui.components.ScanPulse
+import com.squeeze.app.ui.components.entrance
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -68,6 +99,7 @@ fun OnboardingScreen(
         targetWeightKg: Double?,
         targetEpochDay: Long?,
     ) -> Unit,
+    onToggleTheme: () -> Unit = {},
 ) {
     var heightText by remember { mutableStateOf("") }
     var yearText by remember { mutableStateOf("") }
@@ -96,36 +128,264 @@ fun OnboardingScreen(
     val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     val sub = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
 
+    // Three short steps instead of one long form: who you are (and whether you have a
+    // backup), your body, your goal. The pager only swipes back — forward goes through the
+    // button, so the body step cannot be skipped by a stray swipe.
+    val pager = rememberPagerState(pageCount = { STEPS.size })
+    val scope = rememberCoroutineScope()
+    fun go(page: Int) = scope.launch { pager.animateScrollToPage(page) }
+
+    fun finish() {
+        submitted = true
+        // Only the fields the chosen goal asks for are read. Taking a target body
+        // fat from someone who picked "build muscle" would store a number they typed
+        // into a box that happened to be on screen, and then report progress
+        // against it.
+        val fat = targetText.trim().replace(',', '.').toDoubleOrNull()
+            ?.takeIf { option.wantsBodyFat && it in 3.0..60.0 }
+        val targetWeight = targetWeightText.trim().replace(',', '.').toDoubleOrNull()
+            ?.takeIf { option.wantsWeight && it in 30.0..300.0 }
+        val deadline = LocalDate.now().plusWeeks(weeks.toLong()).toEpochDay()
+            .takeIf { fat != null || targetWeight != null }
+
+        ProfileValidation
+            .build(heightText, yearText, sex, currentYear)
+            ?.let {
+                onComplete(it.heightCm, it.birthYear, it.sex, option.goal, fat, targetWeight, deadline)
+            }
+            ?: go(1)
+    }
+
+    AuroraBackground(Modifier.fillMaxSize(), intense = true) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                // Without this the keyboard covers the button on a short screen, and the user
+                // fills the form in with no way to submit it.
+                .imePadding()
+                .padding(horizontal = 22.dp, vertical = 20.dp),
+        ) {
+            // Header: the mark, where you are, and a bar that fills as you go.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SqueezeMark(size = 36.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Step ${pager.currentPage + 1} of ${STEPS.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = muted,
+                    modifier = Modifier.weight(1f),
+                )
+                PageDots(count = STEPS.size, current = pager.currentPage)
+                Spacer(Modifier.width(10.dp))
+                com.squeeze.app.ui.components.ThemeToggle(onToggle = onToggleTheme)
+            }
+            val fill by animateFloatAsState((pager.currentPage + 1f) / STEPS.size, tween(500), label = "fill")
+            LinearProgressIndicator(
+                progress = { fill },
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(5.dp).clip(RoundedCornerShape(50)),
+            )
+
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.weight(1f).padding(top = 8.dp),
+                userScrollEnabled = false,
+                verticalAlignment = Alignment.Top,
+            ) { page ->
+                // Parallax: the page slides and fades as it moves, the heading a little
+                // further than the body, so the change of step has depth.
+                val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction)
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = 1f - kotlin.math.abs(offset).coerceIn(0f, 1f) * 0.6f
+                            val s = 1f - kotlin.math.abs(offset).coerceIn(0f, 1f) * 0.06f
+                            scaleX = s
+                            scaleY = s
+                        }
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 18.dp, bottom = 12.dp),
+                ) {
+                    Text(
+                        STEPS[page].title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.graphicsLayer { translationX = offset * 120f },
+                    )
+                    Text(
+                        STEPS[page].subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = sub,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 20.dp),
+                    )
+                    when (page) {
+                        0 -> AccountStep()
+                        1 -> BodyStep(
+                            heightText = heightText,
+                            onHeight = { heightText = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
+                            heightError = heightError?.message,
+                            yearText = yearText,
+                            onYear = { yearText = it.filter { c -> c.isDigit() }.take(4) },
+                            yearError = yearError?.message,
+                            sex = sex,
+                            onSex = { sex = it },
+                            sexMissing = sexMissing,
+                            muted = muted,
+                        )
+                        else -> GoalPrompt(
+                            option = option,
+                            onOptionChange = { option = it },
+                            targetText = targetText,
+                            onTargetChange = { targetText = it },
+                            targetWeightText = targetWeightText,
+                            onTargetWeightChange = { targetWeightText = it },
+                            weeks = weeks,
+                            onWeeksChange = { weeks = it },
+                            muted = muted,
+                        )
+                    }
+                }
+            }
+
+            if (submitted && !complete && pager.currentPage == 1) {
+                NoticePill(text = "Fill in all three to continue", modifier = Modifier.padding(bottom = 10.dp))
+            }
+
+            val last = pager.currentPage == STEPS.lastIndex
+            PrimaryButton(
+                text = when (pager.currentPage) {
+                    0 -> "Continue"
+                    1 -> "Next: your goal"
+                    else -> "Start tracking"
+                },
+                onClick = {
+                    when {
+                        pager.currentPage == 1 && !complete -> { submitted = true }
+                        last -> { finish() }
+                        else -> { go(pager.currentPage + 1) }
+                    }
+                },
+            )
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                if (pager.currentPage > 0) {
+                    TextButton(onClick = { go(pager.currentPage - 1) }) { Text("Back") }
+                } else {
+                    Spacer(Modifier.width(1.dp))
+                }
+                Text(
+                    "Change any of this later under You.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+            }
+        }
+    }
+}
+
+private class Step(val title: String, val subtitle: String)
+
+private val STEPS = listOf(
+    Step("Welcome to Squeeze", "Your private AI body coach. Here's exactly what happens to your data."),
+    Step("Your body", "Three details every measurement is calculated from."),
+    Step("Your goal", "What you're training for shapes your plan, your food and your coaching."),
+)
+
+/** Step 1: the animated scan, and Google sign-in with restore. */
+@Composable
+private fun AccountStep() {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        ScanPulse(size = 190.dp, modifier = Modifier.entrance(0))
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 18.dp).entrance(1),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FeaturePill("AI scan", Icons.Rounded.CenterFocusStrong, Modifier.weight(1f))
+            FeaturePill("Smart plan", Icons.Rounded.FitnessCenter, Modifier.weight(1f))
+            FeaturePill("Fuel", Icons.Rounded.Restaurant, Modifier.weight(1f))
+        }
+        PrivacyCard(Modifier.fillMaxWidth().entrance(2))
+        Spacer(Modifier.height(12.dp))
+        BrandCard(Modifier.fillMaxWidth().entrance(3)) {
+            com.squeeze.app.ui.backup.GoogleBackupCard(compact = true)
+        }
+    }
+}
+
+/** What happens to your body data, said before anything is asked of you. */
+@Composable
+private fun PrivacyCard(modifier: Modifier = Modifier) {
+    val dark = LocalIsDarkTheme.current
+    val muted = if (dark) Brand.DarkMuted else Brand.Muted
+    BrandCard(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(Brand.IconBlueLight, Brand.BlueDeep))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.padding(start = 12.dp)) {
+                Text("Private by design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Your body is nobody else's business.", style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+        }
+        Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrivacyPoint(Icons.Rounded.PhoneAndroid, "Photos are analysed on this phone", "The AI runs on your phone. Your photos are never uploaded — not to us, not to Google.")
+            PrivacyPoint(Icons.Rounded.Lock, "Encrypted on your phone", "Everything is stored encrypted, and locked behind your fingerprint or face when your phone has one set up.")
+            PrivacyPoint(Icons.Rounded.CloudDone, "Backup only if you want it", "Sign in and your numbers back up to a hidden folder in your own Google Drive. Photos stay here.")
+            PrivacyPoint(Icons.Rounded.Block, "No ads, no tracking, no selling", "There are no analytics or ad networks in this app.")
+        }
+    }
+}
+
+@Composable
+private fun PrivacyPoint(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String) {
+    val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
+    Row {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp).padding(top = 2.dp))
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = muted)
+        }
+    }
+}
+
+@Composable
+private fun FeaturePill(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    val dark = LocalIsDarkTheme.current
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            // Without this the keyboard covers the button on a short screen, and the user
-            // fills the form in with no way to submit it.
-            .imePadding()
-            .padding(horizontal = 22.dp, vertical = 28.dp),
+        modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (dark) Brand.DarkCard.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.85f))
+            .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SqueezeMark(size = 64.dp)
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+    }
+}
 
-        Text(
-            text = "A few details first",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(top = 18.dp),
-        )
-
-        Text(
-            text = "These three decide how every measurement is calculated. Nothing here " +
-                "leaves your phone.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = sub,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
-        )
-
-        BrandCard(Modifier.fillMaxWidth()) {
+/** Step 2: height, year of birth and the equation variant, each saying what it is for. */
+@Composable
+private fun BodyStep(
+    heightText: String,
+    onHeight: (String) -> Unit,
+    heightError: String?,
+    yearText: String,
+    onYear: (String) -> Unit,
+    yearError: String?,
+    sex: Sex?,
+    onSex: (Sex) -> Unit,
+    sexMissing: Boolean,
+    muted: Color,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BrandCard(Modifier.fillMaxWidth().entrance(0)) {
             Text("Height", style = MaterialTheme.typography.titleSmall)
             Text(
                 text = "The scan has no depth sensor, so it uses your height to turn the " +
@@ -136,22 +396,16 @@ fun OnboardingScreen(
             )
             OutlinedTextField(
                 value = heightText,
-                onValueChange = { heightText = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
+                onValueChange = onHeight,
                 label = { Text("Height (cm)") },
                 isError = heightError != null,
-                supportingText = heightError?.let { { Text(it.message) } },
+                supportingText = heightError?.let { { Text(it) } },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal,
-                    imeAction = ImeAction.Next,
-                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(1)) {
             Text("Year of birth", style = MaterialTheme.typography.titleSmall)
             Text(
                 text = "The equations are age-dependent — body composition at the same " +
@@ -162,22 +416,16 @@ fun OnboardingScreen(
             )
             OutlinedTextField(
                 value = yearText,
-                onValueChange = { yearText = it.filter { c -> c.isDigit() }.take(4) },
+                onValueChange = onYear,
                 label = { Text("Year of birth") },
                 isError = yearError != null,
-                supportingText = yearError?.let { { Text(it.message) } },
+                supportingText = yearError?.let { { Text(it) } },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done,
-                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(2)) {
             Text("Equation variant", style = MaterialTheme.typography.titleSmall)
             Text(
                 // Said explicitly, because the field is unavoidable and its purpose is
@@ -193,7 +441,7 @@ fun OnboardingScreen(
                 Sex.entries.forEach { option ->
                     FilterChip(
                         selected = sex == option,
-                        onClick = { sex = option },
+                        onClick = { onSex(option) },
                         label = { Text(if (option == Sex.MALE) "Male" else "Female") },
                     )
                 }
@@ -207,66 +455,6 @@ fun OnboardingScreen(
                 )
             }
         }
-
-        Spacer(Modifier.height(18.dp))
-
-        GoalPrompt(
-            option = option,
-            onOptionChange = { option = it },
-            targetText = targetText,
-            onTargetChange = { targetText = it },
-            targetWeightText = targetWeightText,
-            onTargetWeightChange = { targetWeightText = it },
-            weeks = weeks,
-            onWeeksChange = { weeks = it },
-            muted = muted,
-        )
-
-        Spacer(Modifier.height(22.dp))
-
-        PrimaryButton(
-            text = "Start tracking",
-            onClick = {
-                submitted = true
-                // Only the fields the chosen goal asks for are read. Taking a target body
-                // fat from someone who picked "build muscle" would store a number they typed
-                // into a box that happened to be on screen, and then report progress
-                // against it.
-                val fat = targetText.trim().replace(',', '.').toDoubleOrNull()
-                    ?.takeIf { option.wantsBodyFat && it in 3.0..60.0 }
-                val targetWeight = targetWeightText.trim().replace(',', '.').toDoubleOrNull()
-                    ?.takeIf { option.wantsWeight && it in 30.0..300.0 }
-                val deadline = LocalDate.now().plusWeeks(weeks.toLong()).toEpochDay()
-                    .takeIf { fat != null || targetWeight != null }
-
-                ProfileValidation
-                    .build(heightText, yearText, sex, currentYear)
-                    ?.let {
-                        onComplete(
-                            it.heightCm,
-                            it.birthYear,
-                            it.sex,
-                            option.goal,
-                            fat,
-                            targetWeight,
-                            deadline,
-                        )
-                    }
-            },
-        )
-
-        if (submitted && !complete) {
-            Spacer(Modifier.height(12.dp))
-            NoticePill(text = "Fill in all three to continue")
-        }
-
-        Text(
-            text = "You can change any of these later under You.",
-            style = MaterialTheme.typography.bodySmall,
-            color = muted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 16.dp),
-        )
     }
 }
 
@@ -301,7 +489,7 @@ private fun GoalPrompt(
     val anyTarget = (option.wantsBodyFat && targetText.isNotBlank()) ||
         (option.wantsWeight && targetWeightText.isNotBlank())
 
-    BrandCard(Modifier.fillMaxWidth()) {
+    BrandCard(Modifier.fillMaxWidth().entrance(0)) {
         Text("Your goal — optional", style = MaterialTheme.typography.titleSmall)
         Text(
             text = "A target with a date is what lets the app tell you whether what you are " +

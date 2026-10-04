@@ -71,7 +71,13 @@ fun MeasurementDetailDialog(
     panel: CompositionPanel?,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
 ) {
+    // The AI physique read saved with this scan, merged with this record's measurements.
+    // When there is one it replaces the separate strengths and weak points: one verdict per
+    // body part, not two lists that disagree about the same back.
+    var physique by remember(entry.id) { mutableStateOf<com.squeeze.core.scan.PhysiqueReport?>(null) }
+    LaunchedEffect(entry.id) { physique = physiqueFor(entry) }
     val dark = LocalIsDarkTheme.current
     val muted = if (dark) Brand.DarkMuted else Brand.Muted
 
@@ -146,9 +152,15 @@ fun MeasurementDetailDialog(
                 // below would have told them that.
                 RecordSummary(
                     figures = figures,
-                    findings = findings,
+                    findings = if (physique != null) emptyList() else findings,
                     reference = reference,
                 )
+                physique?.let { report ->
+                    com.squeeze.app.ui.scan.PhysiqueCard(
+                        report = report,
+                        measured = findings.filterNot { it.part },
+                    )
+                }
 
                 when {
                     photoLoading -> Box(
@@ -321,6 +333,9 @@ private fun DetailGroup(
 private fun sourceLabel(source: String): String = when (source) {
     "PHOTO" -> "Photo scan"
     "PHOTO_FRONT_ONLY" -> "Photo scan, front only"
+    // Without this it fell through to "Tape measurement", which is the one label it must
+    // never carry: its scale was inferred rather than measured.
+    "PHOTO_TRUNK_SCALED" -> "Photo scan, trunk framing"
     "REFERENCE_SCAN" -> "Reference scan"
     "BIA_SCALE" -> "Bioimpedance scale"
     else -> "Tape measurement"

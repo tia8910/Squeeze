@@ -4,7 +4,7 @@ import java.security.MessageDigest
 /**
  * Downloads the on-device vision models into the APK's assets at build time.
  *
- * The models are not committed. They total roughly 6 MB of binary that would sit in every
+ * The models are not committed. They total roughly 22 MB of binary that would sit in every
  * clone and every diff forever, and they are immutable published artefacts, so fetching
  * them is cheaper than versioning them.
  *
@@ -35,6 +35,27 @@ val visionModels = listOf(
         url = "https://storage.googleapis.com/mediapipe-models/image_segmenter/" +
             "selfie_segmenter/float16/1/selfie_segmenter.tflite",
         sha256 = "191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b",
+    ),
+    /**
+     * The part segmenter: the model that tells this app which part of a person it is looking
+     * at, rather than merely that a pixel is a person.
+     *
+     * Six classes — background, hair, body-skin, face-skin, clothes, accessories — read off
+     * the file's own embedded `labels.txt` rather than assumed. That is the whole difference
+     * between a silhouette and anatomy, and it is what finally gives the tape equation a
+     * neck: see [com.squeeze.core.scan.BodyPartMap].
+     *
+     * Sixteen megabytes, against six for the two models above, and only the float32 build is
+     * published — there is no float16 or int8 variant of this one to fall back to. It is
+     * fetched at build time like the others, so the cost is APK size rather than repository
+     * size, and it runs entirely on the device: the app holds no INTERNET permission, so a
+     * body photograph still cannot leave the phone.
+     */
+    VisionModel(
+        fileName = "selfie_multiclass_256x256.tflite",
+        url = "https://storage.googleapis.com/mediapipe-models/image_segmenter/" +
+            "selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite",
+        sha256 = "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
     ),
 )
 

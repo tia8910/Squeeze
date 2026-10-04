@@ -1,30 +1,54 @@
 package com.squeeze.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Screenshot
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.BuildConfig
 import com.squeeze.app.ui.brand.SqueezeMark
 import com.squeeze.app.ui.components.BrandCard
+import com.squeeze.app.ui.components.SegmentedControl
+import com.squeeze.app.ui.components.entrance
+import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.theme.ThemeMode
-import com.squeeze.app.ui.components.SecondaryButton
-import com.squeeze.app.ui.components.SectionHeader
 import com.squeeze.core.model.Goal
 import com.squeeze.core.model.Sex
 
+/**
+ * You: who the plan is for, the backup, and a privacy centre that says in plain facts what
+ * happens to the data — then appearance and sound.
+ */
 @Composable
 fun SettingsScreen(
     blockScreenshots: Boolean,
@@ -44,16 +68,38 @@ fun SettingsScreen(
     targetWeightKg: Double?,
     targetEpochDay: Long?,
     onGoalChange: (Goal, Double?, Double?, Long?) -> Unit,
-    onLabelPhotos: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onLabelPhotos: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // Who this is: the goal and frame everything is calculated for.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.entrance(0)) {
+            Box(
+                Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(listOf(Brand.IconBlueLight, Brand.IconBlueDeep))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+            }
+            Column(Modifier.padding(start = 14.dp)) {
+                Text(goalTitle(goal), style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    listOfNotNull(heightCm?.let { "${it.toInt()} cm" }, birthYear?.let { "born $it" }).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                )
+            }
+        }
+
         ProfileSection(
             heightCm = heightCm,
             birthYear = birthYear,
@@ -69,123 +115,114 @@ fun SettingsScreen(
             onGoalChange = onGoalChange,
         )
 
-        SectionHeader(
-            eyebrow = "Look and feel",
-            title = "Appearance",
-            caption = "The app follows your system theme unless you tell it otherwise.",
+        GroupLabel("GOOGLE DRIVE BACKUP")
+        BrandCard(Modifier.fillMaxWidth()) {
+            com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
+        }
+
+        // What happens to the data, as facts with a tick, then the one switch.
+        GroupLabel("PRIVACY CENTRE")
+        GroupCard {
+            InfoRow(Icons.Rounded.PhoneAndroid, "Photos stay on this phone", "Analysed on-device and stored encrypted — never uploaded, not even to your backup.")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            InfoRow(Icons.Rounded.Lock, "Encrypted database", "Everything is encrypted with a key kept in your phone's secure hardware.")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            InfoRow(Icons.Rounded.CloudDone, "Network only for your backup", "The app connects only to your own Google Drive, and only after you sign in. No ads, no analytics.")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            ToggleRow(
+                icon = Icons.Rounded.Screenshot,
+                title = "Block screenshots",
+                detail = "Also hides the app's preview in recent apps.",
+                checked = blockScreenshots,
+                onCheckedChange = onBlockScreenshotsChange,
+            )
+        }
+
+        GroupLabel("APPEARANCE")
+        SegmentedControl(
+            options = listOf("Light", "Dark", "System"),
+            selected = when (themeMode) {
+                ThemeMode.LIGHT -> 0
+                ThemeMode.DARK -> 1
+                ThemeMode.SYSTEM -> 2
+            },
+            onSelect = { onThemeModeChange(listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)[it]) },
         )
 
-        ThemeSection(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
-
-        SectionHeader(
-            eyebrow = "Feedback",
-            title = "Sound",
-            caption = "Short cues, played over your music rather than interrupting it.",
-        )
-
-        SettingToggle(
-            title = "Sound effects",
-            description = "A short chime when a measurement saves, when a photo is captured, " +
-                "and on the celebration screen. These play over your music rather than " +
-                "interrupting it, and stay silent when your phone is on silent or vibrate.",
-            checked = soundEnabled,
-            onCheckedChange = onSoundEnabledChange,
-        )
-
-        SettingToggle(
-            title = "Motivational background music",
-            // Stated plainly because this is the toggle that can take something away from
-            // the user. Someone who already has a playlist running needs to know why this
-            // one is different before they turn it on, not after.
-            description = "A slow, looping backing track while the app is open. It will not " +
-                "start if something else is already playing, and it stops as soon as another " +
-                "app wants the audio. Off by default so it never interrupts your own music.",
-            checked = ambientEnabled,
-            onCheckedChange = onAmbientEnabledChange,
-        )
-
-        Text(
-            text = "All sound is generated on the device as it plays. No audio files are " +
-                "bundled, downloaded or streamed.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        SectionHeader(
-            eyebrow = "Help the scan get better",
-            title = "Label your scans",
-            caption = "Answer three questions about a scan photo. Enough of them and the app " +
-                "can learn to read definition from a picture instead of inferring it from an " +
-                "outline. Nothing leaves this device.",
-        )
-
-        SecondaryButton(text = "Start labelling", onClick = onLabelPhotos)
-
-        SectionHeader(
-            eyebrow = "On this device",
-            title = "Privacy",
-            caption = "Everything here is stored encrypted on your phone. The app holds no " +
-                "internet permission, so none of it can leave.",
-        )
-
-        SettingToggle(
-            title = "Block screenshots",
-            // Stated concretely rather than as a vague privacy promise, because the
-            // recents thumbnail is the part users do not know about and the part that
-            // actually leaks: they never chose to create it.
-            description = "Prevents screenshots and screen recording, and hides the app's " +
-                "contents in the recent-apps switcher. Turn this on if you do not want a " +
-                "preview of this app visible when switching between apps.",
-            checked = blockScreenshots,
-            onCheckedChange = onBlockScreenshotsChange,
-        )
-
-        Text(
-            text = "Your measurements and scan photos never leave this device — the app has " +
-                "no internet permission, so it cannot send them anywhere. Photos are stored " +
-                "encrypted in the app's private storage, are not visible in your gallery, and " +
-                "are deleted when you delete the measurement they belong to. This setting " +
-                "only controls what other apps can capture from the screen.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        GroupLabel("SOUND")
+        GroupCard {
+            ToggleRow(
+                icon = Icons.Rounded.MusicNote,
+                title = "Sound effects",
+                detail = "Short cues on save and capture; silent on vibrate.",
+                checked = soundEnabled,
+                onCheckedChange = onSoundEnabledChange,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            ToggleRow(
+                icon = Icons.Rounded.Headphones,
+                title = "Background music",
+                detail = "Generated on the phone; never starts over your own music.",
+                checked = ambientEnabled,
+                onCheckedChange = onAmbientEnabledChange,
+            )
+        }
 
         AboutCard()
     }
 }
 
-/**
- * Light, dark or follow the system.
- *
- * An explicit choice is offered rather than only tracking the system because this app is
- * used in gyms and bathrooms at 6am — the places where a phone's automatic theme is least
- * likely to match what the user actually wants to look at.
- */
-@Composable
-private fun ThemeSection(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
-    BrandCard(Modifier.fillMaxWidth()) {
-        Text("Theme", style = MaterialTheme.typography.titleSmall)
+private fun goalTitle(goal: Goal) = when (goal) {
+    Goal.HYPERTROPHY -> "Building muscle"
+    Goal.STRENGTH -> "Getting stronger"
+    Goal.CUT -> "Losing fat"
+    Goal.RECOMP -> "Recomposition"
+    Goal.MAKE_WEIGHT -> "Making weight"
+}
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 12.dp),
-        ) {
-            ThemeMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = themeMode == mode,
-                    onClick = { onThemeModeChange(mode) },
-                    label = {
-                        Text(
-                            when (mode) {
-                                ThemeMode.SYSTEM -> "System"
-                                ThemeMode.LIGHT -> "Light"
-                                ThemeMode.DARK -> "Dark"
-                            },
-                        )
-                    },
-                )
-            }
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
+        modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+    )
+}
+
+/** Rows sharing one card, separated by hairlines. */
+@Composable
+private fun GroupCard(content: @Composable () -> Unit) {
+    BrandCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) { content() }
+}
+
+@Composable
+private fun InfoRow(icon: ImageVector, title: String, detail: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = Brand.Success, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -203,36 +240,11 @@ private fun AboutCard() {
             )
         }
         Text(
-            text = "Build ${BuildConfig.VERSION_CODE} · no internet permission — verify it " +
-                "under App info › Permissions.",
+            text = "Build ${BuildConfig.VERSION_CODE} · the network is used only for Google " +
+                "Drive backup, and only after you sign in.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
-    }
-}
-
-@Composable
-private fun SettingToggle(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    BrandCard(Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        }
     }
 }

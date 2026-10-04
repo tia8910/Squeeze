@@ -328,4 +328,240 @@ class AutomaticScanBuilderTest {
             "heights must be expressed relative to the body, not the frame",
         )
     }
+
+    /**
+     * A front photo whose neck band carries no silhouette at all.
+     *
+     * Rows 18 to 35 are empty — a dark neck against a dark wall, a collar the segmenter
+     * absorbed into the background, a chin shadow. This is not a contrived case: it is the
+     * state the app was actually in when it reported the outline method's constant to a
+     * photograph with a plainly visible neck in it.
+     */
+    private fun necklessFigure(): WidthProfile {
+        val widths = DoubleArray(200)
+        for (row in 0..17) widths[row] = 0.10
+        for (row in 36..99) widths[row] = 0.26
+        widths[80] = 0.15
+        for (row in 100..119) widths[row] = 0.24
+        widths[110] = 0.28
+        for (row in 120..199) widths[row] = 0.16
+        return WidthProfile.torsoOnly(widths, topRow = 0, bottomRow = 199)
+    }
+
+    @Test
+    fun `the part model supplies a neck the silhouette never found`() {
+        // **The failure this parameter exists for.** Without it the front photo yields a
+        // waist and no neck, `waist - neck` cannot be formed, the Navy equation returns null
+        // and the scan has no tape reading — which is how one user was shown 11.6% under the
+        // words "not resolved by the photo", twice, on photographs of two different bodies.
+        val withoutModel = AutomaticScanBuilder.build(necklessFigure(), anchors())
+        assertTrue(
+            withoutModel.none { it.site == ScanSite.NECK },
+            "the silhouette must genuinely fail here or this test proves nothing",
+        )
+
+        val withModel = AutomaticScanBuilder.build(
+            necklessFigure(),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
+        )
+
+        val neck = withModel.firstOrNull { it.site == ScanSite.NECK }
+        assertNotNull(neck)
+        assertEquals(0.045, neck.slice.frontWidthFraction, 1e-9)
+    }
+
+    @Test
+    fun `the model's neck replaces the silhouette's rather than averaging with it`() {
+        // The silhouette finds 0.06 here, at row 20. The two numbers are not two readings of
+        // one quantity — one is bare neck skin, the other is the narrowest row of
+        // head-plus-hair-plus-collar — so splitting the difference would land on a width that
+        // is neither, and do it silently.
+        val silhouette = AutomaticScanBuilder.build(figure(80), anchors())
+            .first { it.site == ScanSite.NECK }
+        assertEquals(0.06, silhouette.slice.frontWidthFraction, 1e-9)
+
+        val replaced = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
+        ).first { it.site == ScanSite.NECK }
+
+        assertEquals(0.045, replaced.slice.frontWidthFraction, 1e-9)
+        // Row 25 of 200, expressed against the body span rather than the frame.
+        assertEquals(25.0 / 199.0, replaced.slice.frontHeightFraction, 1e-9)
+    }
+
+    @Test
+    fun `a back view is not averaged into a neck read from bare skin`() {
+        // A back photo's neck is a silhouette neck, so averaging it in would put back most of
+        // the error the model was brought in to remove. Every other site still averages.
+        val back = figure(80, waistWidth = 0.19)
+
+        val markers = AutomaticScanBuilder.build(
+            frontProfile = figure(80), frontAnchors = anchors(),
+            backProfile = back, backAnchors = anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.08,
+            ),
+        )
+
+        assertEquals(
+            0.045,
+            markers.first { it.site == ScanSite.NECK }.slice.frontWidthFraction,
+            1e-9,
+        )
+        assertEquals(
+            (0.15 + 0.19) / 2.0,
+            markers.first { it.site == ScanSite.WAIST }.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `when the model says there is no neck, the silhouette does not answer instead`() {
+        // **What a fallback cost on a real photograph.** The part model refused a
+        // front-double-biceps pose, the builder fell through to the silhouette, and the
+        // silhouette's narrowest chin-to-shoulder row was a trapezius between two raised arms:
+        // 54.3 cm, discarded downstream as impossible, leaving the scan exactly where it had
+        // been. A refusal the model made deliberately must not be filled in by the measurement
+        // it was brought in to replace.
+        val silhouetteAnswers = AutomaticScanBuilder.build(figure(80), anchors())
+        assertTrue(silhouetteAnswers.any { it.site == ScanSite.NECK })
+
+        val modelRefused = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = null,
+            partMaskRead = true,
+        )
+
+        assertTrue(
+            modelRefused.none { it.site == ScanSite.NECK },
+            "a refused neck must stay refused",
+        )
+        // Only the neck. Every other site is still the silhouette's to measure.
+        assertTrue(modelRefused.any { it.site == ScanSite.WAIST })
+        assertTrue(modelRefused.any { it.site == ScanSite.HIP })
+    }
+
+    @Test
+    fun `no part mask at all leaves the silhouette's neck where it was`() {
+        // The flag distinguishes "the model says no" from "there was no model". On a device
+        // where the part segmenter failed to load, the scan must behave exactly as it did
+        // before the model existed rather than lose a site.
+        val noModel = AutomaticScanBuilder.build(figure(80), anchors(), partMaskRead = false)
+
+        assertTrue(noModel.any { it.site == ScanSite.NECK })
+    }
+
+    @Test
+    fun `the neck arrives on the same ruler as the waist it is subtracted from`() {
+        // **Why a ratio carries over and not a fraction.** The neck is measured on the part
+        // mask and the waist on the silhouette, and the Navy equation subtracts one from the
+        // other. Two masks are two coordinate spaces — resolution, aspect, letterboxing — and
+        // nothing downstream can detect a mismatch, because both numbers are individually
+        // plausible.
+        //
+        // Here the part mask is half the silhouette's scale: it saw the waist at 0.075 where
+        // the silhouette sees 0.15. The neck it read as 0.036 is therefore 0.072 in the
+        // silhouette's space, not 0.036 — and 0.036 would have been a neck half the size it
+        // should be, silently.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.036,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.04,
+                waistWidthFraction = 0.075,
+            ),
+        )
+
+        val neck = markers.first { it.site == ScanSite.NECK }
+        val waist = markers.first { it.site == ScanSite.WAIST }
+
+        assertEquals(0.15, waist.slice.frontWidthFraction, 1e-9)
+        // 0.15 * (0.036 / 0.075)
+        assertEquals(0.072, neck.slice.frontWidthFraction, 1e-9)
+        // And the ratio the model saw is exactly preserved.
+        assertEquals(
+            0.036 / 0.075,
+            neck.slice.frontWidthFraction / waist.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `two masks that already agree leave the neck untouched`() {
+        // The calibration must be a no-op when there is nothing to calibrate, which is the
+        // ordinary case. A correction that fires when both masks agree would be a new source
+        // of error rather than a fix for one.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.05,
+                waistWidthFraction = 0.15,
+            ),
+        )
+
+        assertEquals(
+            0.045,
+            markers.first { it.site == ScanSite.NECK }.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `without a waist from the model the neck is used as it came`() {
+        // Previous behaviour, kept: no waist to calibrate against is not a reason to refuse a
+        // neck the model did find.
+        val markers = AutomaticScanBuilder.build(
+            figure(80),
+            anchors(),
+            neck = NeckReading(
+                heightFraction = 0.125,
+                widthFraction = 0.045,
+                bandCoverage = 1.0,
+                faceWidthFraction = 0.05,
+                waistWidthFraction = null,
+            ),
+        )
+
+        assertEquals(
+            0.045,
+            markers.first { it.site == ScanSite.NECK }.slice.frontWidthFraction,
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `a position measured on another mask lands in this profile's rows`() {
+        // The part segmenter emits 256 square whatever the photograph was, so its rows are
+        // not this profile's rows. Fractions are what cross that boundary; treating one
+        // mask's row index as another's would index the wrong band outright.
+        val profile = figure(80)
+
+        assertEquals(25, profile.rowAt(0.125))
+        assertEquals(0, profile.rowAt(-1.0), "a fraction off the top clamps into the profile")
+        assertEquals(199, profile.rowAt(2.0), "and off the bottom")
+    }
 }

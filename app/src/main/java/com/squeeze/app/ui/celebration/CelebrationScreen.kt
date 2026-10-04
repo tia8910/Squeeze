@@ -54,6 +54,9 @@ fun CelebrationScreen(
     daysTracked: Long,
     trend: List<Double>,
     onViewProgress: () -> Unit,
+    /** The journey's next step; when there is one, it is the main button. */
+    nextStep: com.squeeze.core.coach.JourneyStep? = null,
+    onNextStep: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val sound = LocalSoundEngine.current
@@ -160,7 +163,13 @@ fun CelebrationScreen(
             modifier = Modifier.alpha(contentAlpha.value),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            PrimaryButton(text = "View progress", onClick = onViewProgress)
+            if (nextStep != null) {
+                // The domino: finishing one step hands straight to the next.
+                PrimaryButton(text = "Next: ${nextStep.title}", onClick = onNextStep)
+                androidx.compose.material3.TextButton(onClick = onViewProgress) { androidx.compose.material3.Text("View progress") }
+            } else {
+                PrimaryButton(text = "View progress", onClick = onViewProgress)
+            }
             SecondaryButton(
                 text = "Share",
                 onClick = { shareProgress(context, bodyFatPercent, entries, daysTracked) },

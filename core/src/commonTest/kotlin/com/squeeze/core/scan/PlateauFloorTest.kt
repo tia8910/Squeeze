@@ -115,6 +115,7 @@ class PlateauFloorTest {
 
         assertNotNull(estimate)
         assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.percent, 1e-9)
+        assertEquals(SilhouetteBodyFat.leanestClaimable(Sex.MALE), estimate.floorPercent)
     }
 
     @Test

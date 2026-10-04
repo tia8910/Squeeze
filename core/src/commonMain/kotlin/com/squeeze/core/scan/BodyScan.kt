@@ -220,6 +220,19 @@ object AutomaticScanBuilder {
      * @param backProfile optional. A back view supplies a second, independent coronal
      *   measurement of the same body, so averaging it with the front reduces random error by
      *   roughly root-two. It adds no depth information and cannot substitute for a side view.
+     * @param neck optional, from the part segmenter — see [BodyPartMap]. When present it
+     *   **replaces** the silhouette's neck outright rather than being averaged with it,
+     *   because the two are not two measurements of the same thing: the silhouette's neck is
+     *   the narrowest row of head-plus-hair-plus-collar and the model's is bare neck skin.
+     *   Averaging a measurement with a quantity that is not the measurement is how a pipeline
+     *   ends up confidently between two answers, neither of them right.
+     * @param partMaskRead whether a part mask was produced at all, which is a different fact
+     *   from whether it found a neck. When it was read and [neck] is still null, the model
+     *   looked at the chin-to-shoulder band and found no neck in it — and the silhouette's
+     *   neck is then **dropped rather than used as a fallback**, for the same reason it is not
+     *   averaged: it is not a weaker reading of the same thing. On the photograph that
+     *   prompted this, falling back produced a 54.3 cm neck, which is a trapezius with a pair
+     *   of raised arms attached to it.
      * @return markers for every site the available views support. A site needing a width
      *   that was not found is dropped rather than guessed.
      */
@@ -231,10 +244,31 @@ object AutomaticScanBuilder {
         backProfile: WidthProfile? = null,
         backAnchors: PoseAnchors? = null,
         hipsInFrame: Boolean = true,
+        neck: NeckReading? = null,
+        partMaskRead: Boolean = false,
     ): List<ScanMarker> {
-        val frontSites = AnatomicalLevelFinder.detectSites(
+        val detected = AnatomicalLevelFinder.detectSites(
             frontProfile, frontAnchors, hipsInFrame = hipsInFrame,
         )
+
+        // **The one site the silhouette could not find, and the reason this app had no tape
+        // reading at all.** A neck the model located is added even when the silhouette search
+        // returned nothing, which is the usual case and was the whole failure: no neck, no
+        // `waist − neck`, no Navy estimate, and a constant printed in its place.
+        //
+        // And when the model was asked and said there is no neck here, the silhouette does not
+        // get to answer instead. Falling through to it is how a photograph with the model
+        // running still reported a 54.3 cm neck — the outline of a trapezius between two
+        // raised arms — which the plausibility ranges then discarded, leaving the scan exactly
+        // where it was before any of this was built.
+        val frontSites = when {
+            neck != null ->
+                detected + (ScanSite.NECK to frontProfile.rowAt(neck.heightFraction))
+
+            partMaskRead -> detected - ScanSite.NECK
+
+            else -> detected
+        }
         val sideSites = if (sideProfile != null && sideAnchors != null) {
             AnatomicalLevelFinder.detectSites(
                 sideProfile, sideAnchors, hipsInFrame = hipsInFrame,
@@ -250,17 +284,51 @@ object AutomaticScanBuilder {
             emptyMap()
         }
 
+        // **Both sides of `waist − neck` put on one ruler.**
+        //
+        // The neck is measured on the part mask and the waist on the silhouette, and the Navy
+        // equation subtracts one from the other. Two masks are two coordinate spaces — they
+        // may differ in resolution, in aspect, in whether the segmenter letterboxed — and a
+        // difference between quantities measured with different rulers is not a measurement of
+        // anything. It is undetectable downstream, because both numbers are individually
+        // plausible: one scan reported a neck-to-waist width ratio of 0.647 where the mask
+        // itself showed 0.483, and 54.4 cm was the answer.
+        //
+        // So the model's *ratio* is what carries over, not its absolute fraction. The part
+        // mask saw the neck as some proportion of the waist; that proportion applied to the
+        // silhouette's waist is the neck in the silhouette's space, whatever either mask is
+        // doing. Falls back to the raw fraction when there is no waist to calibrate against,
+        // which is the previous behaviour rather than a failure.
+        val silhouetteWaist = frontSites[ScanSite.WAIST]
+            ?.let { frontProfile.torsoWidthAt(it) }
+            ?.takeIf { it > 0.0 }
+
+        val modelNeckWidth = neck?.let { reading ->
+            val modelWaist = reading.waistWidthFraction?.takeIf { it > 0.0 }
+            if (modelWaist != null && silhouetteWaist != null) {
+                silhouetteWaist * (reading.widthFraction / modelWaist)
+            } else {
+                reading.widthFraction
+            }
+        }
+
         return frontSites.mapNotNull { (site, frontRow) ->
             val useLeg = site == ScanSite.THIGH ||
                 site == ScanSite.ARM ||
                 site == ScanSite.CALF
 
-            val frontWidth = frontProfile.widthFor(frontRow, useLeg)
+            // The model's width where it has one; the silhouette's everywhere else.
+            val fromModel = if (site == ScanSite.NECK) modelNeckWidth else null
+
+            val frontWidth = fromModel ?: frontProfile.widthFor(frontRow, useLeg)
             if (frontWidth <= 0.0) return@mapNotNull null
 
             // A back view measures the same axis as the front, so the two are averaged
-            // rather than treated as different quantities.
-            val coronalWidth = backSites[site]
+            // rather than treated as different quantities. A neck read from bare skin is
+            // exempt: the back view's neck is a silhouette neck, and averaging the two would
+            // put back most of the error the model was brought in to remove.
+            val backRow = if (fromModel == null) backSites[site] else null
+            val coronalWidth = backRow
                 ?.let { backProfile?.widthFor(it, useLeg) }
                 ?.takeIf { it > 0.0 }
                 ?.let { (frontWidth + it) / 2.0 }
