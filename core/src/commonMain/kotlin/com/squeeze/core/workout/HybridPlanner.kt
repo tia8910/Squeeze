@@ -133,7 +133,7 @@ object HybridPlanner {
             if (discipline.kind == DisciplineKind.STRENGTH) strengthSessions += sessions else otherSessions += sessions
         }
         if (weakGroups.isNotEmpty() && strengthSessions.isNotEmpty()) {
-            notes += "Your AI scan's weak points — ${weakGroups.joinToString { it.name.lowercase() }} — come " +
+            notes += "Your scan's weak points, ${weakGroups.joinToString { it.name.lowercase() }}, come " +
                 "first on strength days and get an extra set."
         }
 
@@ -305,7 +305,7 @@ object HybridPlanner {
                 }
             }
             PlannedSession(
-                Discipline.GYM, "Gym — ${day.name}", minutes = 45 + 5 * items.size.coerceAtMost(6),
+                Discipline.GYM, "Gym, ${day.name}", minutes = 45 + 5 * items.size.coerceAtMost(6),
                 intensity = Intensity.MODERATE, items = items,
                 why = "${day.name}: ${day.groups.joinToString { it.name.lowercase() }}.",
             )
@@ -355,7 +355,7 @@ object HybridPlanner {
                 PlannedItem(move, detail, group, group != MuscleGroup.ABS, p, isWeak)
             }
             PlannedSession(
-                Discipline.CALISTHENICS, "Calisthenics — $name", minutes = 50, intensity = Intensity.MODERATE,
+                Discipline.CALISTHENICS, "Calisthenics, $name", minutes = 50, intensity = Intensity.MODERATE,
                 items = items,
                 why = "Bodyweight progressions at your level; each one names the next step up.",
             )
@@ -384,9 +384,9 @@ object HybridPlanner {
             PlannedItem("Seal", "8 reps"),
         )
         return PlannedSession(
-            Discipline.PILATES, "Pilates — mat ${if (i % 2 == 0) "A" else "B"}", 40, Intensity.EASY,
+            Discipline.PILATES, "Pilates, mat ${if (i % 2 == 0) "A" else "B"}", 40, Intensity.EASY,
             if (i % 2 == 0) a else b,
-            "Core control and posture — the trunk strength that holds heavy lifts and long runs together.",
+            "Core control and posture, the trunk strength that holds heavy lifts and long runs together.",
         )
     }
 
@@ -394,7 +394,7 @@ object HybridPlanner {
         val a = listOf(
             PlannedItem("Sun salutation A", "5 rounds"),
             PlannedItem("Warrior II → triangle → side angle", "5 breaths each, both sides"),
-            PlannedItem("Low lunge", "1 min each side — hip flexors"),
+            PlannedItem("Low lunge", "1 min each side, hip flexors"),
             PlannedItem("Pigeon", "1 min each side"),
             PlannedItem("Seated forward fold", "1 min"),
             PlannedItem("Supine twist", "1 min each side"),
@@ -410,7 +410,7 @@ object HybridPlanner {
             PlannedItem("Happy baby", "1 min"),
         )
         return PlannedSession(
-            Discipline.YOGA, "Yoga — flow ${if (i % 2 == 0) "A" else "B"}", 35, Intensity.EASY,
+            Discipline.YOGA, "Yoga, flow ${if (i % 2 == 0) "A" else "B"}", 35, Intensity.EASY,
             if (i % 2 == 0) a else b,
             "Mobility and recovery: range you can load in the gym and breath you can use in hard efforts.",
         )
@@ -451,13 +451,13 @@ object HybridPlanner {
         return order.take(n).map { kind ->
             when (kind) {
                 "I" -> PlannedSession(
-                    d, "Intervals — ${d.label.lowercase()}", min(40), Intensity.HARD,
+                    d, "Intervals, ${d.label.lowercase()}", min(40), Intensity.HARD,
                     listOf(
                         PlannedItem("Warm-up", "10 min easy"),
                         PlannedItem("Intervals", intervals),
                         PlannedItem("Cool-down", "5–10 min easy"),
                     ),
-                    "Hard efforts raise your ceiling — VO₂max — and burn the most per minute.",
+                    "Hard efforts raise your ceiling, VO₂max, and burn the most per minute.",
                 )
                 "L" -> PlannedSession(
                     d, "Long ${noun}", min(70), Intensity.MODERATE,
@@ -494,7 +494,7 @@ object HybridPlanner {
             )
         } else {
             PlannedSession(
-                d, "CrossFit WOD ${if (i % 2 == 0) "— AMRAP" else "— EMOM"}", 45, Intensity.HARD,
+                d, "CrossFit WOD ${if (i % 2 == 0) ", AMRAP" else ", EMOM"}", 45, Intensity.HARD,
                 if (i % 2 == 0) {
                     listOf(
                         PlannedItem("Warm-up", "10 min: row, air squats, band pull-aparts"),
@@ -508,7 +508,7 @@ object HybridPlanner {
                         PlannedItem("Strength", "5 × 5 deadlift, moderate weight"),
                     )
                 },
-                "Mixed-modal conditioning — keep strength sessions heavy and let this be the fast work.",
+                "Mixed-modal conditioning, keep strength sessions heavy and let this be the fast work.",
             )
         }
     }
@@ -516,24 +516,24 @@ object HybridPlanner {
     private fun skill(d: Discipline, i: Int): PlannedSession {
         val prehab = when (d) {
             Discipline.CLIMBING -> listOf(
-                PlannedItem("Antagonist push-ups", "3 × 12 — balances all that pulling"),
+                PlannedItem("Antagonist push-ups", "3 × 12, balances all that pulling"),
                 PlannedItem("Wrist extensor curls", "2 × 15"),
             )
             Discipline.TEAM_SPORTS -> listOf(
-                PlannedItem("Nordic curl negatives", "3 × 5 — the best-evidenced hamstring-injury prevention"),
-                PlannedItem("Copenhagen plank", "3 × 20 s each side — groin"),
+                PlannedItem("Nordic curl negatives", "3 × 5, the best-evidenced hamstring-injury prevention"),
+                PlannedItem("Copenhagen plank", "3 × 20 s each side, groin"),
             )
             Discipline.MARTIAL_ARTS -> listOf(
                 PlannedItem("Neck isometrics", "4 directions × 15 s"),
                 PlannedItem("Rotational medicine-ball throws", "3 × 8 each side"),
             )
             else -> listOf(
-                PlannedItem("Band external rotations", "3 × 15 — shoulder health"),
+                PlannedItem("Band external rotations", "3 × 15, shoulder health"),
                 PlannedItem("Lateral lunges", "3 × 10 each side"),
             )
         }
         return PlannedSession(
-            d, "${d.label} — practice", 75, Intensity.HARD,
+            d, "${d.label}, practice", 75, Intensity.HARD,
             listOf(PlannedItem("Your session / club training", "60–90 min")) + prehab,
             "Your sport comes first; the 10-minute add-on protects what it loads most.",
         )

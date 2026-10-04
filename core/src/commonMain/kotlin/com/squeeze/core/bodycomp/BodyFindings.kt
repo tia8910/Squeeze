@@ -124,13 +124,13 @@ object BodyFindings {
             when (metric.band?.label) {
                 "Healthy" -> findings += strength(
                     "Waist under half your height",
-                    "${metric.formatted()} — clear of the 0.5 boundary, which is the single " +
+                    "${metric.formatted()}, clear of the 0.5 boundary, which is the single " +
                         "best screen there is for central fat.",
                 )
 
                 "Slim" -> findings += strength(
                     "Narrow waist for your height",
-                    "${metric.formatted()} — below the usual range, and well under the 0.5 " +
+                    "${metric.formatted()}, below the usual range, and well under the 0.5 " +
                         "boundary.",
                 )
 
@@ -150,7 +150,7 @@ object BodyFindings {
             when (band?.label) {
                 "Athletic", "Fitness" -> findings += strength(
                     "Body fat in the ${band.label.lowercase()} range",
-                    "${metric.formatted()} — " +
+                    "${metric.formatted()}, " +
                         band.detail.replaceFirstChar { it.lowercase() },
                 )
 
@@ -162,7 +162,7 @@ object BodyFindings {
 
                 "Below essential" -> findings += weakness(
                     "Below the fat your body needs",
-                    "${metric.formatted()}. This is not a target — it is a level competitors " +
+                    "${metric.formatted()}. This is not a target, it is a level competitors " +
                         "hold briefly and on purpose. Check the scan before acting on it.",
                 )
             }
@@ -173,7 +173,7 @@ object BodyFindings {
                 "Low risk" -> findings += strength(
                     "Fat is not carried centrally",
                     "Waist-to-hip ${metric.formatted()}. Both numbers come from one photo at " +
-                        "one scale, so scale error cancels — this is among the most " +
+                        "one scale, so scale error cancels, this is among the most " +
                         "trustworthy things a scan produces.",
                 )
 
@@ -224,7 +224,7 @@ object BodyFindings {
                         "and it moves slowly enough to be worth starting now.",
                 )
 
-                "Exceptional — check your inputs" -> findings += weakness(
+                "Exceptional, check your inputs" -> findings += weakness(
                     "This reading needs checking",
                     "FFMI ${metric.formatted()}, above the level usually considered " +
                         "attainable drug-free. It is derived from your weight and your body " +
@@ -292,7 +292,7 @@ object MeasuredParts {
             val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
             if (ratio >= marked) {
                 val v = com.squeeze.core.scan.MuscleGroup.V_TAPER
-                val taper = "Chest ${(ratio * 100).toInt() / 100.0}× your waist — a marked V-taper."
+                val taper = "Chest ${(ratio * 100).toInt() / 100.0}× your waist, a marked V-taper."
                 strong[v] = strong[v]?.let { "$it $taper" } ?: taper
             }
         }

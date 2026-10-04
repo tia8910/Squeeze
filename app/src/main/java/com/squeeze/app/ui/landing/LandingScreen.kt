@@ -101,7 +101,7 @@ fun LandingScreen(onGetStarted: () -> Unit, onToggleTheme: () -> Unit = {}) {
     }
 
     // What the app does, one line at a time — the headline moves, the page does not.
-    val lines = listOf("Scan your body with AI.", "Train with a plan that adapts.", "Eat for your goal.", "Watch it all add up.")
+    val lines = listOf("Scan your body in seconds.", "Train with a plan that adapts.", "Eat for your goal.", "Watch it all add up.")
     var line by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {

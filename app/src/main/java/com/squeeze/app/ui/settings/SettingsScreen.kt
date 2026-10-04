@@ -123,7 +123,7 @@ fun SettingsScreen(
         // What happens to the data, as facts with a tick, then the one switch.
         GroupLabel("PRIVACY CENTRE")
         GroupCard {
-            InfoRow(Icons.Rounded.PhoneAndroid, "Photos stay on this phone", "Analysed on-device and stored encrypted — never uploaded, not even to your backup.")
+            InfoRow(Icons.Rounded.PhoneAndroid, "Photos stay on this phone", "Analysed on-device and stored encrypted, never uploaded, not even to your backup.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             InfoRow(Icons.Rounded.Lock, "Encrypted database", "Everything is encrypted with a key kept in your phone's secure hardware.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)

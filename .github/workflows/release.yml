@@ -53,7 +53,7 @@ jobs:
       - name: Install Android SDK components
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" > /dev/null
 
       - name: Run core tests
         run: ./gradlew :core:test --no-daemon
@@ -88,7 +88,7 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-35" "build-tools;35.0.0" > /dev/null
+            "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
       - name: Resolve version
         id: version
@@ -158,7 +158,7 @@ jobs:
       - name: Verify signatures
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
           APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           AAB=$(find app/build/outputs/bundle/release -name "*.aab" | head -1)
 

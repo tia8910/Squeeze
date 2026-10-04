@@ -143,7 +143,7 @@ class CoachRepository @Inject constructor(
                 null
             } else {
                 todaysSessions(week).takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.title }
-                    ?: "Rest day — recovery is part of the plan"
+                    ?: "Rest day, recovery is part of the plan"
             },
             sessionsDone = sessionsDone,
             sessionsPlanned = week?.days?.sumOf { it.sessions.size },
@@ -402,7 +402,7 @@ class CoachRepository @Inject constructor(
                 WeakPoint(
                     group = group,
                     severity = (1.0 - score).coerceIn(0.0, 1.0),
-                    finding = "AI scan: your ${advice.group.label.lowercase()} read " +
+                    finding = "Body scan: your ${advice.group.label.lowercase()} read " +
                         "${PhysiqueAnalysis.development(score).label.lowercase()} " +
                         "(${(score * 100).toInt()}/100). ${advice.why}",
                     prescription = advice.how,
@@ -450,7 +450,7 @@ class CoachRepository @Inject constructor(
             weightKg = weightTrend.lastOrNull()?.level ?: latestWeight.weightKg!!,
             weightDaysOld = today - latestWeight.epochDay,
             bodyFatPercent = bodyFat,
-            bodyFatSource = if (aiScanned) "your body-fat trend, led by the AI scan" else "your body-fat trend",
+            bodyFatSource = if (aiScanned) "your body-fat trend, led by the body scan" else "your body-fat trend",
             goal = profile.goal,
             trainingAge = profile.trainingAge,
             trainingDaysPerWeek = week?.trainingDays ?: stored.trainingDaysPerWeek ?: DEFAULT_TRAINING_DAYS,

@@ -159,12 +159,12 @@ fun CompositionScreen(
             StatTile(
                 value = weightTrend.lastOrNull()?.let { "%.1f".format(it.level) }
                     ?: latestWeight(measurements)?.let { "%.1f".format(it) }
-                    ?: "—",
+                    ?: "--",
                 label = "Weight (kg)",
                 modifier = Modifier.weight(1f),
             )
             StatTile(
-                value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "—",
+                value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "--",
                 label = "Muscle (kg)",
                 modifier = Modifier.weight(1f),
             )
@@ -239,7 +239,7 @@ private fun FilteredTrend(
     if (factor == null) {
         InfoCard(
             "Scan or weigh in once more and the trend appears here. One reading is a " +
-                "point — the direction only exists once there are two.",
+                "point, the direction only exists once there are two.",
         )
         return
     }
@@ -282,7 +282,7 @@ private fun FilteredTrend(
             // broken feature; naming what is missing turns it into an instruction.
             InfoCard(
                 "Only one ${factor.label.lowercase()} reading so far. One reading is a " +
-                    "point — the direction only exists once there are two.",
+                    "point, the direction only exists once there are two.",
             )
         }
     }
@@ -358,7 +358,7 @@ private fun HeroCard(
             text = if (calibration.isActive) {
                 "Calibrated to your own scan results."
             } else {
-                "Uncalibrated — add a DEXA or BodPod result to anchor it to your body."
+                "Uncalibrated, add a DEXA or BodPod result to anchor it to your body."
             },
             style = MaterialTheme.typography.bodySmall,
             color = muted,

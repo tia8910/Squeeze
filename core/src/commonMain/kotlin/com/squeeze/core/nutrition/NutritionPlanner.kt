@@ -231,10 +231,10 @@ object NutritionPlanner {
                 reasoning += "Your weight trend is ${signed(observed)} kg/week against the " +
                     "plan's ${signed(intended)}, so calories are " +
                     (if (adjustment < 0) "lowered" else "raised") +
-                    " by ${abs(adjustment)} kcal. This assumes you've been eating to plan — " +
+                    " by ${abs(adjustment)} kcal. This assumes you've been eating to plan, " +
                     "if not, follow it for two weeks first."
             } else {
-                reasoning += "Your weight trend (${signed(observed)} kg/week) matches the plan — " +
+                reasoning += "Your weight trend (${signed(observed)} kg/week) matches the plan, " +
                     "no correction needed."
             }
         }
@@ -242,7 +242,7 @@ object NutritionPlanner {
         var calories = (maintenance + intended * KCAL_PER_KG / 7.0 + adjustment).roundToInt()
         val floor = max(if (female) MIN_CALORIES_FEMALE else MIN_CALORIES_MALE, bmr.roundToInt())
         if (calories < floor) {
-            warnings += "Calories were held at $floor — going lower costs muscle and " +
+            warnings += "Calories were held at $floor, going lower costs muscle and " +
                 "training quality faster than it costs fat."
             calories = floor
         }
@@ -267,7 +267,7 @@ object NutritionPlanner {
             fat = max(0.2 * calories / 9.0, fat - (50 - carbs) * 4 / 9.0)
             carbs = max(0.0, (calories - protein * 4 - fat * 9) / 4.0)
         }
-        reasoning += "Protein ${protein.roundToInt()} g — " +
+        reasoning += "Protein ${protein.roundToInt()} g, " +
             (if (leanMass != null) "${proteinPerLean.fixed(1)} g per kg of lean mass" else "from bodyweight") +
             (if (input.goal == Goal.CUT || input.goal == Goal.MAKE_WEIGHT) {
                 ", high because a deficit is when muscle is at risk."
@@ -295,11 +295,11 @@ object NutritionPlanner {
         val restDay = day(restCarbs)
 
         if (input.priorityGroups.isNotEmpty() && intended >= 0) {
-            reasoning += "Your AI scan's weak points — ${input.priorityGroups.joinToString()} — are " +
+            reasoning += "Your scan's weak points, ${input.priorityGroups.joinToString()}, are " +
                 "prioritised in your training block; this surplus and protein are what let " +
                 "them grow."
         } else if (input.priorityGroups.isNotEmpty()) {
-            reasoning += "Your AI scan's weak points — ${input.priorityGroups.joinToString()} — " +
+            reasoning += "Your scan's weak points, ${input.priorityGroups.joinToString()}, " +
                 "stay prioritised in training so the deficit takes fat, not muscle, from them."
         }
 
@@ -323,7 +323,7 @@ object NutritionPlanner {
             reasoning += "You train in the ${t.label.lowercase()} (${t.window}), so the around-training meal " +
                 when (t) {
                     com.squeeze.core.coach.TrainingTime.EARLY_MORNING -> "comes first and breakfast is your recovery meal."
-                    com.squeeze.core.coach.TrainingTime.NIGHT -> "comes last, after dinner — keep it light."
+                    com.squeeze.core.coach.TrainingTime.NIGHT -> "comes last, after dinner, keep it light."
                     else -> "sits right before your session."
                 }
         }
@@ -401,7 +401,7 @@ object NutritionPlanner {
                 "needs ${signed(required)} kg/week."
             if (clamped != required) {
                 warnings += "That deadline needs ${signed(required)} kg/week, faster than is " +
-                    "safe. The plan uses ${signed(clamped)} kg/week — move the date to keep " +
+                    "safe. The plan uses ${signed(clamped)} kg/week, move the date to keep " +
                     "it honest."
             }
             clamped
@@ -412,7 +412,7 @@ object NutritionPlanner {
         reasoning += when {
             rate < -0.01 -> "Target: lose ${abs(rate).fixed(2)} kg a week " +
                 "(${(abs(rate) / w * 100).fixed(2)}% of bodyweight)."
-            rate > 0.01 -> "Target: gain ${rate.fixed(2)} kg a week — the rate new muscle can " +
+            rate > 0.01 -> "Target: gain ${rate.fixed(2)} kg a week, the rate new muscle can " +
                 "actually be built at your training age."
             else -> "Target: hold your weight while composition shifts."
         }

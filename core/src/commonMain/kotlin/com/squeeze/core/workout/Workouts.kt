@@ -146,7 +146,7 @@ object Coaching {
                 weightKg = null,
                 reps = prescription.reps,
                 reason = "First time: pick a weight you could lift ${prescription.reps.last + prescription.rir} " +
-                    "times, do ${prescription.reps.last}, and log it — the app takes it from there.",
+                    "times, do ${prescription.reps.last}, and log it, the app takes it from there.",
             )
         }
         val top = working.maxOf { it.weightKg }
@@ -161,7 +161,7 @@ object Coaching {
                 Suggestion(
                     next,
                     prescription.reps.first..prescription.reps.last,
-                    "Every set hit ${prescription.reps.last} at ${fmt(top)} kg — go up to ${fmt(next)} kg " +
+                    "Every set hit ${prescription.reps.last} at ${fmt(top)} kg, go up to ${fmt(next)} kg " +
                         "and aim for ${prescription.reps.first}+ reps.",
                 )
             }
@@ -220,7 +220,7 @@ object Coaching {
             val nextSession = next(done, prescription, compound, lowerBody)
             return SetAdvice(
                 null, range.first,
-                "That's your ${prescription.sets} sets — done. Next session: ${nextSession.reason}",
+                "That's your ${prescription.sets} sets, done. Next session: ${nextSession.reason}",
                 finished = true,
             )
         }
@@ -229,12 +229,12 @@ object Coaching {
         return when {
             last.reps > range.last || (last.reps >= range.last && spare != null && spare > prescription.rir + 1) -> {
                 val up = last.weightKg + step
-                SetAdvice(up, range.first, "Too light — ${last.reps} reps${spare?.let { " with $it to spare" }.orEmpty()}. " +
+                SetAdvice(up, range.first, "Too light, ${last.reps} reps${spare?.let { " with $it to spare" }.orEmpty()}. " +
                     "Set $setNumber: go up to ${fmt(up)} kg for ${range.first}–${range.last}. $rest.", finished = false)
             }
             last.reps < range.first || (spare == 0 && done.size < prescription.sets - 1) -> {
                 val down = kotlin.math.max(0.0, ((last.weightKg * 0.9) / step).roundToInt() * step)
-                SetAdvice(down, range.first, "Too heavy — ${last.reps} reps${if (spare == 0) " to failure" else ""}. " +
+                SetAdvice(down, range.first, "Too heavy, ${last.reps} reps${if (spare == 0) " to failure" else ""}. " +
                     "Set $setNumber: drop to ${fmt(down)} kg so the rest of your sets count. $rest.", finished = false)
             }
             else -> {

@@ -128,7 +128,7 @@ private fun NeedsScan(onScan: () -> Unit) {
     SectionHeader(
         title = "Your nutrition plan",
         eyebrow = "Nutrition",
-        caption = "Built from your own body — it starts with one scan.",
+        caption = "Built from your own body, it starts with one scan.",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Text(
@@ -137,7 +137,7 @@ private fun NeedsScan(onScan: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    PrimaryButton(text = "Start AI scan", onClick = onScan)
+    PrimaryButton(text = "Start body scan", onClick = onScan)
 }
 
 private fun goalLabel(goal: Goal) = when (goal) {
@@ -229,7 +229,7 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
             )
             Text(
                 "${gap.nutrient.label} is short this week" +
-                    (if (gaps.size > 1) " (and ${gaps.size - 1} more)" else "") + " — see Details for the foods that fix it.",
+                    (if (gaps.size > 1) " (and ${gaps.size - 1} more)" else "") + ", see Details for the foods that fix it.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(start = 12.dp),
             )
@@ -337,8 +337,8 @@ private fun DetailsTab(
         }
     }
 
-    SectionHeader(title = "Change the plan", caption = "It follows these — update them and it updates")
-    SecondaryButton(text = if (context.hasPhysique) "Scan check-in (weight + photo)" else "AI scan (weight + photo)", onClick = onScan)
+    SectionHeader(title = "Change the plan", caption = "It follows these, update them and it updates")
+    SecondaryButton(text = if (context.hasPhysique) "Scan check-in (weight + photo)" else "Body scan (weight + photo)", onClick = onScan)
     SecondaryButton(text = "Training · ${context.trainingDaysPerWeek} days a week", onClick = onOpenTraining)
     SecondaryButton(text = "Goal & deadline", onClick = onEditGoal)
 
@@ -450,7 +450,7 @@ private fun FavouritesSection(state: NutritionUiState, viewModel: NutritionViewM
     }
     SectionHeader(
         title = "Your favourite foods",
-        caption = "Tick what you like to eat — your meals are built from them",
+        caption = "Tick what you like to eat, your meals are built from them",
     )
     BrandCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

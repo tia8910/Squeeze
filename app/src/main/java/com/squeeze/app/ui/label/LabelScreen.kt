@@ -99,7 +99,7 @@ fun LabelScreen(viewModel: LabelViewModel = hiltViewModel()) {
             }
 
             state.subject == null -> NoticePill(
-                "No scan photographs left to judge. Take a scan and come back — every scan " +
+                "No scan photographs left to judge. Take a scan and come back, every scan " +
                     "keeps its photo, so the set grows as you use the app.",
             )
 

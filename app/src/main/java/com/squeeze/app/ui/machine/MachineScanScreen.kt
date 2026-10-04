@@ -66,7 +66,7 @@ fun MachineScanScreen(
     ) {
         Text("Scan a machine", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Point the camera at a gym machine. The on-device AI names it and shows how to use it, " +
+            "Point the camera at a gym machine. The app names it and shows how to use it, " +
                 "with sets and reps for your goal. The photo never leaves your phone.",
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -98,7 +98,7 @@ fun MachineScanScreen(
         if (state.analysing) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircularProgressIndicator(Modifier.padding(4.dp))
-                Text("AI identifying the machine…", style = MaterialTheme.typography.bodyMedium)
+                Text("Identifying the machine…", style = MaterialTheme.typography.bodyMedium)
             }
         }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -106,7 +106,7 @@ fun MachineScanScreen(
         state.match?.let { match ->
             val top = match.candidates.firstOrNull()
             val headline = when {
-                match.noMachine -> "No gym equipment found in this photo. Get the whole machine in frame and try again — or pick it below."
+                match.noMachine -> "No gym equipment found in this photo. Get the whole machine in frame and try again, or pick it below."
                 match.confident && top != null -> "Identified: ${top.first.name} (${(top.second * 100).toInt()}% sure). Not this one? Pick below."
                 top != null -> "Best guess: ${top.first.name} (${(top.second * 100).toInt()}%). Not this one? Pick below."
                 else -> null
@@ -142,7 +142,7 @@ private fun GuideCard(guide: MachineGuide, state: MachineScanUiState) {
             Text("Works: ${guide.muscles}", style = MaterialTheme.typography.bodyMedium)
             if (state.weakPoint) {
                 Text(
-                    "★ Your AI scan flagged this area as a weak point — one extra set is built in.",
+                    "★ Your scan flagged this area as a weak point, one extra set is built in.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )

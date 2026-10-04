@@ -325,7 +325,7 @@ object FrontalityCheck {
         val shoulderToHeight = shoulderSpan * imageAspectRatio / bodyHeightFraction
 
         if (shoulderToHeight < MIN_SHOULDER_TO_HEIGHT) {
-            return "You look turned away from the camera — your shoulders appear narrower " +
+            return "You look turned away from the camera, your shoulders appear narrower " +
                 "than they should for your height. Stand square to the lens, with both " +
                 "shoulders the same distance from it."
         }

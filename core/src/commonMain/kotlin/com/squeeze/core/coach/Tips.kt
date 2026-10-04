@@ -41,22 +41,22 @@ object CoachTips {
             if (c.trainingToday) {
                 when (c.trainingTime) {
                     TrainingTime.EARLY_MORNING ->
-                        add("Training early: a banana or a small yogurt 30 minutes before is enough — save the big breakfast for after.")
+                        add("Training early: a banana or a small yogurt 30 minutes before is enough, save the big breakfast for after.")
                     TrainingTime.MORNING, TrainingTime.AFTERNOON ->
                         add("Eat your carb-and-protein meal 1–2 hours before training, and protein within 2 hours after.")
                     TrainingTime.EVENING ->
                         add("Evening session: a carb-and-protein snack around 4 pm keeps you fuelled; dinner after is your recovery meal.")
                     TrainingTime.NIGHT ->
-                        add("Training late: skip caffeine after about 4 pm so you can still sleep — sleep is when the session pays off.")
+                        add("Training late: skip caffeine after about 4 pm so you can still sleep, sleep is when the session pays off.")
                     null -> add("Set your usual training time in Train and your meals will be timed around it.")
                 }
             } else {
-                add("Rest day: keep protein the same, carbs a little lower, and walk — recovery is part of the plan.")
+                add("Rest day: keep protein the same, carbs a little lower, and walk, recovery is part of the plan.")
             }
             c.weakPoints.firstOrNull()?.let {
-                if (c.trainingToday) add("Train your ${it.lowercase()} first today, while you're fresh — it's your AI focus area.")
+                if (c.trainingToday) add("Train your ${it.lowercase()} first today, while you're fresh, it's your focus area.")
             }
-            c.microGaps.firstOrNull()?.let { add("Your meals run short on ${it.lowercase()} this week — see Fuel → Details for the foods that fix it.") }
+            c.microGaps.firstOrNull()?.let { add("Your meals run short on ${it.lowercase()} this week, see Fuel → Details for the foods that fix it.") }
         }
         val pool = goalTips(c)
         val rotating = pool[(c.epochDay % pool.size).toInt().let { if (it < 0) it + pool.size else it }]
@@ -67,33 +67,33 @@ object CoachTips {
         val protein = c.proteinG?.let { "$it g" } ?: "your protein target"
         return when (c.goal) {
             Goal.CUT -> listOf(
-                "Spread $protein over 3–4 meals — it protects muscle in a deficit and keeps hunger down.",
+                "Spread $protein over 3–4 meals, it protects muscle in a deficit and keeps hunger down.",
                 "Keep lifting heavy while you cut. The weight on the bar is the signal to keep your muscle.",
                 "Aim for 8–10k steps a day: the easiest calories to burn without eating into recovery.",
-                "Judge the cut by the weekly trend, not the daily scale — water swings 1–2 kg day to day.",
+                "Judge the cut by the weekly trend, not the daily scale, water swings 1–2 kg day to day.",
                 "Fill half your plate with vegetables: volume for the stomach, micronutrients for the body.",
             )
             Goal.HYPERTROPHY -> listOf(
                 "Muscle grows from progressive overload: beat last time by a rep or the smallest plate.",
                 "Sleep 7–9 hours. It's the cheapest muscle-building supplement there is.",
                 "A small surplus builds muscle; a big one mostly builds fat. Trust the plan's numbers.",
-                "Get $protein across 4 meals — each meal is a chance to start building.",
+                "Get $protein across 4 meals, each meal is a chance to start building.",
                 "Take most sets within 1–2 reps of failure. Easy sets don't send the growth signal.",
             )
             Goal.STRENGTH -> listOf(
-                "Rest 3–5 minutes between heavy sets — strength recovers slower than breath.",
+                "Rest 3–5 minutes between heavy sets, strength recovers slower than breath.",
                 "Practise the big lifts often with clean reps; technique is strength you already have.",
                 "Carbs before training power heavy sets. Don't train strength on an empty tank.",
                 "Log every top set. A stalled lift is fixed by changing something, and the log shows what.",
             )
             Goal.RECOMP -> listOf(
-                "Recomposition is slow and the scale may not move — trust the scan and the tape.",
+                "Recomposition is slow and the scale may not move, trust the scan and the tape.",
                 "Hit $protein every day; it's what lets you build muscle at maintenance calories.",
-                "Train hard and progressively — recomp works when the training gives the body a reason.",
+                "Train hard and progressively, recomp works when the training gives the body a reason.",
                 "Keep calories steady day to day; recomp rewards consistency over intensity.",
             )
             Goal.MAKE_WEIGHT -> listOf(
-                "Lose weight gradually toward the date — rapid water cuts cost strength and are risky.",
+                "Lose weight gradually toward the date, rapid water cuts cost strength and are risky.",
                 "Keep $protein high and training heavy so the weight that comes off is not muscle.",
                 "Weigh at the same time each morning; the trend is what tells you you're on track.",
             )

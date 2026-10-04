@@ -101,7 +101,7 @@ private fun ScannerHeader(stage: ScannerStage) {
         PulsingDot(active = stage != ScannerStage.DONE)
         Column(Modifier.padding(start = 10.dp)) {
             Text(
-                text = if (stage == ScannerStage.DONE) "AI scan complete" else "AI scanning",
+                text = if (stage == ScannerStage.DONE) "Scan complete" else "Scanning",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -334,7 +334,7 @@ private fun StageList(scanner: AiScanner) {
             if (scanner.aiRuns) {
                 add(
                     StageLine(
-                        "AI reading your physique",
+                        "Reading your physique",
                         "Vision-language model, comparing you with five reference bodies",
                         ScannerStage.AI_READING,
                     ),
@@ -342,7 +342,7 @@ private fun StageList(scanner: AiScanner) {
                 if (scanner.muscleRegions.isNotEmpty()) {
                     add(
                         StageLine(
-                            "AI judging each muscle group",
+                            "Judging each muscle group",
                             scanner.activeGroup
                                 ?.takeIf { scanner.stage == ScannerStage.MUSCLES }
                                 ?.let { "Looking at your ${it.label.lowercase()}…" }
@@ -434,19 +434,19 @@ private fun AiVerdict(scanner: AiScanner) {
             when {
                 scanner.stage == ScannerStage.AI_READING -> {
                     Text(
-                        "The AI is looking at your torso",
+                        "Looking at your torso",
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
                         "Abdominal definition, how the lower stomach sits, how much muscle " +
-                            "shows through — what a coach reads at a glance.",
+                            "shows through, what a coach reads at a glance.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
 
                 reading == null -> Text(
-                    "The AI could not read this photograph, so the result comes from your " +
+                    "The scan could not read this photograph, so the result comes from your " +
                         "measurements alone.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -457,7 +457,7 @@ private fun AiVerdict(scanner: AiScanner) {
                         animationSpec = tween(900, easing = FastOutSlowInEasing),
                         label = "percent",
                     )
-                    Text("The AI reads", style = MaterialTheme.typography.labelLarge)
+                    Text("The scan reads", style = MaterialTheme.typography.labelLarge)
                     Text(
                         "%.1f%% body fat".format(shown),
                         style = MaterialTheme.typography.headlineMedium,
@@ -545,11 +545,11 @@ fun AiLiveBadge(hint: String?, modifier: Modifier = Modifier) {
             PulsingDot(active = true)
             Column(Modifier.padding(start = 10.dp)) {
                 Text(
-                    "AI is watching the frame",
+                    "Watching the frame",
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    hint ?: "Framing looks good — hold still.",
+                    hint ?: "Framing looks good, hold still.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -638,7 +638,7 @@ fun PhysiqueCard(
     val amberText = if (dark) Color(0xFFF8B84A) else Color(0xFFB45309)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
-            Text("AI PHYSIQUE · ${goalName(report.goal).uppercase()}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("PHYSIQUE · ${goalName(report.goal).uppercase()}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text(report.summary, style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
         }
 
@@ -688,7 +688,7 @@ fun PhysiqueCard(
                 }
                 if (report.hidden.isNotEmpty()) {
                     Text(
-                        "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered or out of frame.",
+                        "Not judged: ${report.hidden.joinToString { it.label.lowercase() }}, covered or out of frame.",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = muted,
@@ -704,7 +704,7 @@ fun PhysiqueCard(
         if (report.focus.isNotEmpty()) {
             Text("YOUR FOCUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
         } else {
-            Text("Nothing is lagging for this goal — keep every group progressing.", style = MaterialTheme.typography.bodyMedium)
+            Text("Nothing is lagging for this goal, keep every group progressing.", style = MaterialTheme.typography.bodyMedium)
         }
         report.focus.forEachIndexed { index, advice ->
             com.squeeze.app.ui.components.BrandCard(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
@@ -756,7 +756,7 @@ fun PhysiqueCard(
         }
 
         Text(
-            "Read by the on-device AI from one front photo — a coach's first look, not a " +
+            "Read on your phone from one front photo, a coach's first look, not a " +
                 "measurement. Flexing or harsh light change it, and it cannot see your back.",
             style = MaterialTheme.typography.bodySmall,
             color = muted,

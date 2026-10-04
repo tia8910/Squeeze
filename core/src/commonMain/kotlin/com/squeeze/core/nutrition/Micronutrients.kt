@@ -13,13 +13,13 @@ import com.squeeze.core.model.Sex
 enum class Micronutrient(val label: String, val unit: String, val fixes: String) {
     FIBER("Fibre", "g", "oats, beans, lentils, berries, vegetables at two meals"),
     CALCIUM("Calcium", "mg", "milk or yogurt, cheese, fortified plant milk, tofu set with calcium"),
-    IRON("Iron", "mg", "red meat, lentils, spinach — with vitamin C to absorb it"),
+    IRON("Iron", "mg", "red meat, lentils, spinach, with vitamin C to absorb it"),
     MAGNESIUM("Magnesium", "mg", "pumpkin seeds, almonds, dark chocolate, beans, whole grains"),
     POTASSIUM("Potassium", "mg", "potatoes, bananas, beans, leafy greens, yogurt"),
     ZINC("Zinc", "mg", "red meat, shellfish, pumpkin seeds, chickpeas"),
     VITAMIN_C("Vitamin C", "mg", "citrus, kiwi, peppers, broccoli, berries"),
     FOLATE("Folate", "µg", "leafy greens, lentils, chickpeas, asparagus"),
-    VITAMIN_B12("Vitamin B12", "µg", "meat, fish, eggs, dairy — a supplement if you eat none"),
+    VITAMIN_B12("Vitamin B12", "µg", "meat, fish, eggs, dairy, a supplement if you eat none"),
     VITAMIN_D("Vitamin D", "µg", "oily fish, egg yolks, midday sun; most people in winter need a supplement"),
     OMEGA_3("Omega-3 (EPA+DHA)", "mg", "salmon, sardines or mackerel twice a week, or a fish-oil capsule"),
 }
@@ -87,7 +87,7 @@ object MicroTargets {
     fun advice(coverage: List<MicroCoverage>, goal: Goal, sex: Sex, trainingDaysPerWeek: Int): List<String> =
         buildList {
             coverage.filter { it.short }.forEach { gap ->
-                add("${gap.nutrient.label} averages ${gap.percent}% across this week — add ${gap.nutrient.fixes}.")
+                add("${gap.nutrient.label} averages ${gap.percent}% across this week, add ${gap.nutrient.fixes}.")
             }
             if (goal == Goal.CUT || goal == Goal.MAKE_WEIGHT) {
                 add("A deficit means less food and so less of every micronutrient in it. Keep " +
@@ -95,7 +95,7 @@ object MicroTargets {
             }
             if (trainingDaysPerWeek >= 4) {
                 add("On ${trainingDaysPerWeek} training days a week you sweat out sodium, " +
-                    "potassium and magnesium — salt your food normally and aim for about " +
+                    "potassium and magnesium, salt your food normally and aim for about " +
                     "${sodiumMg(trainingDaysPerWeek)} mg sodium a day.")
             }
             if (sex == Sex.FEMALE) {

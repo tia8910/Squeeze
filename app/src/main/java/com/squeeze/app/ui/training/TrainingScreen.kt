@@ -100,7 +100,7 @@ fun TrainingScreen(
             SectionHeader(
                 title = if (week == null) "Build your week" else "Edit your week",
                 eyebrow = "Train",
-                caption = "Pick your sports and days — the plan does the rest",
+                caption = "Pick your sports and days, the plan does the rest",
             )
             BrandCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -108,7 +108,7 @@ fun TrainingScreen(
                     SetupSection(state, viewModel)
                     TrainingTimeSection(state, viewModel)
                     Text(
-                        "Goal: ${state.goal.label()} — change it in You.",
+                        "Goal: ${state.goal.label()}, change it in You.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -170,7 +170,7 @@ fun TrainingScreen(
             Expandable("How your week was built") {
                 week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                 state.plannedKcalPerDay?.let {
-                    Text("Burns about $it kcal a day on average — already in your nutrition plan.", style = MaterialTheme.typography.bodySmall)
+                    Text("Burns about $it kcal a day on average, already in your nutrition plan.", style = MaterialTheme.typography.bodySmall)
                 }
                 androidx.compose.material3.TextButton(onClick = onOpenNutrition) { Text("Open nutrition ›") }
             }
@@ -181,7 +181,7 @@ fun TrainingScreen(
         if (week != null && !editing && Discipline.GYM in state.disciplines) {
             Expandable("Advanced: 6-week gym progression block") {
                 Text(
-                    "Volume climbs week to week, then a deload — built from the same goal and weak points.",
+                    "Volume climbs week to week, then a deload, built from the same goal and weak points.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 androidx.compose.material3.OutlinedButton(onClick = viewModel::generate, modifier = Modifier.fillMaxWidth()) {
@@ -387,7 +387,7 @@ private fun WeakPointCard(weakPoints: List<WeakPoint>) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = "These are proportions, not absolutes — the parts furthest from where " +
+                text = "These are proportions, not absolutes, the parts furthest from where " +
                     "the rest of your body sits. The block below gives the first " +
                     "${WeakPointAnalysis.MAX_PRIORITIES} of them extra sets.",
                 style = MaterialTheme.typography.bodySmall,
@@ -419,7 +419,7 @@ private fun WeakPointCard(weakPoints: List<WeakPoint>) {
 @Composable
 private fun SportsSection(state: TrainingUiState, viewModel: TrainingViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Your sports — pick one or combine several", style = MaterialTheme.typography.titleSmall)
+        Text("Your sports, pick one or combine several", style = MaterialTheme.typography.titleSmall)
         Discipline.entries.chunked(4).forEach { row ->
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -455,7 +455,7 @@ private fun TrainingTimeSection(state: TrainingUiState, viewModel: TrainingViewM
             }
         }
         Text(
-            state.trainingTime?.let { "${it.window} — your pre- and post-workout meals are timed around it." }
+            state.trainingTime?.let { "${it.window}, your pre- and post-workout meals are timed around it." }
                 ?: "Your meals and daily tips are timed around it.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -681,7 +681,7 @@ private fun VolumeCard(rows: List<VolumeRow>) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("This week's sets", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Logged since Monday against your plan. ★ marks the AI scan's weak points.",
+                "Logged since Monday against your plan. ★ marks your scan's weak points.",
                 style = MaterialTheme.typography.bodySmall,
             )
             rows.forEach { row ->

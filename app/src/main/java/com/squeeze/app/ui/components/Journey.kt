@@ -158,7 +158,7 @@ fun JourneyCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(Icons.Rounded.CenterFocusStrong)
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("AI FOCUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
+                    Text("FOCUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
                     Text(
                         listOfNotNull(
                             summary.weakPoints.takeIf { it.isNotEmpty() }?.joinToString(" · "),

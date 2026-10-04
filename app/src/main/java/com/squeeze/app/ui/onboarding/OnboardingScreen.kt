@@ -287,7 +287,7 @@ fun OnboardingScreen(
 private class Step(val title: String, val subtitle: String)
 
 private val STEPS = listOf(
-    Step("Welcome to Squeeze", "Your private AI body coach. Here's exactly what happens to your data."),
+    Step("Welcome to Squeeze", "Your private body coach. Here's exactly what happens to your data."),
     Step("Your body", "Three details every measurement is calculated from."),
     Step("Your goal", "What you're training for shapes your plan, your food and your coaching."),
 )
@@ -301,7 +301,7 @@ private fun AccountStep() {
             Modifier.fillMaxWidth().padding(vertical = 18.dp).entrance(1),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            FeaturePill("AI scan", Icons.Rounded.CenterFocusStrong, Modifier.weight(1f))
+            FeaturePill("Body scan", Icons.Rounded.CenterFocusStrong, Modifier.weight(1f))
             FeaturePill("Smart plan", Icons.Rounded.FitnessCenter, Modifier.weight(1f))
             FeaturePill("Fuel", Icons.Rounded.Restaurant, Modifier.weight(1f))
         }
@@ -335,7 +335,7 @@ private fun PrivacyCard(modifier: Modifier = Modifier) {
             }
         }
         Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrivacyPoint(Icons.Rounded.PhoneAndroid, "Photos are analysed on this phone", "The AI runs on your phone. Your photos are never uploaded — not to us, not to Google.")
+            PrivacyPoint(Icons.Rounded.PhoneAndroid, "Photos are analysed on this phone", "The analysis runs on your phone. Your photos are never uploaded, not to us, not to Google.")
             PrivacyPoint(Icons.Rounded.Lock, "Encrypted on your phone", "Everything is stored encrypted, and locked behind your fingerprint or face when your phone has one set up.")
             PrivacyPoint(Icons.Rounded.CloudDone, "Backup only if you want it", "Sign in and your numbers back up to a hidden folder in your own Google Drive. Photos stay here.")
             PrivacyPoint(Icons.Rounded.Block, "No ads, no tracking, no selling", "There are no analytics or ad networks in this app.")
@@ -389,7 +389,7 @@ private fun BodyStep(
             Text("Height", style = MaterialTheme.typography.titleSmall)
             Text(
                 text = "The scan has no depth sensor, so it uses your height to turn the " +
-                    "photo into centimetres. Every measurement scales with it — be exact.",
+                    "photo into centimetres. Every measurement scales with it, be exact.",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -408,7 +408,7 @@ private fun BodyStep(
         BrandCard(Modifier.fillMaxWidth().entrance(1)) {
             Text("Year of birth", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "The equations are age-dependent — body composition at the same " +
+                text = "The equations are age-dependent, body composition at the same " +
                     "measurements means something different at 25 and at 55.",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
@@ -490,11 +490,11 @@ private fun GoalPrompt(
         (option.wantsWeight && targetWeightText.isNotBlank())
 
     BrandCard(Modifier.fillMaxWidth().entrance(0)) {
-        Text("Your goal — optional", style = MaterialTheme.typography.titleSmall)
+        Text("Your goal, optional", style = MaterialTheme.typography.titleSmall)
         Text(
             text = "A target with a date is what lets the app tell you whether what you are " +
                 "doing is working, rather than only showing you a number. Skip it if you do " +
-                "not know yet — you can set one any time under You.",
+                "not know yet, you can set one any time under You.",
             style = MaterialTheme.typography.bodySmall,
             color = muted,
             modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),

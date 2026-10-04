@@ -37,16 +37,18 @@ val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystore
 
 android {
     namespace = "com.squeeze.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.squeeze.app"
         minSdk = 26
-        targetSdk = 35
+        // Play requires new apps and updates to target the latest Android within a year of
+        // its release; Android 16 is API 36.
+        targetSdk = 36
 
         // Overridable from CI so a tagged release can stamp a build number without a commit.
         versionCode = secret("VERSION_CODE", "1").toInt()
-        versionName = secret("VERSION_NAME", "0.3.0-local")
+        versionName = secret("VERSION_NAME", "1.0.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

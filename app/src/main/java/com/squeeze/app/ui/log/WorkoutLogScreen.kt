@@ -51,7 +51,7 @@ fun WorkoutLogScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = state.strength, onClick = { viewModel.setStrength(true) }, label = { Text("Strength — sets & reps") })
+            FilterChip(selected = state.strength, onClick = { viewModel.setStrength(true) }, label = { Text("Strength, sets & reps") })
             FilterChip(selected = !state.strength, onClick = { viewModel.setStrength(false) }, label = { Text("Any other sport") })
         }
 

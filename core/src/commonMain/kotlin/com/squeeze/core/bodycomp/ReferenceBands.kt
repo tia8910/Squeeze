@@ -56,7 +56,7 @@ object ReferenceBands {
                 BandPosition.LOW,
                 "Below essential",
                 "Under the fat the body needs for normal function. Sustained, this is not a " +
-                    "target — it is a level competitors hold briefly and deliberately.",
+                    "target, it is a level competitors hold briefly and deliberately.",
             )
 
             percent <= athletic -> ReferenceBand(
@@ -112,7 +112,7 @@ object ReferenceBands {
                 BandPosition.NORMAL,
                 "Average",
                 "Around the adult average for your sex. This says how much lean mass you " +
-                    "carry, not how hard you train — someone lean enough to look muscular " +
+                    "carry, not how hard you train, someone lean enough to look muscular " +
                     "often sits here, because visible muscle comes from low body fat as much " +
                     "as from mass.",
             )
@@ -131,7 +131,7 @@ object ReferenceBands {
 
             else -> ReferenceBand(
                 BandPosition.HIGH,
-                "Exceptional — check your inputs",
+                "Exceptional, check your inputs",
                 "Above the level usually considered attainable drug-free. Before celebrating, " +
                     "check your weight and body fat: this figure is derived from both, and an " +
                     "underestimated body fat inflates it directly.",

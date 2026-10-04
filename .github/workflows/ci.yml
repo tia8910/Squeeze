@@ -45,7 +45,7 @@ jobs:
       - name: Install Android SDK components
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" > /dev/null
 
       - name: Run core tests
         run: ./gradlew :core:jvmTest --no-daemon --stacktrace
@@ -99,7 +99,7 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-35" "build-tools;35.0.0" > /dev/null
+            "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
       # Every build is stamped with the run number and commit, and Settings displays it.
       # Debug builds otherwise all claim to be the same version, which makes "is the new
@@ -135,6 +135,19 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log || {
             grep -E "^e: " build.log | head -40 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+            exit 1
+          }
+
+      # The build Play gets: minified and shrunk by R8, unsigned here (signing is the release
+      # workflow's job). R8 is where a missing keep rule breaks a release that debug never
+      # shows, so it is built on every change, not discovered at upload time.
+      - name: Build release bundle (R8)
+        run: |
+          set -o pipefail
+          ./gradlew :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee release.log || {
+            grep -E "^e: |ERROR: |Missing class" release.log | head -40 | while IFS= read -r line; do
               echo "::error::${line}"
             done
             exit 1

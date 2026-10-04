@@ -183,7 +183,7 @@ fun GoogleBackupCard(compact: Boolean, modifier: Modifier = Modifier, viewModel:
             Text("Signed in as ${status.email}", style = MaterialTheme.typography.titleSmall)
             Text(
                 when {
-                    status.needsReconnect -> "Google Drive access expired — reconnect to keep backing up."
+                    status.needsReconnect -> "Google Drive access expired, reconnect to keep backing up."
                     status.lastBackupMs != null -> "Backs up automatically · last backup " +
                         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(status.lastBackupMs!!))
                     else -> "Backs up automatically once you have data."
@@ -203,7 +203,7 @@ fun GoogleBackupCard(compact: Boolean, modifier: Modifier = Modifier, viewModel:
             }
         }
         Text(
-            "Photos never leave this phone — only your numbers, logs and settings are backed up.",
+            "Photos never leave this phone, only your numbers, logs and settings are backed up.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

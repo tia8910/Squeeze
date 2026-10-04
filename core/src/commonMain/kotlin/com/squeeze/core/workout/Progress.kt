@@ -104,7 +104,7 @@ object ProgressAnalysis {
 
     private fun progressOf(exercise: String, list: List<ExerciseSession>): ExerciseProgress {
         if (list.size < 2) {
-            return ExerciseProgress(exercise, list, Trend.NEW, null, "Log it again next session — the trend starts with the second one.")
+            return ExerciseProgress(exercise, list, Trend.NEW, null, "Log it again next session, the trend starts with the second one.")
         }
         val first = list.first().estimatedMax
         val change = if (first > 0) (list.last().estimatedMax - first) / first * 100 else null
@@ -119,7 +119,7 @@ object ProgressAnalysis {
                 "if it continues, take a lighter week."
             sinceBest >= STALL_SESSIONS -> Trend.STALLED to
                 "No new best in $sinceBest sessions. Drop the weight 10% and build back up, or switch rep range for a few weeks."
-            else -> Trend.PROGRESSING to "On track — ${sinceBest} session${if (sinceBest == 1) "" else "s"} since your best, which is normal."
+            else -> Trend.PROGRESSING to "On track, ${sinceBest} session${if (sinceBest == 1) "" else "s"} since your best, which is normal."
         }
         return ExerciseProgress(exercise, list, trend, change, advice)
     }

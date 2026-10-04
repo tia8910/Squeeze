@@ -208,7 +208,7 @@ private fun WeightStep(knownWeightKg: Double?, onConfirm: (Double?) -> Unit) {
 
         InfoCard(
             "A photograph shows your outline, and an outline cannot tell a lean body from a " +
-                "very lean one — what separates them is definition, which a silhouette " +
+                "very lean one, what separates them is definition, which a silhouette " +
                 "throws away. Your weight is what turns the scan into a figure about you " +
                 "rather than the leanest figure the method is allowed to claim. It is also " +
                 "what the plausibility check and the lean-mass trend run on.",
@@ -224,7 +224,7 @@ private fun WeightStep(knownWeightKg: Double?, onConfirm: (Double?) -> Unit) {
             onClick = { onConfirm(null) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Skip — scan without it")
+            Text("Skip, scan without it")
         }
     }
 }
@@ -500,7 +500,7 @@ private fun CaptureStep(
 
             if (profileMissing) {
                 InfoCard(
-                    "Set your height in Settings first — the scan uses it to convert the " +
+                    "Set your height in Settings first, the scan uses it to convert the " +
                         "photo into real measurements.",
                 )
             }
@@ -677,9 +677,9 @@ private fun StepCard(step: ScanStep) {
             )
             Text(
                 text = when (step) {
-                    ScanStep.SIDE -> "Side view — turn side-on"
-                    ScanStep.BACK -> "Back view — turn around"
-                    else -> "Front view — face the camera"
+                    ScanStep.SIDE -> "Side view, turn side-on"
+                    ScanStep.BACK -> "Back view, turn around"
+                    else -> "Front view, face the camera"
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
@@ -706,7 +706,7 @@ private fun CameraPermissionRequired(onRequest: () -> Unit) {
         Text(
             text = "Allow the camera to take the scan photos here, or upload two photos you " +
                 "already have. Either way the scan runs entirely on this device, and photos " +
-                "are never uploaded — not even to your Google Drive backup.",
+                "are never uploaded, not even to your Google Drive backup.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -757,7 +757,7 @@ private fun FailureCard(failure: DetectionFailure) {
                     DetectionFailure.BodyCropped ->
                         "Your shoulders and your waist were not both in the picture, so " +
                             "there is nothing to measure your waist against. Your head, " +
-                            "your feet and your hips do not have to be in shot — frame " +
+                            "your feet and your hips do not have to be in shot, frame " +
                             "from your shoulders down past your navel and the scan will " +
                             "read your shape from that."
 
@@ -768,7 +768,7 @@ private fun FailureCard(failure: DetectionFailure) {
                     DetectionFailure.ScaleUnreliable ->
                         "Your outline and your body's landmarks disagree about how tall you " +
                             "appear, which means the outline picked up something that is not " +
-                            "you — a mirror frame, a doorway, or a strong shadow. Every " +
+                            "you, a mirror frame, a doorway, or a strong shadow. Every " +
                             "measurement is worked out from your height in the photo, so " +
                             "rather than give you numbers that are all wrong by the same " +
                             "amount, the scan stopped. Try a plainer background."
@@ -827,8 +827,8 @@ private fun neckProvenance(state: ScanUiState): String {
 
         else ->
             (
-                " The part model read it at %.3f of the frame against a face of %.3f — a " +
-                    "ratio of %.2f, where a neck is about 0.9 — and %.0f%% of the band was " +
+                " The part model read it at %.3f of the frame against a face of %.3f, a " +
+                    "ratio of %.2f, where a neck is about 0.9, and %.0f%% of the band was " +
                     "bare skin. Waist: %s of the frame by the outline, %s by the part model."
                 )
                 .format(
@@ -960,7 +960,7 @@ private fun ResultStep(
                     state.poseAdvice,
                     (
                         "Your hips were not in shot, so your waist was read against your " +
-                            "shoulders — the weaker of the two denominators, because your " +
+                            "shoulders, the weaker of the two denominators, because your " +
                             "arms attach there."
                         ).takeIf { state.framing == ScanFraming.UPPER_BODY },
                     (
@@ -978,7 +978,7 @@ private fun ResultStep(
                     state.bareAbdomenFraction
                         ?.takeIf { it < BodyPartMap.MIN_BARE_ABDOMEN }
                         ?.let { bare ->
-                            ("Only %.0f%% of your midsection was bare skin — the rest was " +
+                            ("Only %.0f%% of your midsection was bare skin, the rest was " +
                                 "clothing, and the waist above is the outline of the " +
                                 "clothing. Fabric can only add width, so this reading is " +
                                 "too high rather than uncertain. Retake it bare-midriff.")
@@ -1025,7 +1025,7 @@ private fun ResultStep(
                                 neck == null && rejectedNeckCm != null ->
                                     ("Your waist measured %.1f cm and your neck came out at " +
                                         "%.1f cm, which is outside the range a neck can be " +
-                                        "on your frame — so it was thrown out rather than " +
+                                        "on your frame, so it was thrown out rather than " +
                                         "used, and the tape equation needs both.")
                                         .format(waist, rejectedNeckCm) + neckProvenance(state)
 
@@ -1044,7 +1044,7 @@ private fun ResultStep(
 
                                 neck == null && state.neckRefusal == NeckRefusal.COVERED ->
                                     ("Your waist measured %.1f cm, but your neck is covered " +
-                                        "— a collar, hood or scarf — so it can't be measured. " +
+                                        ", a collar, hood or scarf, so it can't be measured. " +
                                         "Retake it with your neck bare.").format(waist)
 
                                 neck == null && state.neckRefusal == NeckRefusal.NO_FACE ->
@@ -1069,7 +1069,7 @@ private fun ResultStep(
                                     "Your waist measured %.1f cm and your neck %.1f cm. "
                                         .format(waist, neck) +
                                         "The tape equation works on the gap between them " +
-                                        "and this one is too small to give a sane answer — " +
+                                        "and this one is too small to give a sane answer, " +
                                         "a neck reading much over half the waist is the " +
                                         "trapezius, not the neck."
                             }
@@ -1125,13 +1125,13 @@ private fun ResultStep(
                         "your own proportions rather than measured. That is good enough " +
                         "for the body-fat figure, which reads one girth difference against " +
                         "your height and barely moves when the scale is a few per cent " +
-                        "out — the range above already includes it. Treat the centimetres " +
+                        "out, the range above already includes it. Treat the centimetres " +
                         "in your history as softer than a tape: a scale worked out this " +
                         "way moves every one of them together, which is why the scan is " +
                         "saved under its own name rather than as a measured one."
                 } else {
                     "Measured from your trunk. Your waist, shoulders and hips were all in " +
-                        "shot, which is everything the shape reading needs — and closer " +
+                        "shot, which is everything the shape reading needs, and closer " +
                         "framing puts far more detail on your midsection. Tape " +
                         "measurements in centimetres need your full height in the " +
                         "picture, so this scan does not produce them."
@@ -1146,7 +1146,7 @@ private fun ResultStep(
         if (state.framing == ScanFraming.UPPER_BODY) {
             InfoCard(
                 "Measured from your upper body. Your hips were not in shot, so your waist " +
-                    "was read against your shoulders instead of your hips — that works, " +
+                    "was read against your shoulders instead of your hips, that works, " +
                     "but your arms attach at the shoulder line and whatever the outline " +
                     "caught of them widens that measurement. The range above is wider for " +
                     "exactly that reason. Getting your hips into the next photo narrows it.",
@@ -1161,12 +1161,12 @@ private fun ResultStep(
         state.abdominalBodyFatPercent?.let { percent ->
             InfoCard(
                 "From your side profile: about %.0f%%. This is your abdomen measured " +
-                    "against your own ribcage — the axis abdominal fat actually moves " +
+                    "against your own ribcage, the axis abdominal fat actually moves " +
                     "along, and the one a front photo cannot see."
                     .format(percent),
             )
         } ?: InfoCard(
-            "No side photo, so your abdomen was not measured — only your outline from the " +
+            "No side photo, so your abdomen was not measured, only your outline from the " +
                 "front. Fat accumulates on the abdomen far more in depth than in width, so " +
                 "a side photo is the single biggest improvement available to this scan.",
         )
@@ -1328,7 +1328,7 @@ private fun OptionalExtrasStep(
         Text("Front photo captured", style = MaterialTheme.typography.headlineSmall)
 
         Text(
-            text = "Enough to measure — but the side photo is the one worth taking. Fat on " +
+            text = "Enough to measure, but the side photo is the one worth taking. Fat on " +
                 "the abdomen accumulates far more in depth than in width, and a front view " +
                 "cannot see depth at all. It is the difference between guessing at your " +
                 "midsection and measuring it.",
@@ -1341,11 +1341,11 @@ private fun OptionalExtrasStep(
         }
 
         ExtraOption(
-            title = "Add a side photo — recommended",
+            title = "Add a side photo, recommended",
             captured = hasSide,
             detail = "The one measurement a front photo cannot make. Your abdomen is " +
                 "measured against your own ribcage, in the same picture, so nothing about " +
-                "your height or the framing can affect it — and unlike the front view, an " +
+                "your height or the framing can affect it, and unlike the front view, an " +
                 "arm at your side cannot get in the way of it.",
             onClick = onAddSide,
         )
@@ -1354,7 +1354,7 @@ private fun OptionalExtrasStep(
             title = "Add a back photo",
             captured = hasBack,
             detail = "Measures the same width as the front from the other side, and the two " +
-                "are averaged. A small precision gain — worth it if you are chasing a " +
+                "are averaged. A small precision gain, worth it if you are chasing a " +
                 "reliable trend, skippable otherwise.",
             onClick = onAddBack,
         )
@@ -1482,16 +1482,16 @@ private fun VisualMatchSection(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = if (resolving) {
-                    "Which describes you? — this is what settles it"
+                    "Which describes you?, this is what settles it"
                 } else {
-                    "Which describes you? — optional"
+                    "Which describes you?, optional"
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
                 text = if (resolving) {
                     // Said in the terms the person can act on rather than as an apology.
-                    "Your outline could not separate lean from very lean — it knows your " +
+                    "Your outline could not separate lean from very lean, it knows your " +
                         "edge and nothing inside it, and what separates those bodies is " +
                         "entirely inside. Look at your own midsection and pick the line " +
                         "that matches. It is worth more here than the figure above: five " +
@@ -1540,7 +1540,7 @@ private fun VisualMatchSection(
             if (selected != null && measured != null && kotlin.math.abs(selected - measured) > 6.0) {
                 Text(
                     text = ("Your measurements give %.0f%% and what you picked is nearer " +
-                        "%.0f%%. That gap is too large to be noise — the scan has most " +
+                        "%.0f%%. That gap is too large to be noise, the scan has most " +
                         "likely mis-measured a site. Both are saved, and the estimate will " +
                         "sit between them, but a tape reading would settle it.")
                         .format(measured, selected),
@@ -1675,7 +1675,7 @@ private fun ShapeHeadline(
             // what is left is the outline's own floor, which is a bound and says so.
             label = when {
                 fromTape -> "Measured from your waist and neck"
-                fromAi -> "Read by on-device AI from how you look"
+                fromAi -> "Read on your phone from how you look"
                 fromAppearance -> "From how you look"
                 bounded -> "Leanest your outline can claim"
                 else -> "From your shape"
@@ -1694,7 +1694,7 @@ private fun ShapeHeadline(
                 // Said because it is the thing that was untrue for a long time and is now
                 // true: the girths came off this photograph and the figure came off them.
                 fromTape -> "Read from your photo"
-                fromAi -> "Read from your photo · on-device AI"
+                fromAi -> "Read from your photo, on your phone"
                 fromAppearance -> "Your appearance, not your outline"
                 else -> null
             },
@@ -1707,7 +1707,7 @@ private fun ShapeHeadline(
                 // strength of something that turned out to be reading the camera's noise.
                 fromTape ->
                     "Your waist and your neck were measured off this photograph and put " +
-                        "through the tape equation — the same one a fabric tape feeds, on " +
+                        "through the tape equation, the same one a fabric tape feeds, on " +
                         "girths the picture supplied instead of your hands. Nothing here " +
                         "is the method's own floor and nothing came from your weight." +
                         if (scaleInferred) {
@@ -1723,9 +1723,9 @@ private fun ShapeHeadline(
                 // tested on and that nothing left the phone — and the outline's floor is
                 // printed beside it, because the two are independent and can disagree.
                 fromAi ->
-                    "An AI model running on this phone looked at your photo the way a coach " +
-                        "would — at whether your abdominal muscles show through the skin, " +
-                        "which your outline cannot see — and compared it with descriptions " +
+                    "A model running on this phone looked at your photo the way a coach " +
+                        "would, at whether your abdominal muscles show through the skin, " +
+                        "which your outline cannot see, and compared it with descriptions " +
                         "of bodies from stage-lean to overweight. Nothing left your phone. " +
                         (
                             supersededBound?.let {
@@ -1746,7 +1746,7 @@ private fun ShapeHeadline(
                         "%.1f%%\"".format(
                             supersededBound?.floorPercent ?: supersededBound?.percent ?: 0.0,
                         ) +
-                        " — it knows your edge and nothing inside it, and what separates a " +
+                        ", it knows your edge and nothing inside it, and what separates a " +
                         "lean body from a very lean one is entirely inside. This carries " +
                         "five points either side against the outline's nine, so it leads. " +
                         "The saved record combines the two."
@@ -1754,21 +1754,21 @@ private fun ShapeHeadline(
                 bounded ->
                     "Your outline could not settle this one. What separates a lean body " +
                         "from a very lean one is abdominal definition, and a silhouette " +
-                        "throws that away — it knows your edge and nothing inside it. So " +
+                        "throws that away, it knows your edge and nothing inside it. So " +
                         "this is a floor, not a reading of you: you are no leaner than " +
-                        "this, and the outline cannot say how much softer — which is why " +
+                        "this, and the outline cannot say how much softer, which is why " +
                         "the range above starts here and runs upwards only. The app used " +
                         "to fill the gap from your height and weight, which gave every " +
                         "photo at your weight the same answer whatever your body looked " +
                         "like. It no longer does that. A side photo settles it from a " +
-                        "picture — it measures your abdomen front to back, the axis a " +
-                        "front view cannot see — and a tape at your navel or your own " +
+                        "picture, it measures your abdomen front to back, the axis a " +
+                        "front view cannot see, and a tape at your navel or your own " +
                         "known figure settle it from a measurement."
 
                 else ->
                     "Read from how wide your waist is relative to your shoulders and " +
                         "hips. It never converts pixels to centimetres, so nothing about " +
-                        "how you were framed can reach it — which is why the scan keeps " +
+                        "how you were framed can reach it, which is why the scan keeps " +
                         "this figure and not the one the circumferences give."
             },
             style = MaterialTheme.typography.bodySmall,
@@ -1831,8 +1831,8 @@ private fun ShapeHeadline(
                     append("waist %.2f× your shoulders".format(indices.waistToShoulder))
                     if (hip != null) append(", waist %.2f× your hips".format(hip))
                     append(
-                        ". Anything the outline picked up beside you — trousers at the hip, " +
-                            "an arm against your side, your thighs together — makes a " +
+                        ". Anything the outline picked up beside you, trousers at the hip, " +
+                            "an arm against your side, your thighs together, makes a " +
                             "denominator wider and the reading leaner, which is why a lean " +
                             "figure from this method is held rather than reported.",
                     )
@@ -1887,7 +1887,7 @@ private fun AccuracyDisclaimer() {
                 "Lighting, most of all. A lamp off to one side carves shadows that look " +
                     "like muscle definition; flat overhead light hides it. Even light from " +
                     "in front of you is best.",
-                "Photo quality — focus, distance, and whether your outline separates " +
+                "Photo quality, focus, distance, and whether your outline separates " +
                     "cleanly from the background.",
                 "Pose and clothing. Standing square, arms clear of your sides, and the same " +
                     "clothing each time.",
@@ -1902,7 +1902,7 @@ private fun AccuracyDisclaimer() {
             }
             Text(
                 text = "So watch the direction, not the number. Whatever this method gets " +
-                    "wrong, it gets wrong the same way every time — which means the trend " +
+                    "wrong, it gets wrong the same way every time, which means the trend " +
                     "across scans is trustworthy even when a single reading is not. Keep " +
                     "your conditions consistent and the line will tell you the truth long " +
                     "before any one figure does.",

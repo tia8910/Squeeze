@@ -124,7 +124,7 @@ object CompositionAnalyser {
                 unit = "kg",
                 confidence = Confidence.ESTIMATED,
                 detail = "Everything that is not fat: muscle, bone, organs and water. This is " +
-                    "the number to watch during a cut — holding it is the whole point.",
+                    "the number to watch during a cut, holding it is the whole point.",
             )
 
             val ffmi = partition.leanMassKg / (heightM * heightM)
@@ -133,7 +133,7 @@ object CompositionAnalyser {
                 value = ffmi,
                 unit = "",
                 confidence = Confidence.ESTIMATED,
-                detail = "Fat-free mass index — lean mass scaled for height, so it can be " +
+                detail = "Fat-free mass index, lean mass scaled for height, so it can be " +
                     "compared between people.",
                 band = ReferenceBands.ffmi(ffmi, profile.sex),
             )
@@ -270,7 +270,7 @@ object CompositionAnalyser {
                 unit = "",
                 confidence = Confidence.DIRECT,
                 detail = "Where fat sits rather than how much there is. Both numbers come " +
-                    "from the same photo at the same scale, so scale error cancels — this is " +
+                    "from the same photo at the same scale, so scale error cancels, this is " +
                     "one of the most trustworthy things a scan produces.",
                 band = ReferenceBands.waistToHip(waist / hip, profile.sex),
             )
@@ -284,7 +284,7 @@ object CompositionAnalyser {
                 unit = "",
                 confidence = Confidence.DIRECT,
                 detail = "The V-taper. Rises when you build your upper back and chest, and " +
-                    "when you lose from the waist — so it moves for two different good reasons.",
+                    "when you lose from the waist, so it moves for two different good reasons.",
             )
         }
 
@@ -311,7 +311,7 @@ object CompositionAnalyser {
                 unit = "kcal/day",
                 confidence = Confidence.ROUGH,
                 detail = "Resting energy times a light-activity factor. Activity multipliers " +
-                    "are a broad guess for any individual — treat this as a starting point to " +
+                    "are a broad guess for any individual, treat this as a starting point to " +
                     "adjust from once you see how your weight actually responds.",
             )
         }

@@ -49,10 +49,10 @@ object BodyProportions {
                     name = "Waist-to-hip",
                     value = whr,
                     interpretation = when {
-                        whr < 0.80 -> "Low — fat distribution is weighted toward the hips."
-                        whr < 0.90 -> "Moderate — a typical adult distribution."
-                        whr < 1.00 -> "Elevated — more fat carried around the middle."
-                        else -> "High — strongly central fat distribution."
+                        whr < 0.80 -> "Low, fat distribution is weighted toward the hips."
+                        whr < 0.90 -> "Moderate, a typical adult distribution."
+                        whr < 1.00 -> "Elevated, more fat carried around the middle."
+                        else -> "High, strongly central fat distribution."
                     },
                     flagged = whr >= 0.95,
                 ),
@@ -68,7 +68,7 @@ object BodyProportions {
                     // This ratio predicts cardiometabolic risk better than BMI and needs no
                     // weight at all, which makes it unusually well suited to a photo scan.
                     interpretation = when {
-                        whtr < 0.40 -> "Below the usual range — worth checking against a tape."
+                        whtr < 0.40 -> "Below the usual range, worth checking against a tape."
                         whtr < 0.50 -> "Within the range generally considered healthy."
                         whtr < 0.60 -> "Above the 0.5 guideline often used as a threshold."
                         else -> "Well above the 0.5 guideline."
@@ -85,7 +85,7 @@ object BodyProportions {
                     name = "Chest-to-waist",
                     value = taper,
                     interpretation = when {
-                        taper < 1.10 -> "Narrow taper — chest and waist are close in size."
+                        taper < 1.10 -> "Narrow taper, chest and waist are close in size."
                         taper < 1.25 -> "Moderate taper."
                         taper < 1.45 -> "Pronounced taper."
                         else -> "Very pronounced taper."
@@ -101,7 +101,7 @@ object BodyProportions {
                     value = waist / neck,
                     // The Navy equation is driven by exactly this gap, so surfacing it shows
                     // the user which of their measurements is moving their body-fat number.
-                    interpretation = "The gap the body-fat equation is built on — it moves " +
+                    interpretation = "The gap the body-fat equation is built on, it moves " +
                         "when your waist changes, not when your neck does.",
                 ),
             )

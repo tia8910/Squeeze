@@ -47,7 +47,7 @@ class BackupCodec @Inject constructor(private val db: SqueezeDatabase) {
 
     suspend fun restore(json: String) {
         val root = JSONObject(json)
-        require(root.optInt("format") in 1..FORMAT) { "This backup is from a newer version of the app — update it first." }
+        require(root.optInt("format") in 1..FORMAT) { "This backup is from a newer version of the app, update it first." }
         // Parsed in full before anything is deleted.
         val profile = root.optJSONObject("profile")?.toProfile()
         val measurements = root.objects("measurements").map { it.toMeasurement() }
