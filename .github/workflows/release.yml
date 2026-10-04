@@ -53,7 +53,7 @@ jobs:
       - name: Install Android SDK components
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" > /dev/null
 
       - name: Run core tests
         run: ./gradlew :core:test --no-daemon
@@ -70,6 +70,9 @@ jobs:
     name: Signed AAB and APK
     needs: test
     runs-on: ubuntu-latest
+    # Write, so the first run can commit the encrypted upload key. Nothing else is pushed.
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -88,7 +91,7 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-35" "build-tools;35.0.0" > /dev/null
+            "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
       - name: Resolve version
         id: version
@@ -104,22 +107,90 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version: ${VERSION:-<module default>}"
 
-      # The keystore is written to RUNNER_TEMP rather than the workspace so it can never be
-      # picked up by a later step that archives or uploads the checkout.
-      - name: Decode keystore
+      # The upload key, in one of two ways:
+      #
+      #  - KEYSTORE_BASE64 (+ KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) secrets: a key made
+      #    on a computer, as before.
+      #  - Only a SIGNING_PASSPHRASE secret: the key is created here on the first run, then
+      #    kept in the repository ENCRYPTED with that passphrase (AES-256, PBKDF2 with 600,000
+      #    rounds) as signing/upload.jks.enc. Without the passphrase the file is noise. Every
+      #    later run decrypts it, so every release is signed by the same key.
+      #
+      # The decrypted keystore only ever exists in RUNNER_TEMP, never in the workspace, so no
+      # later step can archive or upload it.
+      - name: Upload key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::KEYSTORE_BASE64 is not set. Add the repository secrets described in README.md."
+          set -euo pipefail
+          JKS="$RUNNER_TEMP/release.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$JKS"
+            if [ ! -s "$JKS" ]; then
+              echo "::error::Decoded keystore is empty; the secret is probably not valid base64."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [ "${#SIGNING_PASSPHRASE}" -lt 20 ]; then
+            echo "::error::Add a SIGNING_PASSPHRASE repository secret (at least 20 random characters). See docs/PLAY_RELEASE.md."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-          # Confirm it decoded to something a keystore-shaped, without printing its contents.
-          if [ ! -s "$RUNNER_TEMP/release.jks" ]; then
-            echo "::error::Decoded keystore is empty; the secret is probably not valid base64."
-            exit 1
+
+          if [ -f signing/upload.jks.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+              -in signing/upload.jks.enc -out "$JKS" -pass env:SIGNING_PASSPHRASE \
+              || { echo "::error::Could not decrypt signing/upload.jks.enc: SIGNING_PASSPHRASE is not the one it was created with."; exit 1; }
+          else
+            if [ "${GITHUB_REF_TYPE}" != "branch" ]; then
+              echo "::error::No upload key yet. Run this workflow once from a branch (Actions › Release › Run workflow) to create it."
+              exit 1
+            fi
+            echo "Creating the upload key (first release)"
+            keytool -genkeypair -keystore "$JKS" -storetype PKCS12 -alias upload \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -storepass "$SIGNING_PASSPHRASE" -keypass "$SIGNING_PASSPHRASE" \
+              -dname "CN=Squeeze.fit, O=Squeeze.fit"
+            mkdir -p signing
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+              -in "$JKS" -out signing/upload.jks.enc -pass env:SIGNING_PASSPHRASE
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add signing/upload.jks.enc
+            git commit -m "Add the encrypted upload key"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
+
+          # The PKCS12 store and its key share one password: the passphrase.
+          {
+            echo "SQ_KEYSTORE_PASSWORD=$SIGNING_PASSPHRASE"
+            echo "SQ_KEY_ALIAS=upload"
+            echo "SQ_KEY_PASSWORD=$SIGNING_PASSPHRASE"
+          } >> "$GITHUB_ENV"
+
+          # Public fingerprints: the SHA-1 is what the Google Cloud Android client needs.
+          echo "Upload key fingerprints:"
+          keytool -list -v -keystore "$JKS" -alias upload -storepass "$SIGNING_PASSPHRASE" | grep -E "SHA1|SHA256"
+
+      # The on-device vision-language model: fetched from a pinned URL, checksum-verified
+      # and compressed to 48.5 MB. See tools/vlm/prepare_clip.py.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache the on-device CLIP model
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/assets/clip_vitb32_laion_q4.onnx
+          key: clip-vitb32-laion-q4-81148049
+
+      - name: Prepare the on-device CLIP model
+        run: |
+          pip install --quiet onnx==1.17.0 onnxruntime==1.20.1
+          python tools/vlm/prepare_clip.py
 
       - name: Build signed AAB and APK
         env:
@@ -132,7 +203,12 @@ jobs:
           # versionCode. Re-running a tag therefore produces a higher code, not a clash.
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ steps.version.outputs.version }}
-        run: ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+        run: |
+          # Secrets win when set; otherwise the passphrase-made key from the step above.
+          export KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD:-${SQ_KEYSTORE_PASSWORD:-}}"
+          export KEY_ALIAS="${KEY_ALIAS:-${SQ_KEY_ALIAS:-}}"
+          export KEY_PASSWORD="${KEY_PASSWORD:-${SQ_KEY_PASSWORD:-}}"
+          ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
 
       # Signing is the whole point of this workflow, so verify it rather than assuming it.
       # A missing signingConfig yields an unsigned artifact and no build error, which would
@@ -140,7 +216,7 @@ jobs:
       - name: Verify signatures
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
           APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           AAB=$(find app/build/outputs/bundle/release -name "*.aab" | head -1)
 

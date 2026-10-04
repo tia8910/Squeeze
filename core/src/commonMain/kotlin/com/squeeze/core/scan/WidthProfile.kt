@@ -74,6 +74,17 @@ data class WidthProfile(
 
     fun heightFractionOf(row: Int): Double = row.toDouble() / torsoWidths.size.toDouble()
 
+    /**
+     * The row at a fraction of the frame's height, clamped into this profile.
+     *
+     * The inverse of [heightFractionOf], and the only sanctioned way to bring a position
+     * measured on a *different* mask into this one's row space. The part segmenter emits at
+     * 256 square whatever the photograph was, so its rows are not this profile's rows, and
+     * treating them as if they were would index the wrong band by a factor of two or three.
+     */
+    fun rowAt(heightFraction: Double): Int =
+        (heightFraction * torsoWidths.size).toInt().coerceIn(0, torsoWidths.lastIndex)
+
     // Explicit equals/hashCode: a data class compares DoubleArray by identity, which would
     // make two identical profiles unequal.
     override fun equals(other: Any?): Boolean {
@@ -146,14 +157,11 @@ object AnatomicalLevelFinder {
      * thigh came back byte-identical — a bug visible in the app as two sites reporting the
      * same centimetre value. Disjoint ranges make that impossible by construction.
      */
-    /**
-     * Where within the chin-to-shoulder span the neck is genuinely narrowest.
-     *
-     * Trimmed at both ends: the jaw sits above it and the trapezius below, and the silhouette
-     * is wider than the neck at both.
-     */
-    private const val NECK_BAND_START = 0.35
-    private const val NECK_BAND_END = 0.80
+    // NECK_BAND_START and NECK_BAND_END are gone. They trimmed the chin-to-shoulder span to
+    // 0.35..0.80 to keep the jaw and the trapezius out of the neck search, which reads as
+    // sound and is not: the search takes a minimum, so those rows were never selected anyway,
+    // and the 0.35 cut removed the rows just below the jaw where the neck is narrowest. See
+    // the neck search in detectSites for what it cost.
 
     private const val HIP_BAND_END = 0.18
 
@@ -207,17 +215,32 @@ object AnatomicalLevelFinder {
     ): Map<ScanSite, Int> {
         val sites = mutableMapOf<ScanSite, Int>()
 
-        // Not the whole chin-to-shoulder span. The anchor above the neck comes from the
-        // mouth landmarks, so the top of that span is jaw and the bottom is where the
-        // trapezius flares out into the shoulder. Both are wider than a neck, and including
-        // them is how a 175 cm man ends up with a 52 cm neck — which drives the Navy
-        // equation to a negative body fat and so produces no estimate at all.
-        val neckSpan = anchors.shoulderRow - anchors.chinRow
-        narrowestBetween(
-            profile,
-            anchors.chinRow + (neckSpan * NECK_BAND_START).toInt(),
-            anchors.chinRow + (neckSpan * NECK_BAND_END).toInt(),
-        )?.let { sites[ScanSite.NECK] = it }
+        // **The whole chin-to-shoulder span, because this is a minimum and a minimum over
+        // more rows cannot be larger.**
+        //
+        // This used to search only 0.35 to 0.80 of the span, to avoid the jaw above and the
+        // trapezius below — "including them is how a 175 cm man ends up with a 52 cm neck,
+        // which drives the Navy equation to a negative body fat and so produces no estimate
+        // at all". The diagnosis was right and the remedy was backwards.
+        //
+        // [narrowestBetween] returns the narrowest row it finds. Adding rows to its range can
+        // only lower the width it settles on, never raise it, so the band could not have been
+        // what inflated the neck — and cutting the span at 0.35 removed the rows just under
+        // the jaw, which is exactly where a neck is narrowest. The trim was throwing away the
+        // measurement it was trying to protect.
+        //
+        // What it cost: a competition-lean bodybuilder and a soft-midsectioned man both
+        // scanned at 11.6%, the method's own constant. Both had produced a waist — 73.4 cm
+        // for the bodybuilder — and both lost their neck, so `waist − neck` fell under the
+        // 30.8 cm that a 175 cm frame needs to keep the equation above two per cent, the
+        // estimate came back null, and the tape path vanished without a word.
+        //
+        // The jaw and the trapezius are still in range and still wider than the neck. A
+        // minimum ignores them. What catches a row that is too *narrow* — a segmentation
+        // notch rather than anatomy — is [PlausibleRanges], which holds the neck to between
+        // 0.17 and 0.27 of stature and always did.
+        narrowestBetween(profile, anchors.chinRow, anchors.shoulderRow)
+            ?.let { sites[ScanSite.NECK] = it }
 
         narrowestBetween(profile, anchors.shoulderRow, anchors.hipRow)
             ?.let { sites[ScanSite.WAIST] = it }

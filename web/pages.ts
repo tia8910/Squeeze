@@ -64,7 +64,7 @@ ${opts.body}
       <a href="/privacy">Privacy policy</a>
       <a href="${REPO}" rel="noopener">Source code</a>
     </div>
-    <div class="copy">Squeeze.fit — measurements stay on your phone.</div>
+    <div class="copy">Squeeze.fit · measurements stay on your phone.</div>
   </div>
 </footer>
 </body>
@@ -90,7 +90,7 @@ export function homePage(): string {
     <p class="tagline">Small steps. <i>Big change.</i></p>
     <p class="lede">
       Body composition tracking that runs entirely on your phone. Measure with a photo or a
-      tape, and see what is actually changing — separated from the noise.
+      tape, and see what is actually changing, separated from the noise.
     </p>
     <div class="cta">
       <a class="btn primary" href="${REPO}/releases" rel="noopener">Get the app</a>
@@ -103,9 +103,9 @@ export function homePage(): string {
     <p class="sub">Four things, done properly, instead of a dashboard of numbers nobody acts on.</p>
     <div class="grid four">
       <div class="card">${GLYPHS.scan}<h3>Smart Scan</h3><p>A body scan from one front photo. Side and back views are optional, and add measured depth when you use them.</p></div>
-      <div class="card">${GLYPHS.trends}<h3>Track Trends</h3><p>A filter built for irregular, noisy measurements — so a real change is reported as one, and scatter is not.</p></div>
-      <div class="card">${GLYPHS.motivate}<h3>Stay Motivated</h3><p>Consistency is what the maths needs, so consistency is what gets celebrated — in either direction.</p></div>
-      <div class="card">${GLYPHS.privacy}<h3>Privacy First</h3><p>No account, no sync, no analytics. The app holds no internet permission at all.</p></div>
+      <div class="card">${GLYPHS.trends}<h3>Track Trends</h3><p>A filter built for irregular, noisy measurements, so a real change is reported as one, and scatter is not.</p></div>
+      <div class="card">${GLYPHS.motivate}<h3>Stay Motivated</h3><p>Consistency is what the maths needs, so consistency is what gets celebrated, in either direction.</p></div>
+      <div class="card">${GLYPHS.privacy}<h3>Privacy First</h3><p>Photos never leave your phone. No analytics, no ads. Backup is optional, to your own Google Drive.</p></div>
     </div>
   </section>
 
@@ -119,7 +119,7 @@ export function homePage(): string {
         <h3>Accuracy is a fixed offset</h3>
         <p>
           How far an estimate sits from a DEXA scan is mostly a personal, systematic offset.
-          It barely moves between measurements — so when you compare yourself to yourself, it
+          It barely moves between measurements, so when you compare yourself to yourself, it
           cancels out almost entirely.
         </p>
       </div>
@@ -137,7 +137,7 @@ export function homePage(): string {
       <p>
         Every estimate is shown with its confidence interval, and the app says
         <em>&ldquo;no confirmed change yet&rdquo;</em> until the movement is larger than your own
-        measurement noise. It will not draw a confident arrow through scatter — that is the
+        measurement noise. It will not draw a confident arrow through scatter, that is the
         one thing guaranteed to mislead you about your own body.
       </p>
     </div>
@@ -145,16 +145,15 @@ export function homePage(): string {
 
   <section class="wrap">
     <div class="panel">
-      <h2>It cannot send your data anywhere</h2>
+      <h2>Your photos never leave your phone</h2>
       <p style="color:var(--body);max-width:640px">
-        Squeeze.fit is built without the <code class="perm">android.permission.INTERNET</code>
-        permission. That is not a policy or a promise in a document — it is enforced by
-        Android itself. Without that permission the app has no way to open a network
-        connection, so your measurements and photographs physically cannot leave the device.
+        The body scan and every calculation run on your phone, with models built into the app.
+        Photographs are stored encrypted and are never uploaded. The only connection the app
+        ever makes is an optional backup of your numbers to a hidden folder in your own Google
+        Drive, and only if you sign in.
       </p>
       <p class="note">
-        You do not have to take our word for it: open <strong>App info › Permissions</strong>
-        on your phone, or read the manifest in the source.
+        No analytics, no ads, no servers of ours receiving your data.
       </p>
       <div class="cta" style="justify-content:flex-start;margin-top:22px">
         <a class="btn secondary" href="/privacy">Read the privacy policy</a>
@@ -174,9 +173,9 @@ export function homePage(): string {
 </main>`;
 
   return layout({
-    title: "Squeeze.fit — body composition that stays on your phone",
+    title: "Squeeze.fit · body composition that stays on your phone",
     description:
-      "Track body fat and body composition from a photo or a tape measure. Runs entirely on device, with no internet permission, no account and no analytics.",
+      "Track body fat, training and nutrition from a photo or a tape measure. Photos are analysed on your phone and never uploaded. No ads, no analytics.",
     path: "/",
     body,
   });
@@ -187,81 +186,84 @@ export function privacyPage(): string {
 <main class="wrap">
   <section class="prose">
     <h1 style="font-size:clamp(30px,5vw,42px);letter-spacing:-0.03em;margin-bottom:6px">Privacy policy</h1>
-    <p class="updated">Last updated 4 August 2026</p>
+    <p class="updated">Last updated 4 October 2026</p>
 
     <p>
-      Squeeze.fit is a body composition tracker that runs entirely on your device. This policy
-      describes what the app and this website do with information. The short version: the app
-      collects nothing, transmits nothing, and has no technical ability to do either.
+      Squeeze.fit is a body composition, training and nutrition app. Its body scan, physique
+      analysis and every calculation run on your phone. This policy describes what the app and
+      this website do with information. The short version: your photographs never leave your
+      phone, we run no servers that receive your data, and the only network connection the app
+      makes is an optional backup to your own Google Drive.
     </p>
 
-    <h2>The app cannot connect to the internet</h2>
-    <p>
-      The Android app is built without the <code class="perm">android.permission.INTERNET</code>
-      permission. Android enforces this at the operating system level, so the app cannot open a
-      network connection of any kind. There is no server, no account system and no sync.
-    </p>
-    <p>
-      This is verifiable rather than promised. Open <strong>App info › Permissions</strong> on
-      your phone, or read <code class="perm">AndroidManifest.xml</code> in the public source.
-    </p>
-
-    <h2>What the app stores, and where</h2>
+    <h2>What the app stores on your phone</h2>
     <ul>
-      <li><strong>Your profile</strong> — height, year of birth, and which equation variant to use.</li>
-      <li><strong>Your measurements</strong> — circumferences, weights, skinfolds and any reference scan results you enter.</li>
-      <li><strong>Your settings</strong> — theme, sound and screenshot preferences.</li>
-      <li><strong>Your scan photographs</strong> — encrypted, and described in full below.</li>
+      <li><strong>Your profile:</strong> height, year of birth, the equation variant, your goal, sports, training days and time, and favourite foods.</li>
+      <li><strong>Your measurements:</strong> weights, circumferences, skinfolds, body fat estimates and any reference results you enter.</li>
+      <li><strong>Your training:</strong> logged sets, sessions and the physique scores from each scan.</li>
+      <li><strong>Your scan photographs:</strong> encrypted, and described in full below.</li>
+      <li><strong>Your settings:</strong> theme, sound and screenshot preferences.</li>
     </ul>
     <p>
       All of it is written to an encrypted database in the app's private storage, which other
-      apps cannot read. Deleting the app deletes the data with it.
+      apps cannot read. Deleting the app deletes the data on the phone with it.
     </p>
 
     <h2>Photographs</h2>
     <p>
-      Scan photographs are <strong>saved on your device</strong>, so you can look back at the
-      image a measurement came from. They are encrypted with a key held in your phone's secure
-      hardware and written to the app's private storage.
+      Scan photographs are analysed on your phone by models built into the app. They are saved
+      so you can look back at them, encrypted with a key held in your phone's secure hardware,
+      and they do not appear in your gallery. <strong>Photographs are never uploaded</strong>,
+      including to your Google Drive backup. Deleting a measurement deletes its photograph.
     </p>
     <p>
-      That means they do not appear in your gallery, no other app can read them, and they are
-      excluded from cloud backups. Because the key lives in the device's secure hardware, the
-      files are unreadable if the storage is ever recovered from a lost or stolen phone.
+      The camera permission is used only while you take a scan photo or photograph a gym
+      machine. You can pick an existing photo instead.
     </p>
+
+    <h2>Google sign in and Drive backup (optional)</h2>
     <p>
-      Deleting a measurement deletes its photograph with it. Deleting the app removes all of
-      them. They are never uploaded, because the app has no way to upload anything.
+      You can sign in with your Google account to back up your data. If you do:
     </p>
+    <ul>
+      <li>The app receives your Google account's name and email address, to show which account is signed in.</li>
+      <li>It asks Google for the <code class="perm">drive.appdata</code> permission only. This lets the app read and write a hidden folder in your own Google Drive that only Squeeze.fit can see. It gives no access to any other file in your Drive.</li>
+      <li>The backup contains your profile, measurements, training logs, plans and settings. It does not contain photographs.</li>
+      <li>The backup is sent directly from your phone to Google over an encrypted connection. It is stored in your Google account, subject to <a href="https://policies.google.com/privacy" rel="noopener" style="color:var(--blue)">Google's privacy policy</a>. We do not receive a copy and cannot access it.</li>
+    </ul>
     <p>
-      The camera permission is used only while you are taking a scan photo. You can also pick
-      an existing photo instead, in which case the app never asks for camera access at all.
+      If you do not sign in, the app makes no network connections. To stop backing up, choose
+      Sign out in the app. To delete the backup, open Google Drive, go to Settings, then
+      Manage apps, find Squeeze.fit and choose Delete hidden app data. You can also remove the
+      app's access at <a href="https://myaccount.google.com/permissions" rel="noopener" style="color:var(--blue)">myaccount.google.com/permissions</a>.
+    </p>
+
+    <h2>Purchases</h2>
+    <p>
+      Purchases are handled by Google Play. We receive confirmation that a purchase was made,
+      never your payment details.
     </p>
 
     <h2>What we do not do</h2>
     <ul>
       <li>No analytics, telemetry, crash reporting or usage tracking.</li>
       <li>No advertising and no advertising identifiers.</li>
-      <li>No accounts, sign-in, email collection or newsletters.</li>
-      <li>No third-party SDKs that phone home.</li>
-      <li>No selling or sharing of data, because none is ever collected.</li>
+      <li>No servers of our own that receive your data, and no accounts with us.</li>
+      <li>No selling or sharing of data with anyone.</li>
     </ul>
 
     <h2>Sharing, when you choose it</h2>
     <p>
-      The app has one Share button, on the celebration screen. It hands a short plain-text
-      summary — body fat percentage, entry count and days tracked — to Android's system share
-      sheet, and you pick where it goes. Nothing is sent by the app itself, no photograph is
-      attached, and no measurement history is included. If you never press it, nothing is ever
-      shared.
+      The celebration screen has a Share button. It hands a short text summary (body fat
+      percentage, entry count and days tracked) to Android's share sheet, and you pick where it
+      goes. No photograph or measurement history is attached.
     </p>
 
     <h2>This website</h2>
     <p>
-      This site serves static pages. It sets no cookies, runs no analytics, embeds no third-party
-      scripts, and does not attempt to identify you. Our hosting provider processes standard web
-      request logs, such as IP address and user agent, in order to serve the page and defend
-      against abuse.
+      This site serves static pages. It sets no cookies, runs no analytics and embeds no
+      third party scripts. Our hosting provider processes standard request logs, such as IP
+      address and user agent, to serve pages and prevent abuse.
     </p>
 
     <h2>Children</h2>
@@ -270,18 +272,17 @@ export function privacyPage(): string {
       are not validated for them.
     </p>
 
-    <h2>Your rights</h2>
+    <h2>Your rights and deleting your data</h2>
     <p>
-      Because no data ever reaches us, there is nothing for us to disclose, correct or delete on
-      your behalf. You hold all of it. Deleting the app, or clearing its storage from Android
-      settings, removes everything permanently — there is no backup to restore from, including
-      ours.
+      Your data lives on your phone and, if you choose, in your own Google Drive. You can delete
+      everything on the phone by deleting the app or clearing its storage in Android settings,
+      and delete the backup as described above. We hold no copy to disclose, correct or delete.
     </p>
 
     <h2>Changes</h2>
     <p>
-      If this policy changes, the revised version will be published here with a new date. Since
-      the app cannot contact us, material changes will also appear in the app's release notes.
+      If this policy changes, the revised version will be published here with a new date, and
+      material changes will be noted in the app's release notes.
     </p>
 
     <h2>Contact</h2>
@@ -293,9 +294,9 @@ export function privacyPage(): string {
 </main>`;
 
   return layout({
-    title: "Privacy policy — Squeeze.fit",
+    title: "Privacy policy · Squeeze.fit",
     description:
-      "Squeeze.fit collects nothing and transmits nothing. The Android app holds no internet permission, so your measurements and photos cannot leave your device.",
+      "Squeeze.fit analyses your photos on your phone and never uploads them. The only connection it makes is an optional backup to your own Google Drive.",
     path: "/privacy",
     body,
   });
@@ -310,7 +311,7 @@ export function notFoundPage(): string {
 </main>`;
 
   return layout({
-    title: "Not found — Squeeze.fit",
+    title: "Not found · Squeeze.fit",
     description: "That page does not exist.",
     path: "/404",
     body,

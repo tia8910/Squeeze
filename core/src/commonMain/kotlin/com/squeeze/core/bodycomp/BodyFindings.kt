@@ -14,7 +14,16 @@ enum class FindingKind { STRENGTH, WEAKNESS }
  * @param title the claim, short enough to scan in a list
  * @param detail why, naming the figure it came from so it can be checked against the panel
  */
-data class BodyFinding(val kind: FindingKind, val title: String, val detail: String)
+/**
+ * @param part set on findings about one body part, so a screen that shows the AI physique
+ *   analysis can fold them into it instead of listing them twice
+ */
+data class BodyFinding(
+    val kind: FindingKind,
+    val title: String,
+    val detail: String,
+    val part: Boolean = false,
+)
 
 /**
  * What a record is good at and what it is not.
@@ -94,7 +103,7 @@ object BodyFindings {
                     "${label(group)} ahead of the rest of you",
                     "Measurably above the balanced proportion for your frame. Worth knowing " +
                         "when you cut: this is the part with the most to lose.",
-                )
+                ).copy(part = true)
             }
 
             WeakPointAnalysis.analyse(girths, sex)
@@ -104,7 +113,7 @@ object BodyFindings {
                     findings += weakness(
                         "${label(point.group)} behind the rest of you",
                         "${point.finding} ${point.prescription}",
-                    )
+                    ).copy(part = true)
                 }
         }
 
@@ -115,13 +124,13 @@ object BodyFindings {
             when (metric.band?.label) {
                 "Healthy" -> findings += strength(
                     "Waist under half your height",
-                    "${metric.formatted()} — clear of the 0.5 boundary, which is the single " +
+                    "${metric.formatted()}, clear of the 0.5 boundary, which is the single " +
                         "best screen there is for central fat.",
                 )
 
                 "Slim" -> findings += strength(
                     "Narrow waist for your height",
-                    "${metric.formatted()} — below the usual range, and well under the 0.5 " +
+                    "${metric.formatted()}, below the usual range, and well under the 0.5 " +
                         "boundary.",
                 )
 
@@ -141,7 +150,7 @@ object BodyFindings {
             when (band?.label) {
                 "Athletic", "Fitness" -> findings += strength(
                     "Body fat in the ${band.label.lowercase()} range",
-                    "${metric.formatted()} — " +
+                    "${metric.formatted()}, " +
                         band.detail.replaceFirstChar { it.lowercase() },
                 )
 
@@ -153,7 +162,7 @@ object BodyFindings {
 
                 "Below essential" -> findings += weakness(
                     "Below the fat your body needs",
-                    "${metric.formatted()}. This is not a target — it is a level competitors " +
+                    "${metric.formatted()}. This is not a target, it is a level competitors " +
                         "hold briefly and on purpose. Check the scan before acting on it.",
                 )
             }
@@ -164,7 +173,7 @@ object BodyFindings {
                 "Low risk" -> findings += strength(
                     "Fat is not carried centrally",
                     "Waist-to-hip ${metric.formatted()}. Both numbers come from one photo at " +
-                        "one scale, so scale error cancels — this is among the most " +
+                        "one scale, so scale error cancels, this is among the most " +
                         "trustworthy things a scan produces.",
                 )
 
@@ -186,13 +195,13 @@ object BodyFindings {
                     "Chest ${metric.formatted()} times your waist. It rises when you build " +
                         "your upper back and chest and when you lose from the waist, so it " +
                         "moves for two good reasons at once.",
-                )
+                ).copy(part = true)
 
                 metric.value < flat -> findings += weakness(
                     "Little taper through the torso",
                     "Chest ${metric.formatted()} times your waist. Upper-back and shoulder " +
                         "work moves this faster than anything done at the waist.",
-                )
+                ).copy(part = true)
             }
         }
 
@@ -215,7 +224,7 @@ object BodyFindings {
                         "and it moves slowly enough to be worth starting now.",
                 )
 
-                "Exceptional — check your inputs" -> findings += weakness(
+                "Exceptional, check your inputs" -> findings += weakness(
                     "This reading needs checking",
                     "FFMI ${metric.formatted()}, above the level usually considered " +
                         "attainable drug-free. It is derived from your weight and your body " +
@@ -258,4 +267,49 @@ object BodyFindings {
 
     private fun weakness(title: String, detail: String) =
         BodyFinding(FindingKind.WEAKNESS, title, detail)
+}
+
+/**
+ * The tape's view of each muscle group, in the physique analysis's terms — so the AI's
+ * impression and the measured proportions become one verdict instead of two lists that
+ * contradict each other on the same screen.
+ */
+object MeasuredParts {
+
+    /** Strong and weak groups, each with the measured reason. */
+    fun from(
+        c: Circumferences,
+        sex: Sex,
+    ): Pair<Map<com.squeeze.core.scan.MuscleGroup, String>, Map<com.squeeze.core.scan.MuscleGroup, String>> {
+        val strong = linkedMapOf<com.squeeze.core.scan.MuscleGroup, String>()
+        WeakPointAnalysis.strongPoints(c, sex).forEach { g ->
+            toScan(g)?.let { if (it !in strong) strong[it] = "Measured ahead of the balanced proportion for your frame." }
+        }
+        val chest = c.chestCm
+        val waist = c.waistCm
+        if (chest != null && waist != null && waist > 0) {
+            val ratio = chest / waist
+            val marked = if (sex == Sex.FEMALE) BodyFindings.FEMALE_STRONG_TAPER else BodyFindings.MALE_STRONG_TAPER
+            if (ratio >= marked) {
+                val v = com.squeeze.core.scan.MuscleGroup.V_TAPER
+                val taper = "Chest ${(ratio * 100).toInt() / 100.0}× your waist, a marked V-taper."
+                strong[v] = strong[v]?.let { "$it $taper" } ?: taper
+            }
+        }
+        val weak = WeakPointAnalysis.analyse(c, sex)
+            .mapNotNull { p -> toScan(p.group)?.let { it to p.finding } }
+            .filter { it.first !in strong }
+            .toMap()
+        return strong to weak
+    }
+
+    fun toScan(group: MuscleGroup): com.squeeze.core.scan.MuscleGroup? = when (group) {
+        MuscleGroup.CHEST -> com.squeeze.core.scan.MuscleGroup.CHEST
+        MuscleGroup.BACK -> com.squeeze.core.scan.MuscleGroup.V_TAPER
+        MuscleGroup.SHOULDERS -> com.squeeze.core.scan.MuscleGroup.SHOULDERS
+        MuscleGroup.BICEPS, MuscleGroup.TRICEPS -> com.squeeze.core.scan.MuscleGroup.ARMS
+        MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.CALVES ->
+            com.squeeze.core.scan.MuscleGroup.LEGS
+        MuscleGroup.ABS -> com.squeeze.core.scan.MuscleGroup.ABS
+    }
 }

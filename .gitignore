@@ -9,6 +9,9 @@ captures/
 *.apk
 *.aab
 *.keystore
+# Debug-only signing key, committed so the debug SHA-1 registered with Google sign-in
+# stays the same on every machine and CI run. Never used for release builds.
+!app/debug.keystore
 release-keys.properties
 keystore.properties
 *.jks
@@ -18,3 +21,6 @@ keystore.properties
 app/src/main/assets/*.task
 app/src/main/assets/*.tflite
 walletlens-app
+# The on-device CLIP image encoder is fetched and quantised by tools/vlm/prepare_clip.py.
+app/src/main/assets/*.onnx
+__pycache__/

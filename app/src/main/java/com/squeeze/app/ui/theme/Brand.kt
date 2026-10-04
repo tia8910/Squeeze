@@ -37,13 +37,15 @@ object Brand {
     val Ice = Color(0xFFF4F7FF)
 
     /** `--muted`. Secondary copy. */
-    val Muted = Color(0xFF69738A)
+    val Muted = Color(0xFF5B6479)
 
     /** `--line`. Hairline borders. Depth comes from these rather than from elevation. */
     val Line = Color(0xFFE7EBF3)
 
     val Card = Color(0xFFFFFFFF)
-    val Ground = Color(0xFFFFFFFF)
+
+    /** A cool off-white, so white cards float on it rather than merging into it. */
+    val Ground = Color(0xFFF6F8FC)
 
     /** `.stat` background. A hair off white — enough to separate, not enough to read as grey. */
     val Sunken = Color(0xFFFAFBFE)

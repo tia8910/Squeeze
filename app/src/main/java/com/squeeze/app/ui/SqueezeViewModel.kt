@@ -51,6 +51,8 @@ data class SqueezeUiState(
      * target, and the day it is read on changes the answer.
      */
     val goalProgress: GoalProgress? = null,
+    /** The journey and a line from every feature, for the top of the dashboard. */
+    val summary: com.squeeze.app.data.DashboardSummary? = null,
     val loading: Boolean = true,
 )
 
@@ -62,6 +64,8 @@ class SqueezeViewModel @Inject constructor(
     private val securitySettings: SecuritySettings,
     private val uiSettings: UiSettings,
     private val photoStore: ScanPhotoStore,
+    private val coach: com.squeeze.app.data.CoachRepository,
+    private val backup: com.squeeze.app.data.backup.BackupManager,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
@@ -123,6 +127,10 @@ class SqueezeViewModel @Inject constructor(
                         ?: existing?.targetBodyFatPercent,
                     targetWeightKg = targetWeightKg ?: existing?.targetWeightKg,
                     targetEpochDay = targetEpochDay ?: existing?.targetEpochDay,
+                    trainingDaysPerWeek = existing?.trainingDaysPerWeek,
+                    disciplines = existing?.disciplines,
+                    favouriteFoods = existing?.favouriteFoods,
+                    trainingTime = existing?.trainingTime,
                 ),
             )
             refresh()
@@ -171,6 +179,22 @@ class SqueezeViewModel @Inject constructor(
 
     init {
         refresh()
+        // A restore from Google Drive replaces the database underneath this screen.
+        viewModelScope.launch { backup.restores.collect { if (it > 0) refresh() } }
+    }
+
+    /** The AI physique analysis saved with [entry]'s scan, merged with its measurements. */
+    suspend fun physiqueFor(entry: MeasurementEntity): com.squeeze.core.scan.PhysiqueReport? {
+        val read = coach.physiqueOn(entry.epochDay) ?: return null
+        return coach.physiqueReport(read, entry)
+    }
+
+    /** Opens today's planned session in the log, then [then] navigates there. */
+    fun startTodaysSession(then: () -> Unit) {
+        viewModelScope.launch {
+            coach.prepareTodaysSession()
+            then()
+        }
     }
 
     fun refresh() {
@@ -196,6 +220,7 @@ class SqueezeViewModel @Inject constructor(
                 repeatability = snapshot.repeatability,
                 calibration = snapshot.calibration,
                 goalProgress = goalProgress(profile, snapshot, measurements),
+                summary = coach.dashboard(),
                 loading = false,
             )
         }

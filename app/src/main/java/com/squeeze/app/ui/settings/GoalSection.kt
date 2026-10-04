@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.FilterChip
+import com.squeeze.app.ui.components.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -69,7 +69,7 @@ enum class GoalOption(
     RECOMP(
         Goal.RECOMP,
         "Both at once",
-        "Hold your weight while the percentage falls — muscle up, fat down. Slower than " +
+        "Hold your weight while the percentage falls, muscle up, fat down. Slower than " +
             "either alone, and the only goal that needs both numbers to be checkable.",
         wantsBodyFat = true,
         wantsWeight = true,

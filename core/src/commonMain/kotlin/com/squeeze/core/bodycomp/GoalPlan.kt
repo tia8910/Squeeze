@@ -148,7 +148,7 @@ object GoalPlanner {
                 actions = if (abs(current - goalValue) < 1.0) {
                     emptyList()
                 } else {
-                    listOf("Set a new date — there is not enough time left to change this much.")
+                    listOf("Set a new date, there is not enough time left to change this much.")
                 },
             )
         }
@@ -175,7 +175,7 @@ object GoalPlanner {
                         "weeks, or set a less ambitious target.",
                     if (gap < 0) {
                         "Going faster than this costs muscle, which raises your body fat " +
-                            "percentage even as the scale falls — the opposite of the goal."
+                            "percentage even as the scale falls, the opposite of the goal."
                     } else {
                         "Gaining faster than this adds fat rather than muscle."
                     },
@@ -194,7 +194,7 @@ object GoalPlanner {
                 actualRatePerWeek = actualRatePerWeek,
                 projectedValue = projected,
                 daysRemaining = daysRemaining,
-                headline = "You are moving away from your target, not toward it — " +
+                headline = "You are moving away from your target, not toward it, " +
                     "${abs(actualRatePerWeek).fixed(2)} points a week in the wrong direction.",
                 actions = advice(gap, currentWeightKg, requiredRate, actualRatePerWeek, sex),
             )
@@ -241,7 +241,7 @@ object GoalPlanner {
         headline = "Not enough measurements yet to say whether you are on track.",
         actions = listOf(
             "Measure two or three more times over the next fortnight. A rate needs a run of " +
-                "readings — a single scan cannot have a direction.",
+                "readings, a single scan cannot have a direction.",
         ),
     )
 
@@ -293,7 +293,7 @@ object GoalPlanner {
                 val dailyDeficit = (kgPerWeek * 7700.0 / 7.0).roundToInt()
                 if (dailyDeficit > 0) {
                     add(
-                        "Take about $dailyDeficit kcal a day out of your intake — that is " +
+                        "Take about $dailyDeficit kcal a day out of your intake, that is " +
                             "the size of the gap between the rate you need and the rate you " +
                             "have.",
                     )
@@ -301,7 +301,7 @@ object GoalPlanner {
             }
             add(
                 "Keep lifting heavy and keep protein around " +
-                    "${proteinTarget(weightKg, sex)} — in a deficit that is what decides " +
+                    "${proteinTarget(weightKg, sex)}, in a deficit that is what decides " +
                     "whether the weight you lose is fat or muscle.",
             )
         } else {
@@ -316,7 +316,7 @@ object GoalPlanner {
         }
 
         add(
-            "Measure at the same time of day, in the same state — a trend built from mixed " +
+            "Measure at the same time of day, in the same state, a trend built from mixed " +
                 "conditions can read as behind when nothing has actually changed.",
         )
     }

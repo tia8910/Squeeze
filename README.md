@@ -71,15 +71,39 @@ a number a user might act on lives in `core/` and is covered by tests.
   flag is all-or-nothing — leaving it on would stop users capturing their own progress and
   make store listing screenshots impossible to produce. Screens rendering a captured body
   photo should set it unconditionally regardless of the preference.
-- **No `INTERNET` permission.** The app cannot open a socket, so no photograph and no
-  measurement can leave the device even if a bug or a dependency tried to send one. This is
-  enforced by the OS rather than promised, and any user can verify it in the permission
-  list. Body scanning uses models packaged in the APK; Play Billing reaches the Play Store
-  over binder IPC, not this process's network stack.
+- **Network only for opt-in Google Drive backup.** `INTERNET` is declared for one feature:
+  after the user signs in with Google, their data (JSON from `BackupCodec`: measurements,
+  logs, plans, settings — never photographs) is written to the hidden app-data folder of
+  their own Drive (`drive.appdata` scope only). Without sign-in the app opens no connection.
+  Body scanning uses models packaged in the APK; Play Billing reaches the Play Store over
+  binder IPC, not this process's network stack.
 - **Biometric gate** on launch and on every return to the foreground.
-- **Backup and device transfer disabled.** Cloud backup would put the database on someone
-  else's server, which contradicts the guarantee. The user's route to a backup is the
-  app's own passphrase-encrypted export.
+- **Android system backup and device transfer disabled.** Android's own cloud backup would
+  copy the encrypted database and its keys somewhere the user never chose. The routes to a
+  backup are the app's passphrase-encrypted export and the opt-in Google Drive backup below.
+
+### Google Drive backup setup
+
+Sign in with Google appears in onboarding (a returning user restores everything there) and in
+Settings › Google Drive backup. Once signed in, the app backs up when it goes to the
+background, at most hourly. It needs a Google Cloud project you own:
+
+1. **APIs & Services › Library:** enable the **Google Drive API**.
+2. **OAuth consent screen:** External; add the scope `.../auth/drive.appdata`. While the app
+   is in *Testing*, add every Google account that will sign in as a **test user**.
+3. **Credentials › Create OAuth client ID › Android**, once per package:
+   - debug: package `com.squeeze.app.debug`, SHA-1
+     `F8:42:9D:48:DF:EA:00:D7:01:A3:E9:45:1D:DC:3D:03:93:A3:2A:1A` (the committed
+     `app/debug.keystore`, used by every debug build including CI's);
+   - release: package `com.squeeze.app`, SHA-1 of the release key, or Play's app-signing key
+     from Play Console › App integrity.
+4. **Web client ID:** the build uses Squeeze's Web client
+   (`71286678065-4occld8qvre6itvgecp2mmrdeoqka9qe.apps.googleusercontent.com`, set as
+   `googleWebClientId` in `app/build.gradle.kts`; override with `GOOGLE_WEB_CLIENT_ID`). So
+   the Android clients in step 3 must be created **in that same project** (71286678065).
+   It is not a secret. Google's consent screen shows that project's app name.
+
+With the ID blank, the Google button explains that sign-in is not set up in that build.
 
 ### Monetisation
 

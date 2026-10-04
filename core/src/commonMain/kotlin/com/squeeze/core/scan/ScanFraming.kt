@@ -170,8 +170,27 @@ object TorsoFraming {
         val trunk = hipRow - shoulderRow
         if (trunk <= 0 || shoulderRow <= 0) return null
 
-        val chinRow = (shoulderRow - maxOf(1, (trunk * CHIN_ABOVE_SHOULDER).toInt()))
-            .coerceAtLeast(0)
+        // **The mouth landmark when there is one, and the trunk fraction only as a fallback.**
+        //
+        // The fraction was placing the chin a quarter of the trunk span above the shoulders,
+        // which on a real photograph sat *below* the jaw. AnatomicalLevelFinder then searched
+        // for the neck between 0.35 and 0.80 of chin-to-shoulder, so the whole band landed on
+        // the trapezius, which is wider than a neck — and its own comment says what follows:
+        // "a 175 cm man ends up with a 52 cm neck, which drives the Navy equation to a
+        // negative body fat and so produces no estimate at all".
+        //
+        // That is what a user saw. His trunk scan measured a waist, a chest and a
+        // waist-to-height of 0.41, and still reported the outline's constant under the words
+        // "not resolved by the photo", because the one site the tape equation needs was
+        // measured on his shoulders.
+        //
+        // Reconstructed on his frame: shoulders near row 1200 and hips near 1517 put the
+        // synthesised chin at 1121 and the neck band at 1149-1184, which is trapezius. His
+        // mouth sits near 990, which puts the band at 1063-1158 — his neck.
+        val chinRow = geometry.mouth
+            ?.let { (it.y * rowCount).toInt() }
+            ?.takeIf { it in 0 until shoulderRow }
+            ?: (shoulderRow - maxOf(1, (trunk * CHIN_ABOVE_SHOULDER).toInt())).coerceAtLeast(0)
 
         // Allowed to fall past the bottom of the picture, and that is not an oversight. The
         // knee is never read as a row — it only sets how deep below the hip the hip-width

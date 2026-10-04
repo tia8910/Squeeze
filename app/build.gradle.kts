@@ -25,23 +25,41 @@ fun secret(name: String, default: String = ""): String =
     System.getenv(name) ?: localProperties.getProperty(name) ?: default
 
 
+/**
+ * The Web OAuth client of Squeeze's own Google Cloud project (71286678065), so Google's
+ * consent screen shows Squeeze's name. The Android clients must be registered in the same
+ * project; see README "Google Drive backup setup".
+ */
+val googleWebClientId = "71286678065-4occld8qvre6itvgecp2mmrdeoqka9qe.apps.googleusercontent.com"
+
 val releaseKeystorePath = secret("KEYSTORE_FILE")
 val hasReleaseSigning = releaseKeystorePath.isNotBlank() && file(releaseKeystorePath).exists()
 
 android {
     namespace = "com.squeeze.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.squeeze.app"
         minSdk = 26
-        targetSdk = 35
+        // Play requires new apps and updates to target the latest Android within a year of
+        // its release; Android 16 is API 36.
+        targetSdk = 36
 
         // Overridable from CI so a tagged release can stamp a build number without a commit.
         versionCode = secret("VERSION_CODE", "1").toInt()
-        versionName = secret("VERSION_NAME", "0.3.0-local")
+        versionName = secret("VERSION_NAME", "1.0.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // **64-bit ARM only.** Three libraries here carry native code — ONNX Runtime for the
+        // on-device model, MediaPipe, SQLCipher — and each ships a copy per processor type.
+        // Four types meant four copies, most of the non-model weight of the APK, for x86
+        // emulators and 32-bit phones. Every phone Play has required 64-bit support on since
+        // 2019 runs arm64-v8a. Add "x86_64" here to run on an emulator.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
 
 
         // Play Console licensing key, used by PurchaseVerifier. Blank disables local
@@ -49,9 +67,24 @@ android {
         // the right behaviour for a debug build with no Play Console behind it.
         buildConfigField("String", "PLAY_PUBLIC_KEY", "\"${secret("PLAY_PUBLIC_KEY")}\"")
 
+        // The *Web* OAuth client ID from the Google Cloud project, used by Sign in with
+        // Google for Drive backup. Not a secret (it ships in every APK that uses it), so it
+        // has a committed default; blank disables Google sign-in rather than breaking it.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${secret("GOOGLE_WEB_CLIENT_ID", googleWebClientId)}\"")
+
     }
 
     signingConfigs {
+        // A fixed debug key instead of each machine's auto-generated one, so the SHA-1
+        // registered for Google sign-in (Drive backup) matches every debug build, CI's
+        // included. It is debug-only and public by design: it proves nothing about who built
+        // the APK, and the release key stays secret.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             // Guarded: configuring a signing config with null paths fails the build outright,
             // so an unconfigured clone must skip it rather than half-populate it.
@@ -76,6 +109,7 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -99,8 +133,8 @@ android {
 }
 
 // Room exports its schema so migrations can be diffed and tested. Without a location set
-// the export is a build warning and the schema is silently lost, which matters here: this
-// app has no cloud backup, so a botched migration is unrecoverable data loss.
+// the export is a build warning and the schema is silently lost, which matters here: cloud
+// backup is optional, so for most users a botched migration is unrecoverable data loss.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
@@ -138,11 +172,18 @@ dependencies {
     implementation(libs.health.connect)
 
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.onnxruntime.android)
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.androidx.exifinterface)
+
+    // Optional Google Drive backup: Sign in with Google, then drive.appdata authorisation.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+    implementation(libs.play.services.auth)
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)

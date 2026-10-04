@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.FilterChip
+import com.squeeze.app.ui.components.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.data.db.MeasurementEntity
+import com.squeeze.app.ui.components.entrance
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.BandChip
 import com.squeeze.app.ui.components.BrandRow
@@ -90,6 +92,12 @@ fun CompositionScreen(
     onAddMeasurement: () -> Unit,
     onDelete: (MeasurementEntity) -> Unit,
     modifier: Modifier = Modifier,
+    /** The journey's next step and a line from every feature; null until first loaded. */
+    summary: com.squeeze.app.data.DashboardSummary? = null,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
+    onStep: (com.squeeze.core.coach.StepId) -> Unit = {},
+    onOpenNutrition: () -> Unit = {},
+    onOpenTraining: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -101,21 +109,38 @@ fun CompositionScreen(
     ) {
         val latest = trend.lastOrNull()
 
+        Greeting()
+
+        // Where the body is, first — then the one next step and a line from every feature.
+        // The dashboard is the way into everything, and each finished step knocks over the next.
+        if (latest != null) {
+            HeroCard(latest, calibration, trend, leanMassTrend.lastOrNull()?.level)
+        }
+
+        summary?.let {
+            com.squeeze.app.ui.components.JourneyCard(
+                summary = it,
+                onStep = onStep,
+                onOpenTraining = onOpenTraining,
+                onOpenNutrition = onOpenNutrition,
+                onOpenScan = onStartScan,
+            )
+        }
+
         if (latest == null) {
             EmptyState(
                 onStartScan = onStartScan,
                 onAddMeasurement = onAddMeasurement,
                 measurements = measurements,
+                showScan = summary?.journey?.next?.id != com.squeeze.core.coach.StepId.AI_SCAN,
             )
             if (measurements.isNotEmpty()) {
                 // Entries exist but none carries enough sites for an estimate — show them,
                 // so the user can see their data went somewhere and fix what is missing.
-                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+                HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
             }
             return@Column
         }
-
-        HeroCard(latest, calibration, trend)
 
         // Directly under the hero, above everything else. It is the only card here that
         // answers "so what": the number says where you are, this says whether that is
@@ -134,12 +159,12 @@ fun CompositionScreen(
             StatTile(
                 value = weightTrend.lastOrNull()?.let { "%.1f".format(it.level) }
                     ?: latestWeight(measurements)?.let { "%.1f".format(it) }
-                    ?: "—",
+                    ?: "--",
                 label = "Weight (kg)",
                 modifier = Modifier.weight(1f),
             )
             StatTile(
-                value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "—",
+                value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "--",
                 label = "Muscle (kg)",
                 modifier = Modifier.weight(1f),
             )
@@ -159,44 +184,28 @@ fun CompositionScreen(
             muscle = leanMassTrend,
         )
 
-        StatRow {
-            StatTile(
-                value = measurements.size.toString(),
-                label = if (measurements.size == 1) "Entry" else "Entries",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = daysTracked(measurements).toString(),
-                label = "Days tracked",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                value = lastEntryLabel(measurements),
-                label = "Last entry",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
+        // One action: the scan, which also takes the weight. Tape measurements stay
+        // available for people who use a tape, but as a quiet link rather than a second
+        // button of equal weight.
         PrimaryButton(
-            text = "Scan",
+            text = "Scan check-in",
             onClick = onStartScan,
             leading = {
                 Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
             },
         )
-        SecondaryButton(
-            text = "Enter",
-            onClick = onAddMeasurement,
-            leading = {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
+        androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.material3.Text(
+                "Enter tape measurements instead · ${measurements.size} " +
+                    (if (measurements.size == 1) "entry" else "entries") + " so far",
+            )
+        }
 
         // The full analysis lives inside each history entry rather than here. On the
         // dashboard it described whichever fields happened to be newest across different
         // sessions, which is a fine answer to "where am I now" and a poor thing to call an
         // analysis, because no single measurement ever produced that combination.
-        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete)
+        HistorySection(measurements, profile, loadPhoto, analysisFor, onDelete, physiqueFor)
 
         repeatability?.let { RepeatabilityCard(it) }
     }
@@ -230,7 +239,7 @@ private fun FilteredTrend(
     if (factor == null) {
         InfoCard(
             "Scan or weigh in once more and the trend appears here. One reading is a " +
-                "point — the direction only exists once there are two.",
+                "point, the direction only exists once there are two.",
         )
         return
     }
@@ -273,7 +282,7 @@ private fun FilteredTrend(
             // broken feature; naming what is missing turns it into an instruction.
             InfoCard(
                 "Only one ${factor.label.lowercase()} reading so far. One reading is a " +
-                    "point — the direction only exists once there are two.",
+                    "point, the direction only exists once there are two.",
             )
         }
     }
@@ -291,92 +300,91 @@ private fun HeroCard(
     latest: TrendPoint,
     calibration: PersonalCalibration,
     trend: List<TrendPoint>,
+    leanMassKg: Double?,
 ) {
-    BrandCard(Modifier.fillMaxWidth()) {
+    val dark = LocalIsDarkTheme.current
+    val subColour = if (dark) Brand.DarkSub else Brand.Sub
+    val muted = if (dark) Brand.DarkMuted else Brand.Muted
+    BrandCard(Modifier.fillMaxWidth().entrance(0)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-            Text(
-                text = "Body fat",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 8.dp),
-            )
+            // The ring is the body-fat scale from 0 to 40%: a picture of where the number sits.
+            com.squeeze.app.ui.components.ProgressRing(
+                progress = (latest.level / 40.0).toFloat(),
+                size = 118.dp,
+                stroke = 10.dp,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        com.squeeze.app.ui.components.AnimatedNumber(
+                            value = latest.level,
+                            decimals = 1,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text("%", style = MaterialTheme.typography.labelLarge, color = muted, modifier = Modifier.padding(bottom = 4.dp))
+                    }
+                    Text("body fat", style = MaterialTheme.typography.labelSmall, color = muted)
+                }
+            }
+            Column(Modifier.weight(1f).padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("BODY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "± %.1f points".format(latest.levelConfidence95) +
+                        (leanMassKg?.let { " · lean %.1f kg".format(it) } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subColour,
+                )
+                if (trend.size >= 2) {
+                    Sparkline(values = trend.map { it.level }, modifier = Modifier.padding(vertical = 2.dp), height = 40.dp, strokeWidth = 2.5.dp, dotRadius = 3.5.dp)
+                }
+                val chip = if (latest.isChangeSignificant) {
+                    "%s%.2f pts / week".format(if (latest.weeklyChange < 0) "−" else "+", abs(latest.weeklyChange))
+                } else {
+                    "No confirmed change yet"
+                }
+                Text(
+                    chip,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
         }
-
-        // The number animates to its new value on each refresh. Beyond feel, this is a
-        // state-change cue: after a save the user sees the estimate move, which confirms the
-        // new measurement was absorbed without reading anything.
-        val animatedLevel by animateFloatAsState(
-            targetValue = latest.level.toFloat(),
-            animationSpec = tween(durationMillis = 700),
-            label = "heroLevel",
-        )
-
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = "%.1f".format(animatedLevel),
-                style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "%",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 10.dp, start = 3.dp),
-            )
-        }
-
-        val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
-
-        Text(
-            text = "± %.1f points, 95%% confidence".format(latest.levelConfidence95),
-            style = MaterialTheme.typography.bodySmall,
-            color = subColour,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-
         Text(
             text = if (calibration.isActive) {
                 "Calibrated to your own scan results."
             } else {
-                "Uncalibrated — add a DEXA or BodPod result to anchor this to your body."
+                "Uncalibrated, add a DEXA or BodPod result to anchor it to your body."
             },
             style = MaterialTheme.typography.bodySmall,
-            color = subColour,
+            color = muted,
             modifier = Modifier.padding(top = 12.dp),
         )
+    }
+}
 
-        // One reading is a dot, not a trend. Reserving the chart's full height for it left
-        // a band of empty white in the middle of the hero card that read as a rendering
-        // fault — the card looked broken rather than early.
-        if (trend.size >= 2) {
-            Sparkline(
-                values = trend.map { it.level },
-                modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-            )
-        } else {
-            Spacer(Modifier.height(16.dp))
-        }
-
-        NoticePill(
-            text = if (latest.isChangeSignificant) {
-                val direction = if (latest.weeklyChange < 0) "down" else "up"
-                "%.2f points per week %s — larger than your noise".format(
-                    abs(latest.weeklyChange),
-                    direction,
-                )
-            } else {
-                "No confirmed change yet"
-            },
+/** "Good evening" and today's date — the dashboard greets before it reports. */
+@Composable
+private fun Greeting() {
+    val now = java.time.LocalDateTime.now()
+    val hello = when (now.hour) {
+        in 5..11 -> "Good morning"
+        in 12..17 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    val date = now.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM"))
+    Column(Modifier.padding(top = 6.dp).entrance(0)) {
+        Text(
+            date,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted,
         )
+        Text(hello, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
@@ -394,6 +402,7 @@ private fun HistorySection(
     loadPhoto: suspend (String) -> Bitmap?,
     analysisFor: (MeasurementEntity) -> CompositionPanel?,
     onDelete: (MeasurementEntity) -> Unit,
+    physiqueFor: suspend (MeasurementEntity) -> com.squeeze.core.scan.PhysiqueReport? = { null },
 ) {
     if (measurements.isEmpty()) return
 
@@ -470,6 +479,7 @@ private fun HistorySection(
                 selected = null
             },
             onDismiss = { selected = null },
+            physiqueFor = physiqueFor,
         )
     }
 }
@@ -520,6 +530,8 @@ private fun EmptyState(
     onStartScan: () -> Unit,
     onAddMeasurement: () -> Unit,
     measurements: List<MeasurementEntity>,
+    /** False when the journey card above already offers the scan, so it is not asked twice. */
+    showScan: Boolean = true,
 ) {
     // Entries can exist while no estimate does, when a scan saved some sites but not the
     // ones the equation needs. Saying "no measurements yet" then is simply false, and it
@@ -531,7 +543,7 @@ private fun EmptyState(
     val subColour = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        BrandCard(Modifier.fillMaxWidth()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(1)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier
@@ -547,7 +559,14 @@ private fun EmptyState(
                 )
             }
 
-            Row(
+            if (!blocked) {
+                com.squeeze.app.ui.components.ScanPulse(
+                    size = 160.dp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp),
+                )
+            }
+
+            if (blocked) Row(
                 modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -593,28 +612,18 @@ private fun EmptyState(
             )
         }
 
-        PrimaryButton(
-            text = "Scan with camera or photos",
-            onClick = onStartScan,
-            leading = {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
-        SecondaryButton(
-            text = "Enter tape measurements",
-            onClick = onAddMeasurement,
-            leading = {
-                Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
-
-        Text(
-            text = "Two measurements are needed before a trend appears, and about three weeks " +
-                "before the app can tell a real change from measurement noise. A tape is more " +
-                "repeatable than any photo method — the scan is faster, the tape is more precise.",
-            style = MaterialTheme.typography.bodySmall,
-            color = subColour,
-        )
+        if (showScan) {
+            PrimaryButton(
+                text = "Scan with camera or photos",
+                onClick = onStartScan,
+                leading = {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
+                },
+            )
+        }
+        androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
+            Text("Prefer a tape measure? Enter measurements instead")
+        }
     }
 }
 

@@ -131,7 +131,7 @@ object LightingQuality {
                     "gone rather than dim. Move out of direct sun or away from a bare bulb."
 
             signature.meanLuminance < MIN_MEAN ->
-                "Too dark to read definition. Face a window, or turn on more light — the " +
+                "Too dark to read definition. Face a window, or turn on more light, the " +
                     "phone's flash will not reach you at this distance."
 
             signature.meanLuminance > MAX_MEAN ->

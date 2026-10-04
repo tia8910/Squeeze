@@ -3,6 +3,7 @@ package com.squeeze.app.data
 import com.squeeze.app.data.db.MeasurementDao
 import com.squeeze.app.data.db.MeasurementEntity
 import com.squeeze.core.bodycomp.BodyFatCalculator
+import com.squeeze.core.scan.LandmarkStature
 import com.squeeze.core.bodycomp.VisualAssessment
 import com.squeeze.core.bodycomp.CalibrationPoint
 import com.squeeze.core.bodycomp.LeanMassPlausibility
@@ -190,6 +191,31 @@ class BodyCompositionRepository @Inject constructor(
                             EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent,
                     )
 
+                    // Scaled from the trunk because the feet were out of frame, so every
+                    // girth in the row rests on an inferred stature. The extra error is not
+                    // a chosen constant: the scale uncertainty is run through the equation's
+                    // own coefficients and added in quadrature to the method's published
+                    // figure. At five per cent that is about 1.8 points for a man.
+                    //
+                    // Wider than a measured scan, and far narrower than the alternative —
+                    // before this source existed such a photograph produced no centimetres
+                    // at all, so the fusion fell back to the outline's nine-point bound,
+                    // which is the same value for every body that reaches it.
+                    MeasurementSource.PHOTO_TRUNK_SCALED.name -> {
+                        val base = EstimationMethod.PHOTO_FRONT_ONLY.standardErrorPercent
+                        val fromScale = BodyFatCalculator.navyScaleSensitivityPercent(
+                            profile,
+                            entity.toCircumferences(),
+                            LandmarkStature.TRUNK_SPAN_SCALE_ERROR,
+                        ) ?: 0.0
+                        navy.copy(
+                            method = EstimationMethod.PHOTO_FRONT_ONLY,
+                            standardErrorPercent = kotlin.math.sqrt(
+                                base * base + fromScale * fromScale,
+                            ),
+                        )
+                    }
+
                     else -> navy
                 }
             }
@@ -245,7 +271,11 @@ class BodyCompositionRepository @Inject constructor(
         // BMI fallback out of the answer, and to refuse the record outright when nothing
         // photo-derived survived.
         val fromPhoto = entity.source == MeasurementSource.PHOTO.name ||
-            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name
+            entity.source == MeasurementSource.PHOTO_FRONT_ONLY.name ||
+            // A trunk-scaled row is still a photograph's answer, and must keep the BMI
+            // fallback out for exactly the reason the other two do: leaving it in returned
+            // one number for every scan of one body at one weight.
+            entity.source == MeasurementSource.PHOTO_TRUNK_SCALED.name
 
         // The BMI fallback, and **only where a photograph is not the question**.
         //
@@ -349,6 +379,29 @@ class BodyCompositionRepository @Inject constructor(
         //
         // Tape and skinfold entries are untouched: for those the BMI fallback is what it was
         // always documented to be, a first-run placeholder before anything has been measured.
+        // **On a photo scan, the on-device model's reading is the answer.**
+        //
+        // Every other candidate a photograph produces reads the body's edge — its girths,
+        // its outline — and the edge cannot tell a stage-lean body from a soft one with the
+        // same waist; both test photographs came out at a waist-to-height of 0.42. Blending
+        // them in pulled the stage-lean bodybuilder from the model's 7.0% to 8.1%, and put a
+        // man the model read at about 15% on 12.1% because the tape equation, fed girths that
+        // read small, said 10.3%. The appearance reading goes into the column the scan
+        // screen writes it to; a band the user picked themselves lands in the same column
+        // and is taken the same way, as their own call.
+        //
+        // A reference scan still outranks it. That is a measurement of the answer rather
+        // than an estimate of it, and it is what calibration fits the model against.
+        if (fromPhoto) {
+            val answer = candidates.firstOrNull { it.method == EstimationMethod.REFERENCE_SCAN }
+                ?: candidates.firstOrNull { it.method == EstimationMethod.VISUAL_ASSESSMENT }
+            if (answer != null) {
+                return LeanMassPlausibility.filter(listOf(answer), profile, entity.weightKg)
+                    .firstOrNull()
+                    ?: LeanMassPlausibility.clampToRange(answer, profile, entity.weightKg)
+            }
+        }
+
         val photoDerived = candidates.any {
             it.method == EstimationMethod.PHOTO_SHAPE ||
                 it.method == EstimationMethod.PHOTO_SILHOUETTE ||
@@ -443,6 +496,7 @@ class BodyCompositionRepository @Inject constructor(
          * produces a dozen.
          */
         const val SHAPE_DISAGREEMENT_POINTS = 6.0
+
 
         /**
          * Within-day bodyweight scatter, as a fraction of bodyweight.

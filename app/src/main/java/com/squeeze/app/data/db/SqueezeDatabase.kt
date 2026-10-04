@@ -16,8 +16,10 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MesocycleEntity::class,
         ProfileEntity::class,
         DefinitionLabelEntity::class,
+        PhysiqueReadEntity::class,
+        ActivitySessionEntity::class,
     ],
-    version = 9,
+    version = 12,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -26,6 +28,8 @@ abstract class SqueezeDatabase : RoomDatabase() {
     abstract fun mesocycleDao(): MesocycleDao
     abstract fun profileDao(): ProfileDao
     abstract fun definitionLabelDao(): DefinitionLabelDao
+    abstract fun physiqueDao(): PhysiqueDao
+    abstract fun activityDao(): ActivityDao
 }
 
 /**
@@ -149,6 +153,39 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /** Training days on the profile, and the AI physique reads that feed training and nutrition. */
+    private val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN trainingDaysPerWeek INTEGER")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS physique_reads (" +
+                    "epochDay INTEGER NOT NULL, goal TEXT NOT NULL, scores TEXT NOT NULL, " +
+                    "PRIMARY KEY(epochDay))",
+            )
+        }
+    }
+
+    /** Chosen sports and favourite foods on the profile, and a log for every sport. */
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN disciplines TEXT")
+            db.execSQL("ALTER TABLE profile ADD COLUMN favouriteFoods TEXT")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS activity_sessions (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, epochDay INTEGER NOT NULL, " +
+                    "sport TEXT NOT NULL, title TEXT NOT NULL, minutes INTEGER NOT NULL, " +
+                    "intensity TEXT NOT NULL, distanceKm REAL, netKcal INTEGER NOT NULL)",
+            )
+        }
+    }
+
+    /** The user's usual training time, which times the meals around the session. */
+    private val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profile ADD COLUMN trainingTime TEXT")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -165,6 +202,9 @@ object SqueezeDatabaseFactory {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to

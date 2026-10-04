@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,6 +33,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -92,10 +94,10 @@ fun BrandCard(
     Column(
         modifier = modifier
             .shadow(
-                elevation = 10.dp,
+                elevation = 8.dp,
                 shape = shape,
-                ambientColor = Brand.Navy.copy(alpha = 0.5f),
-                spotColor = Brand.Navy.copy(alpha = 0.5f),
+                ambientColor = Brand.Navy.copy(alpha = 0.22f),
+                spotColor = Brand.Navy.copy(alpha = 0.22f),
             )
             .clip(shape)
             .background(cardFill())
@@ -200,9 +202,21 @@ fun PrimaryButton(
     enabled: Boolean = true,
     leading: @Composable (() -> Unit)? = null,
 ) {
+    val source = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    // A slow band of light across the button: the one place the eye should go.
+    val shine = androidx.compose.animation.core.rememberInfiniteTransition(label = "shine")
+    val sweep by shine.animateFloat(
+        initialValue = -0.6f,
+        targetValue = 1.6f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            tween(durationMillis = 3_200, delayMillis = 1_400, easing = LinearOutSlowInEasing),
+        ),
+        label = "sweep",
+    )
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        interactionSource = source,
+        modifier = modifier.fillMaxWidth().height(54.dp).pressScale(source),
         enabled = enabled,
         shape = RoundedCornerShape(SqueezeShape.TileRadius),
         contentPadding = PaddingValues(),
@@ -219,10 +233,28 @@ fun PrimaryButton(
                 .background(
                     Brush.linearGradient(
                         listOf(
+                            Brand.IconBlueLight,
                             MaterialTheme.colorScheme.primary,
                             if (LocalIsDarkTheme.current) Brand.Blue else Brand.BlueDeep,
                         ),
                     ),
+                )
+                .then(
+                    if (enabled) {
+                        Modifier.drawWithContent {
+                            drawContent()
+                            val x = size.width * sweep
+                            drawRect(
+                                Brush.linearGradient(
+                                    listOf(Color.Transparent, Color.White.copy(alpha = 0.28f), Color.Transparent),
+                                    start = androidx.compose.ui.geometry.Offset(x - size.height * 1.5f, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(x + size.height * 1.5f, size.height),
+                                ),
+                            )
+                        }
+                    } else {
+                        Modifier.graphicsLayer { alpha = 0.45f }
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -231,7 +263,7 @@ fun PrimaryButton(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 leading?.invoke()
-                Text(text, style = MaterialTheme.typography.labelLarge, color = Color.White)
+                Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
@@ -382,12 +414,24 @@ fun HeroMetric(
         )
 
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = if (dark) Brand.DarkInk else Brand.Navy,
-            )
+            // A number counts up to itself, so a fresh result reads as computed. Anything
+            // that is not a plain number ("--", a range) is shown as it is.
+            val numeric = value.replace(",", "").toDoubleOrNull()
+            if (numeric != null) {
+                AnimatedNumber(
+                    value = numeric,
+                    decimals = value.substringAfter('.', "").length.takeIf { '.' in value } ?: 0,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = if (dark) Brand.DarkInk else Brand.Navy,
+                )
+            } else {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (dark) Brand.DarkInk else Brand.Navy,
+                )
+            }
             if (unit.isNotEmpty()) {
                 Text(
                     text = unit,
@@ -466,4 +510,160 @@ fun Arriving(
     Box(modifier.graphicsLayer { this.alpha = alpha; translationY = offset.toPx() }) {
         content()
     }
+}
+
+/**
+ * The premium surface: a deep blue gradient with drifting light, white content. For the one
+ * card per screen that says what to do next — used twice on a screen it stops meaning that.
+ */
+@Composable
+fun HeroCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(SqueezeShape.CardRadius)
+    val glow = androidx.compose.animation.core.rememberInfiniteTransition(label = "hero")
+    val drift by glow.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            tween(9_000, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "drift",
+    )
+    Column(
+        modifier = modifier
+            .shadow(16.dp, shape, ambientColor = Brand.Blue.copy(alpha = 0.6f), spotColor = Brand.Blue.copy(alpha = 0.6f))
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(Brand.IconBlueDeep, Brand.BlueDeep, Brand.Navy)))
+            .drawWithContent {
+                val c = androidx.compose.ui.geometry.Offset(size.width * (0.2f + 0.7f * drift), size.height * 0.1f)
+                val r = size.maxDimension * 0.8f
+                drawCircle(Brush.radialGradient(listOf(Brand.IconBlueLight.copy(alpha = 0.55f), Color.Transparent), c, r), r, c)
+                drawContent()
+            }
+            .padding(SqueezeShape.CardPadding),
+        content = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides Color.White,
+            ) { content() }
+        },
+    )
+}
+
+/** The white-on-blue action inside a [HeroCard]. */
+@Composable
+fun HeroButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val source = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Button(
+        onClick = onClick,
+        interactionSource = source,
+        modifier = modifier.fillMaxWidth().height(52.dp).pressScale(source),
+        shape = RoundedCornerShape(SqueezeShape.TileRadius),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Brand.BlueDeep),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * A pill switcher: options side by side on a recessed track, the chosen one filled in blue.
+ * For two to four mutually exclusive views or settings.
+ */
+@Composable
+fun SegmentedControl(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dark = LocalIsDarkTheme.current
+    val track = RoundedCornerShape(16.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(track)
+            .background(cardFill())
+            .border(1.dp, lineColour(), track)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEachIndexed { i, label ->
+            val on = i == selected
+            val fill by androidx.compose.animation.animateColorAsState(
+                if (on) MaterialTheme.colorScheme.primary else Color.Transparent,
+                label = "segment",
+            )
+            val source = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .pressScale(source)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(fill)
+                    .clickable(interactionSource = source, indication = null, role = androidx.compose.ui.semantics.Role.Tab) { onSelect(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = when {
+                        on -> if (dark) Brand.DarkGround else Color.White
+                        dark -> Brand.DarkMuted
+                        else -> Brand.Muted
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The app's filter chip: Material's, but a chosen chip is filled solid blue with a tick, so
+ * it reads as chosen at a glance. Material's default — a pale tint and the same label colour —
+ * left a ticked food looking almost identical to an unticked one.
+ */
+@Composable
+fun FilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    leadingIcon: @Composable (() -> Unit)? = null,
+) {
+    androidx.compose.material3.FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        modifier = modifier,
+        enabled = enabled,
+        leadingIcon = leadingIcon ?: if (selected) {
+            {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.height(18.dp),
+                )
+            }
+        } else {
+            null
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+            selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+            enabled = enabled,
+            selected = selected,
+            borderColor = lineColour(),
+            selectedBorderColor = Color.Transparent,
+        ),
+    )
 }

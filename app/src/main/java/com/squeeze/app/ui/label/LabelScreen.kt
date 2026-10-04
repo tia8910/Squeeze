@@ -12,7 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import com.squeeze.app.ui.components.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -99,7 +99,7 @@ fun LabelScreen(viewModel: LabelViewModel = hiltViewModel()) {
             }
 
             state.subject == null -> NoticePill(
-                "No scan photographs left to judge. Take a scan and come back — every scan " +
+                "No scan photographs left to judge. Take a scan and come back, every scan " +
                     "keeps its photo, so the set grows as you use the app.",
             )
 

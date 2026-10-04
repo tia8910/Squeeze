@@ -30,7 +30,7 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 /** Applied to every response. Cheap, and there is no reason for the site to be framed. */
-const SECURITY_HEADERS: Record<string, string> = {
+export const SECURITY_HEADERS: Record<string, string> = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
   "x-frame-options": "DENY",
