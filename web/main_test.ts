@@ -33,8 +33,8 @@ Deno.test("privacy policy is reachable and states the core claim", async () => {
 
     assert(response.status === 200, `${path} returned ${response.status}`);
     assert(
-      body.includes("android.permission.INTERNET"),
-      `${path} does not name the permission the whole claim rests on`,
+      body.includes("drive.appdata") && body.includes("never uploaded"),
+      `${path} does not state what leaves the phone and what never does`,
     );
   }
 });
