@@ -148,7 +148,10 @@ jobs:
           set -o pipefail
           ./gradlew :app:bundleRelease --no-daemon 2>&1 | tee release.log || {
             # GitHub keeps ten annotations per step: spend them on the reason, not a trace.
-            awk '/What went wrong/{f=1;next} /\* Try:/{f=0} f' release.log \
+            # R8 lists the keep/dontwarn rules it is missing in missing_rules.txt; when it
+            # exists it is the whole answer.
+            { cat app/build/outputs/mapping/release/missing_rules.txt 2>/dev/null | grep -v "^#" || true
+              awk '/What went wrong/{f=1;next} /\* Try:/{f=0} f' release.log; } \
               | grep -v "^\s*$" | head -n 9 | while IFS= read -r line; do
               echo "::error::${line//%/%25}"
             done
