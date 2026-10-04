@@ -39,7 +39,7 @@ Upload the first AAB with Play App Signing on (the default). Then:
 1. Play Console › Test and release › App integrity › copy the **App signing key** SHA-1
    (and the upload key SHA-1).
 2. Google Cloud, project **Squeeze** (71286678065) › Clients › Create client › Android:
-   package `com.squeeze.app`, the App signing SHA-1. Add a second one with the upload key
+   package `fit.squeeze.app`, the App signing SHA-1. Add a second one with the upload key
    SHA-1 if you will install release builds outside Play.
 3. Google Auth Platform › Audience: **Publish app** (move out of Testing) so any Google
    account can sign in. `drive.appdata` is a non sensitive scope, so no verification review

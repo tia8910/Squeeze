@@ -40,7 +40,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.squeeze.app"
+        // The Play Store ID. com.squeeze.app was already taken on Play; this is squeeze.fit
+        // reversed. The Kotlin namespace above stays com.squeeze.app; only the ID changes.
+        applicationId = "fit.squeeze.app"
         minSdk = 26
         // Play requires new apps and updates to target the latest Android within a year of
         // its release; Android 16 is API 36.
