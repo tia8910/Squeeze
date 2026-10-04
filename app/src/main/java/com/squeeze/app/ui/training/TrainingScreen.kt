@@ -41,6 +41,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.layout.width
 import com.squeeze.core.program.TrainingWeek
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.CenterFocusWeak
+import androidx.compose.material.icons.rounded.TrendingUp
+import com.squeeze.app.ui.theme.LocalIsDarkTheme
+import com.squeeze.app.ui.theme.Brand
+import com.squeeze.app.ui.components.entrance
 
 @Composable
 fun TrainingScreen(
@@ -111,6 +128,7 @@ fun TrainingScreen(
             nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
 
             val todayIndex = java.time.LocalDate.now().dayOfWeek.value - 1
+            WeekStrip(week, todayIndex)
             TodayCard(week.days[todayIndex], onStart = { session -> viewModel.startLog(session); onLog() })
 
             // Asked once for anyone whose week predates the question; afterwards it lives in
@@ -131,18 +149,23 @@ fun TrainingScreen(
 
             if (state.volume.isNotEmpty()) VolumeCard(state.volume)
 
-            com.squeeze.app.ui.components.BrandRow(onClick = onProgress) {
-                Column(Modifier.weight(1f)) {
-                    Text("Your progress", style = MaterialTheme.typography.titleSmall)
-                    Text("Progressive overload on every lift · workout summaries", style = MaterialTheme.typography.bodySmall)
-                }
-                Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionTile(
+                    icon = androidx.compose.material.icons.Icons.Rounded.TrendingUp,
+                    title = "Your progress",
+                    detail = "Overload on every lift",
+                    onClick = onProgress,
+                    modifier = Modifier.weight(1f),
+                )
+                ActionTile(
+                    icon = androidx.compose.material.icons.Icons.Rounded.CenterFocusWeak,
+                    title = "Scan a machine",
+                    detail = "How to use it, sets & reps",
+                    onClick = onScanMachine,
+                    modifier = Modifier.weight(1f),
+                )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton(text = "Log a workout", onClick = onLog, modifier = Modifier.weight(1f))
-                SecondaryButton(text = "Scan a machine", onClick = onScanMachine, modifier = Modifier.weight(1f))
-            }
+            SecondaryButton(text = "Log any workout", onClick = onLog)
 
             Expandable("How your week was built") {
                 week.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
@@ -440,27 +463,136 @@ private fun TrainingTimeSection(state: TrainingUiState, viewModel: TrainingViewM
     }
 }
 
-/** Today's sessions, with one button to start and log. */
+/** The seven days at a glance: today in blue, rest days marked, training days dotted. */
 @Composable
-private fun TodayCard(day: PlannedDay, onStart: (PlannedSession) -> Unit) {
-    BrandCard(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("TODAY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            if (day.rest) {
-                Text("Rest day", style = MaterialTheme.typography.titleLarge)
-                Text("Recovery is where training turns into results. Walk, stretch, sleep well.", style = MaterialTheme.typography.bodySmall)
-            } else {
-                day.sessions.forEach { session ->
-                    Text(session.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "${session.minutes} min · ${session.intensity.label.lowercase()}" +
-                            session.items.firstOrNull()?.let { " · starts with ${it.name}" }.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
+private fun WeekStrip(week: HybridWeek, todayIndex: Int) {
+    val dark = LocalIsDarkTheme.current
+    val muted = if (dark) Brand.DarkMuted else Brand.Muted
+    val line = if (dark) Brand.DarkLine else Brand.Line
+    Row(Modifier.fillMaxWidth().entrance(0), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        week.days.forEach { day ->
+            val today = day.index == todayIndex
+            val shape = RoundedCornerShape(14.dp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(shape)
+                    .background(if (today) MaterialTheme.colorScheme.primary else if (dark) Brand.DarkCard else Brand.Card)
+                    .border(1.dp, if (today) Color.Transparent else line, shape)
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    day.name.take(3),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (today) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = if (today) Color.White else muted,
+                )
+                when {
+                    day.rest -> Text("rest", style = MaterialTheme.typography.labelSmall, color = if (today) Color.White else muted)
+                    else -> Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (today) Color.White else MaterialTheme.colorScheme.primary.copy(alpha = if (day.index < todayIndex) 0.35f else 1f)),
                     )
-                    PrimaryButton(text = "Start & log", onClick = { onStart(session) })
                 }
             }
         }
+    }
+}
+
+/** Today's sessions, each with its exercises in order and one button to start and log. */
+@Composable
+private fun TodayCard(day: PlannedDay, onStart: (PlannedSession) -> Unit) {
+    val dark = LocalIsDarkTheme.current
+    val muted = if (dark) Brand.DarkMuted else Brand.Muted
+    val row = if (dark) Brand.DarkSunken else Brand.RowFill
+    val amber = Color(0xFFF59E0B)
+    BrandCard(Modifier.fillMaxWidth().entrance(1)) {
+        if (day.rest) {
+            Text("TODAY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("Rest day", style = MaterialTheme.typography.headlineSmall)
+            Text("Recovery is where training turns into results. Walk, stretch, sleep well.", style = MaterialTheme.typography.bodySmall, color = muted)
+            return@BrandCard
+        }
+        day.sessions.forEachIndexed { s, session ->
+            if (s > 0) Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text("TODAY · ${session.discipline.label.uppercase()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(session.title, style = MaterialTheme.typography.headlineSmall)
+                    Text("${session.minutes} min · ${session.intensity.label.lowercase()}", style = MaterialTheme.typography.bodySmall, color = muted)
+                }
+                session.items.firstOrNull { it.weakPoint }?.group?.let { g ->
+                    Text(
+                        "${g.name.lowercase().replaceFirstChar { it.uppercase() }} focus",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (dark) Color(0xFFF8B84A) else Color(0xFFB45309),
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(amber.copy(alpha = 0.15f)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
+            Column(Modifier.padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                session.items.take(5).forEachIndexed { i, item ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(row).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(if (item.weakPoint) amber.copy(alpha = 0.18f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "${i + 1}",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (item.weakPoint) (if (dark) Color(0xFFF8B84A) else Color(0xFFB45309)) else MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(item.name, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                item.prescription?.let { "${it.sets} × ${it.reps.first}–${it.reps.last}" } ?: item.detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = muted,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                if (session.items.size > 5) {
+                    Text("+ ${session.items.size - 5} more", style = MaterialTheme.typography.bodySmall, color = muted)
+                }
+            }
+            PrimaryButton(text = "Start & log", onClick = { onStart(session) })
+        }
+    }
+}
+
+/** A square shortcut: icon, title, one line. */
+@Composable
+private fun ActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
+    BrandCard(modifier.clickable(onClick = onClick), contentPadding = 14.dp) {
+        Box(
+            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        }
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 1)
     }
 }
 

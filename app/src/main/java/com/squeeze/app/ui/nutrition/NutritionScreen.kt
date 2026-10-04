@@ -27,6 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squeeze.app.ui.components.entrance
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -101,11 +104,11 @@ fun NutritionScreen(
                 )
                 nextStep?.let { com.squeeze.app.ui.components.NextStepBanner(it, onNextStep) }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Today", "Meals", "Details").forEachIndexed { i, label ->
-                        FilterChip(selected = tab == i, onClick = { tab = i }, label = { Text(label) })
-                    }
-                }
+                com.squeeze.app.ui.components.SegmentedControl(
+                    options = listOf("Today", "Meals", "Details"),
+                    selected = tab,
+                    onSelect = { tab = it },
+                )
 
                 when (tab) {
                     0 -> TodayTab(context, state.showTrainingDay, viewModel::showTrainingDay)
@@ -150,27 +153,45 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
     val plan = context.plan
     val day = if (trainingDay) plan.trainingDay else plan.restDay
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected = trainingDay, onClick = { onDayType(true) }, label = { Text("Training day") })
-        FilterChip(selected = !trainingDay, onClick = { onDayType(false) }, label = { Text("Rest day") })
-    }
+    com.squeeze.app.ui.components.SegmentedControl(
+        options = listOf("Training day", "Rest day"),
+        selected = if (trainingDay) 0 else 1,
+        onSelect = { onDayType(it == 0) },
+    )
 
-    BrandCard(Modifier.fillMaxWidth()) {
-        HeroMetric(
-            value = "%,d".format(day.calories),
-            unit = "kcal",
-            label = if (trainingDay) "On training days" else "On rest days",
-            band = "Maintenance ≈ %,d kcal".format(plan.maintenanceCalories),
-        )
-        Box(Modifier.height(12.dp))
-        MacroBar(day)
-        Box(Modifier.height(12.dp))
-        StatRow {
-            StatTile("${day.proteinG} g", "Protein", Modifier.weight(1f), tinted = true)
-            StatTile("${day.carbsG} g", "Carbs", Modifier.weight(1f))
-            StatTile("${day.fatG} g", "Fat", Modifier.weight(1f))
+    BrandCard(Modifier.fillMaxWidth().entrance(0)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // The ring is the day's target against maintenance: full at maintenance, short
+            // of it in a deficit, past it (capped) in a surplus.
+            com.squeeze.app.ui.components.ProgressRing(
+                progress = (day.calories.toFloat() / plan.maintenanceCalories.coerceAtLeast(1)).coerceIn(0f, 1f),
+                size = 124.dp,
+                stroke = 12.dp,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    com.squeeze.app.ui.components.AnimatedNumber(
+                        value = day.calories.toDouble(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text("kcal target", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Column(Modifier.weight(1f).padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val total = (day.proteinG * 4f + day.carbsG * 4f + day.fatG * 9f).coerceAtLeast(1f)
+                MacroLine("Protein", day.proteinG, day.proteinG * 4f / total, com.squeeze.app.ui.theme.Brand.IconBlueLight)
+                MacroLine("Carbs", day.carbsG, day.carbsG * 4f / total, MaterialTheme.colorScheme.primary)
+                MacroLine("Fat", day.fatG, day.fatG * 9f / total, com.squeeze.app.ui.theme.Brand.OutlineBlue)
+            }
         }
-        Box(Modifier.height(10.dp))
+        Text(
+            "Maintenance ≈ %,d kcal".format(plan.maintenanceCalories),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        Box(Modifier.height(6.dp))
         Text(
             "Water ${plan.waterLitres} L · Fibre ${plan.fiberG} g · Sodium ${"%,d".format(plan.sodiumMg)} mg",
             style = MaterialTheme.typography.bodySmall,
@@ -186,13 +207,99 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
     plan.warnings.take(2).forEach { warning ->
         Text("• $warning", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
+    // Today's meals, in the order they are eaten, the one around training marked.
+    val today = java.time.LocalDate.now().dayOfWeek.value - 1
+    plan.week.getOrNull(today)?.let { MealTimeline(it.meals) }
+
     val gaps = plan.micros.filter { it.short }
-    if (gaps.isNotEmpty()) {
-        Text(
-            "Watch this week: ${gaps.joinToString { it.nutrient.label.lowercase() }} — see Details.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    gaps.firstOrNull()?.let { gap ->
+        val amber = androidx.compose.ui.graphics.Color(0xFFF59E0B)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(amber.copy(alpha = 0.12f))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${(gap.supplied / gap.target * 100).toInt()}%",
+                style = MaterialTheme.typography.titleLarge,
+                color = if (com.squeeze.app.ui.theme.LocalIsDarkTheme.current) androidx.compose.ui.graphics.Color(0xFFF8B84A) else androidx.compose.ui.graphics.Color(0xFFB45309),
+            )
+            Text(
+                "${gap.nutrient.label} is short this week" +
+                    (if (gaps.size > 1) " (and ${gaps.size - 1} more)" else "") + " — see Details for the foods that fix it.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MacroLine(label: String, grams: Int, share: Float, colour: androidx.compose.ui.graphics.Color) {
+    val fill by androidx.compose.animation.core.animateFloatAsState(share, androidx.compose.animation.core.tween(900), label = "macro")
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row {
+            Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            Text("$grams g", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box(
+            Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.outline),
+        ) {
+            Box(Modifier.fillMaxWidth(fill.coerceIn(0.02f, 1f)).fillMaxHeight().clip(RoundedCornerShape(50)).background(colour))
+        }
+    }
+}
+
+/** A day's meals as a timeline: a dot per meal, the line joining them, cards beside. */
+@Composable
+private fun MealTimeline(meals: List<Meal>) {
+    val line = MaterialTheme.colorScheme.outline
+    Column {
+        meals.forEachIndexed { i, meal ->
+            val training = meal.name == "Around training"
+            Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                Column(Modifier.width(22.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .padding(top = 18.dp)
+                            .size(14.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (training) MaterialTheme.colorScheme.primary else line),
+                    )
+                    if (i < meals.lastIndex) {
+                        Box(Modifier.width(2.dp).weight(1f).background(line))
+                    }
+                }
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp, bottom = 8.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(
+                            if (training) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                        )
+                        .border(1.dp, if (training) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else line, RoundedCornerShape(18.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    Row {
+                        Text(if (training) "Pre/post-workout" else meal.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        Text(
+                            "${meal.macros.calories} kcal · ${meal.macros.proteinG} g P",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (training) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        meal.items.joinToString(" · ") { "${it.food} ${it.grams} g".replace(" (not counted)", "") },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -397,6 +504,6 @@ private fun WeekSection(context: NutritionContext, selected: Int, onSelect: (Int
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        day.meals.forEach { MealCard(it) }
+        MealTimeline(day.meals)
     }
 }

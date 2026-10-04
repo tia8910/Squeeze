@@ -617,6 +617,9 @@ private fun goalName(goal: Goal): String = when (goal) {
     Goal.MAKE_WEIGHT -> "Make weight"
 }
 
+/** Amber for "needs work": distinct from the blue accent in lightness as well as hue. */
+private val FocusAmber = Color(0xFFF59E0B)
+
 /**
  * The AI's physique analysis on the result screen: every group it judged, the strengths and
  * weak points for the user's goal, and what to do about each weak point.
@@ -629,130 +632,134 @@ fun PhysiqueCard(
     /** Whole-body findings from the measurements — waist-to-height, body fat, lean mass. */
     measured: List<com.squeeze.core.bodycomp.BodyFinding> = emptyList(),
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PulsingDot(active = false)
-                Text(
-                    "AI physique analysis",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 10.dp),
-                )
-            }
-            Text(
-                "Goal: ${goalName(report.goal)} · ${report.summary}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            report.scores.forEach { score ->
-                Column {
-                    WeightBar(
-                        label = score.group.label,
-                        weight = score.score.toFloat(),
-                        strongest = score.development == Development.DEVELOPED,
-                    )
-                    val change = previous?.second?.get(score.group)?.let { score.score - it }
-                    val since = previous?.first?.let {
-                        java.time.LocalDate.ofEpochDay(it)
-                            .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
-                    }
-                    val moved = change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
-                        " · ${if (it > 0) "▲" else "▼"} ${(kotlin.math.abs(it) * 100).toInt()} since $since"
-                    }.orEmpty()
-                    Text(
-                        score.development.label + moved,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (score.development) {
-                            Development.DEVELOPED -> MaterialTheme.colorScheme.primary
-                            Development.AVERAGE -> MaterialTheme.colorScheme.onSurfaceVariant
-                            Development.LAGGING -> MaterialTheme.colorScheme.error
-                        },
-                        modifier = Modifier.padding(start = 2.dp),
-                    )
-                }
-            }
-
-            if (report.hidden.isNotEmpty()) {
-                Text(
-                    "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered by " +
-                        "clothing or out of frame in this photo. Scan with them bare to include them.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Text("Strengths", style = MaterialTheme.typography.titleSmall)
-            if (report.strengths.isEmpty()) {
-                Text(
-                    "None stands out yet — that is normal early on, and it is what training fixes.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            report.strengths.forEach { group ->
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("✓ ${group.label}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    report.strengthEvidence[group]?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            Text("Weak points for your goal", style = MaterialTheme.typography.titleSmall)
-            if (report.focus.isEmpty()) {
-                Text(
-                    "Nothing is lagging for this goal. Keep every group progressing.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            report.focus.forEachIndexed { index, advice ->
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        "${index + 1}. ${advice.group.label}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(advice.why, style = MaterialTheme.typography.bodyMedium)
-                    report.weaknessEvidence[advice.group]?.let {
-                        Text("Measured: $it", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Text(
-                        advice.how,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            if (measured.isNotEmpty()) {
-                Text("From your measurements", style = MaterialTheme.typography.titleSmall)
-                measured.forEach { finding ->
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            (if (finding.kind == com.squeeze.core.bodycomp.FindingKind.STRENGTH) "✓ " else "! ") + finding.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(finding.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            Text(
-                "The on-device model's impression of one front photograph, the way a coach " +
-                    "sizes you up at a glance — not a measurement. Flexing, a pump or harsh " +
-                    "light make a group look bigger, and it cannot see your back. Saving this " +
-                    "scan puts the weak points into your training block and your nutrition " +
-                    "plan; changing your goal re-ranks them.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    val dark = com.squeeze.app.ui.theme.LocalIsDarkTheme.current
+    val muted = if (dark) com.squeeze.app.ui.theme.Brand.DarkMuted else com.squeeze.app.ui.theme.Brand.Muted
+    val track = if (dark) com.squeeze.app.ui.theme.Brand.DarkLine else com.squeeze.app.ui.theme.Brand.Line
+    val amberText = if (dark) Color(0xFFF8B84A) else Color(0xFFB45309)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column {
+            Text("AI PHYSIQUE · ${goalName(report.goal).uppercase()}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(report.summary, style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
         }
+
+        com.squeeze.app.ui.components.BrandCard(Modifier.fillMaxWidth(), contentPadding = 16.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                report.scores.forEach { score ->
+                    val lagging = score.development == Development.LAGGING
+                    val sweep by androidx.compose.animation.core.animateFloatAsState(score.score.toFloat(), androidx.compose.animation.core.tween(900), label = "bar")
+                    val change = previous?.second?.get(score.group)?.let { score.score - it }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(score.group.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(92.dp))
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(track),
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(sweep.coerceIn(0.02f, 1f))
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (lagging) FocusAmber else MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                        Column(Modifier.width(76.dp), horizontalAlignment = Alignment.End) {
+                            Text(
+                                if (score.group == MuscleGroup.ABS && lagging && score.group in report.weaknessEvidence) "Hidden" else score.development.label.replace("Strong point", "Strong"),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = when (score.development) {
+                                    Development.DEVELOPED -> MaterialTheme.colorScheme.primary
+                                    Development.AVERAGE -> muted
+                                    Development.LAGGING -> amberText
+                                },
+                            )
+                            change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
+                                Text(
+                                    "${if (it > 0) "▲" else "▼"} ${(kotlin.math.abs(it) * 100).toInt()}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = muted,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (report.hidden.isNotEmpty()) {
+                    Text(
+                        "Not judged: ${report.hidden.joinToString { it.label.lowercase() }} — covered or out of frame.",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = muted,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(track.copy(alpha = 0.6f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+
+        if (report.focus.isNotEmpty()) {
+            Text("YOUR FOCUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
+        } else {
+            Text("Nothing is lagging for this goal — keep every group progressing.", style = MaterialTheme.typography.bodyMedium)
+        }
+        report.focus.forEachIndexed { index, advice ->
+            com.squeeze.app.ui.components.BrandCard(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
+                Row {
+                    Box(
+                        Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(FocusAmber),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("${index + 1}", fontWeight = FontWeight.ExtraBold, color = Color(0xFF07101F))
+                    }
+                    Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(advice.group.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
+                        Text(report.weaknessEvidence[advice.group] ?: advice.why, style = MaterialTheme.typography.bodySmall, color = muted)
+                        Text(advice.how, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        if (report.strengths.isNotEmpty()) {
+            Text("STRENGTHS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
+            report.strengths.forEach { group ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(
+                        Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF16A34A).copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("✓", color = Color(0xFF16A34A), fontWeight = FontWeight.Bold)
+                    }
+                    Column(Modifier.padding(start = 10.dp)) {
+                        Text(group.label, style = MaterialTheme.typography.titleSmall)
+                        report.strengthEvidence[group]?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
+                    }
+                }
+            }
+        }
+
+        if (measured.isNotEmpty()) {
+            Text("FROM YOUR MEASUREMENTS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
+            measured.forEach { finding ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        (if (finding.kind == com.squeeze.core.bodycomp.FindingKind.STRENGTH) "✓ " else "! ") + finding.title,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(finding.detail, style = MaterialTheme.typography.bodySmall, color = muted)
+                }
+            }
+        }
+
+        Text(
+            "Read by the on-device AI from one front photo — a coach's first look, not a " +
+                "measurement. Flexing or harsh light change it, and it cannot see your back.",
+            style = MaterialTheme.typography.bodySmall,
+            color = muted,
+        )
     }
 }

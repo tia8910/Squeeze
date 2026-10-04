@@ -132,7 +132,9 @@ class CoachRepository @Inject constructor(
                 trainingTime = trainingTime(),
                 trainingToday = trainingToday,
                 weakPoints = report?.weaknesses?.map { it.label }.orEmpty(),
-                microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
+                fuel = nutrition?.plan?.let { if (trainingToday) it.trainingDay else it.restDay },
+            trainingToday = trainingToday,
+            microGaps = nutrition?.plan?.micros?.filter { it.short }?.map { it.nutrient.label }.orEmpty(),
                 proteinG = nutrition?.plan?.trainingDay?.proteinG,
                 epochDay = LocalDate.now().toEpochDay(),
             ),
@@ -542,6 +544,9 @@ data class DashboardSummary(
     val goalRate: Double?,
     /** Coaching tips for today: what today holds first, then one for the goal. */
     val tips: List<String> = emptyList(),
+    /** Today's targets, as numbers, for the dashboard tiles. */
+    val fuel: com.squeeze.core.nutrition.Macros? = null,
+    val trainingToday: Boolean = false,
     val trainingTime: TrainingTime? = null,
 )
 

@@ -93,10 +93,10 @@ fun BrandCard(
     Column(
         modifier = modifier
             .shadow(
-                elevation = 10.dp,
+                elevation = 8.dp,
                 shape = shape,
-                ambientColor = Brand.Navy.copy(alpha = 0.5f),
-                spotColor = Brand.Navy.copy(alpha = 0.5f),
+                ambientColor = Brand.Navy.copy(alpha = 0.22f),
+                spotColor = Brand.Navy.copy(alpha = 0.22f),
             )
             .clip(shape)
             .background(cardFill())
@@ -563,5 +563,59 @@ fun HeroButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Brand.BlueDeep),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * A pill switcher: options side by side on a recessed track, the chosen one filled in blue.
+ * For two to four mutually exclusive views or settings.
+ */
+@Composable
+fun SegmentedControl(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dark = LocalIsDarkTheme.current
+    val track = RoundedCornerShape(16.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(track)
+            .background(cardFill())
+            .border(1.dp, lineColour(), track)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEachIndexed { i, label ->
+            val on = i == selected
+            val fill by androidx.compose.animation.animateColorAsState(
+                if (on) MaterialTheme.colorScheme.primary else Color.Transparent,
+                label = "segment",
+            )
+            val source = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .pressScale(source)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(fill)
+                    .clickable(interactionSource = source, indication = null, role = androidx.compose.ui.semantics.Role.Tab) { onSelect(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = when {
+                        on -> if (dark) Brand.DarkGround else Color.White
+                        dark -> Brand.DarkMuted
+                        else -> Brand.Muted
+                    },
+                )
+            }
+        }
     }
 }

@@ -63,6 +63,8 @@ import com.squeeze.app.ui.onboarding.OnboardingScreen
 import com.squeeze.app.ui.scan.ScanScreen
 import com.squeeze.app.ui.settings.SettingsScreen
 import com.squeeze.app.ui.theme.Brand
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import com.squeeze.app.ui.components.pressScale
 import androidx.compose.ui.graphics.graphicsLayer
 import com.squeeze.core.model.Goal
@@ -442,24 +444,25 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
     val dark = LocalIsDarkTheme.current
 
+    // A floating bar: inset from the edges, rounded, on the card surface — the content
+    // scrolls under the gap around it rather than stopping at a hairline.
+    val barShape = RoundedCornerShape(24.dp)
     Column(
         Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(if (dark) Brand.DarkLine else Brand.Line),
-        )
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .shadow(14.dp, barShape, ambientColor = Brand.Navy.copy(alpha = 0.18f), spotColor = Brand.Navy.copy(alpha = 0.18f))
+                .clip(barShape)
+                .background(if (dark) Brand.DarkCard else Brand.Card)
+                .border(1.dp, if (dark) Brand.DarkLine else Brand.Line, barShape)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Destination.entries.forEach { destination ->
@@ -496,7 +499,7 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
                     modifier = Modifier
                         .weight(1f)
                         .pressScale(interaction)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(pill)
                         .clickable(
                             interactionSource = interaction,

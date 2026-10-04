@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
@@ -109,95 +114,153 @@ fun JourneyCard(
         NoticePill("You're all caught up today ✓")
     }
 
-    val lines = buildList {
-        summary.todaysTraining?.let { training ->
-            add(
-                Triple(
-                    "Train",
-                    training + (summary.sessionsPlanned?.let { " · ${summary.sessionsDone}/$it this week" } ?: ""),
-                    onOpenTraining,
-                ),
-            )
-        }
-        summary.fuelToday?.let { add(Triple("Eat", it, onOpenNutrition)) }
-        if (summary.weakPoints.isNotEmpty() || summary.strengths.isNotEmpty()) {
-            add(
-                Triple(
-                    "Focus",
-                    listOfNotNull(
-                        summary.weakPoints.takeIf { it.isNotEmpty() }?.joinToString(),
-                        summary.strengths.takeIf { it.isNotEmpty() }?.let { "strong: ${it.joinToString()}" },
-                    ).joinToString(" · "),
-                    onOpenScan,
-                ),
-            )
+    // Today, as tiles: what to eat, how much protein, and what the AI says to focus on —
+    // each one a door into its tab.
+    val dark = com.squeeze.app.ui.theme.LocalIsDarkTheme.current
+    val muted = if (dark) com.squeeze.app.ui.theme.Brand.DarkMuted else com.squeeze.app.ui.theme.Brand.Muted
+    val fuel = summary.fuel
+    if (fuel != null || summary.todaysTraining != null) {
+        Row(Modifier.fillMaxWidth().entrance(1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            fuel?.let {
+                MetricTile(
+                    icon = Icons.Rounded.Restaurant,
+                    label = if (summary.trainingToday) "EAT · TRAINING DAY" else "EAT TODAY",
+                    value = "%,d".format(it.calories),
+                    unit = "kcal",
+                    detail = "${it.carbsG} C · ${it.fatG} F",
+                    onClick = onOpenNutrition,
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    icon = Icons.Rounded.WaterDrop,
+                    label = "PROTEIN",
+                    value = it.proteinG.toString(),
+                    unit = "g",
+                    detail = "spread over 4 meals",
+                    onClick = onOpenNutrition,
+                    modifier = Modifier.weight(1f),
+                )
+            } ?: summary.todaysTraining?.let { training ->
+                MetricTile(
+                    icon = Icons.Rounded.FitnessCenter,
+                    label = "TRAIN TODAY",
+                    value = summary.sessionsDone.toString(),
+                    unit = "/ ${summary.sessionsPlanned ?: 0} this week",
+                    detail = training,
+                    onClick = onOpenTraining,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
-    if (lines.isNotEmpty()) {
-        BrandCard(Modifier.fillMaxWidth().entrance(1)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("TODAY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                lines.forEachIndexed { i, (label, body, onClick) ->
-                    if (i > 0) HorizontalDivider()
-                    TodayLine(label, body, onClick)
+    if (summary.weakPoints.isNotEmpty() || summary.strengths.isNotEmpty()) {
+        BrandCard(Modifier.fillMaxWidth().entrance(2).clickable(onClick = onOpenScan), contentPadding = 14.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(Icons.Rounded.CenterFocusStrong)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text("AI FOCUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
+                    Text(
+                        listOfNotNull(
+                            summary.weakPoints.takeIf { it.isNotEmpty() }?.joinToString(" · "),
+                        ).joinToString().ifEmpty { "Balanced" },
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    if (summary.strengths.isNotEmpty()) {
+                        Text("Strong: ${summary.strengths.joinToString()}", style = MaterialTheme.typography.bodySmall, color = muted)
+                    }
                 }
+                Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
 
-    if (summary.tips.isNotEmpty()) {
-        BrandCard(Modifier.fillMaxWidth().entrance(2)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("COACH TIPS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                summary.tips.forEach { tip ->
-                    Row {
-                        Text("•", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(16.dp))
-                        Text(tip, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+    if (summary.tips.isNotEmpty()) TipCarousel(summary.tips, Modifier.entrance(3))
+}
+
+/** A small number tile: icon and label, the value, one line under it. */
+@Composable
+private fun MetricTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    unit: String,
+    detail: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dark = com.squeeze.app.ui.theme.LocalIsDarkTheme.current
+    val muted = if (dark) com.squeeze.app.ui.theme.Brand.DarkMuted else com.squeeze.app.ui.theme.Brand.Muted
+    BrandCard(modifier.clickable(onClick = onClick), contentPadding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
         }
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
+            Text(value, style = MaterialTheme.typography.headlineSmall)
+            Text(" $unit", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(bottom = 3.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun TodayLine(label: String, body: String, onClick: () -> Unit) {
+private fun IconBadge(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+    }
+}
+
+/**
+ * One coach tip at a time, sliding to the next every few seconds or on a tap, with dots for
+ * where it is in the set.
+ */
+@Composable
+private fun TipCarousel(tips: List<String>, modifier: Modifier = Modifier) {
+    var index by androidx.compose.runtime.remember(tips) { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(tips) {
+        while (tips.size > 1) {
+            kotlinx.coroutines.delay(6_000)
+            index = (index + 1) % tips.size
+        }
+    }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
     Row(
-        modifier = Modifier
+        modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+            .clickable { index = (index + 1) % tips.size }
+            .padding(14.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         Box(
             Modifier
-                .size(36.dp)
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                .size(30.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                when (label) {
-                    "Train" -> Icons.Rounded.FitnessCenter
-                    "Eat" -> Icons.Rounded.Restaurant
-                    else -> Icons.Rounded.CenterFocusStrong
+            Icon(Icons.Rounded.Lightbulb, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = index,
+                transitionSpec = {
+                    (androidx.compose.animation.slideInHorizontally { it / 3 } + androidx.compose.animation.fadeIn()) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally { -it / 3 } + androidx.compose.animation.fadeOut())
                 },
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
+                label = "tip",
+            ) { i ->
+                Text(tips[i.coerceIn(0, tips.lastIndex)], style = MaterialTheme.typography.bodyMedium)
+            }
+            if (tips.size > 1) PageDots(count = tips.size, current = index)
         }
-        Column(Modifier.padding(start = 12.dp).width(52.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        }
-        Text(
-            body,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
