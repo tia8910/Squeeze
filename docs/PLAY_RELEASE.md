@@ -6,28 +6,30 @@ live on the website.
 
 ## 1. One time setup
 
-### Upload key and GitHub secrets
+### Upload key (no computer needed)
 
-1. Create an upload key on your computer (keep the file and passwords safe, never commit them):
+The Release workflow creates the upload key itself. You add one secret from your phone:
 
-   ```
-   keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10950
-   ```
+1. In a password manager, generate a random password of 32 or more characters and save it
+   there as "Squeeze upload key". **If it is lost, the key is lost** (Play can reset an
+   upload key, but it takes a support request).
+2. github.com/tia8910/Squeeze › Settings › Secrets and variables › Actions › New repository
+   secret: name `SIGNING_PASSPHRASE`, value that password.
+3. Actions › **Release** › Run workflow › choose this branch › Run.
 
-2. In GitHub, Settings › Secrets and variables › Actions, add:
+The first run creates the key, encrypts it with the passphrase and commits only the encrypted
+file (`signing/upload.jks.enc`). Every later run decrypts it, so all releases share one key.
+The run's "Upload key" step prints the key's SHA-1 for the Google Cloud Android client.
 
-   | Secret | Value |
-   |---|---|
-   | `KEYSTORE_BASE64` | `base64 -w0 upload.jks` output |
-   | `KEYSTORE_PASSWORD` | the keystore password |
-   | `KEY_ALIAS` | `upload` |
-   | `KEY_PASSWORD` | the key password |
-   | `PLAY_PUBLIC_KEY` | Play Console › Monetise › Monetisation setup › Licensing (base64 RSA key) |
+Later, once the app exists in Play Console, add a second secret `PLAY_PUBLIC_KEY` (Play
+Console › Monetise › Monetisation setup › Licensing) so the app can check purchases itself.
+
+(A key made on a computer still works: set `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS` and `KEY_PASSWORD` instead, and those take priority.)
 
 ### Build the release
 
-Push a tag (`git tag v1.0.0 && git push origin v1.0.0`) or run the **Release** workflow by
-hand. It produces `squeeze-1.0.0.aab` (upload this) plus a signed APK and the R8 mapping file
+Run the **Release** workflow from the Actions tab (or push a tag such as `v1.0.0`). It produces `squeeze-1.0.0.aab` (upload this) plus a signed APK and the R8 mapping file
 in the `squeeze-release` artifact.
 
 ### Play App Signing and Google sign in
