@@ -128,8 +128,17 @@ jobs:
           pip install --quiet onnx==1.17.0 onnxruntime==1.20.1
           python tools/vlm/prepare_clip.py
 
+      # Compiler errors are also raised as annotations, so they can be read from the
+      # check run without downloading the whole log.
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log || {
+            grep -E "^e: " build.log | head -40 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+            exit 1
+          }
 
       - name: Rename APK
         run: |
