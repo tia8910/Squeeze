@@ -207,7 +207,8 @@ private fun ProCard(pro: com.squeeze.app.billing.EntitlementState, onOpenPro: ()
                 color = Color.White,
             )
             Text(
-                if (paid) "Manage or cancel in Google Play" else "Training, nutrition, coaching and backup",
+                if (pro.plan == com.squeeze.app.billing.Products.REVIEW_ACCESS) "Unlocked with an access code"
+                else if (paid) "Manage or cancel in Google Play" else "Training, nutrition, coaching and backup",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
             )

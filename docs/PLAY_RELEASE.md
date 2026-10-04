@@ -97,16 +97,18 @@ PRIVATE BY DESIGN
 
 **Ads:** No.
 
-**App access:** Choose *Yes, some parts are restricted* (Pro features need a subscription).
-Add one instruction set, name "Squeeze Pro", no username or password, and this text:
+**App access:** Choose *Yes, some parts are restricted*. Play reviewers cannot buy or start
+free trials, so the app has a reviewer access code (only its hash is in this repository; the
+code itself is kept private). Add one instruction set, name "Squeeze Pro", username empty,
+password the access code, and this text:
 
-> No account or login is needed. The body scan works for everyone. Training, Nutrition,
-> Log, Machine scan and Drive backup are part of Squeeze Pro, a Google Play subscription
-> with a 7 day free trial. To review them, open You › Squeeze Pro and start the free trial
-> (cancel any time in Google Play), or use an account added as a license tester. Google
-> sign in is optional and only used for backup to the user's own Drive.
+> No account or login is needed. The body scan is free. To unlock all Pro features
+> (Training, Nutrition, Log, Machine scan, Drive backup) without paying: open the You tab,
+> tap Squeeze Pro, tap "Have an access code?" at the bottom, enter the code in the password
+> field and tap Unlock. Google sign in is optional and only used for backup to the user's
+> own Drive.
 
-Also tick that the app does not need other special access (no location, no invite code).
+Tick "Sign in details in this declaration provide full access to all the features".
 
 **Content rating:** questionnaire category *Reference, News or Educational / Utility*; no
 violence, sexual content, gambling or user interaction. Expected rating: Everyone / PEGI 3.

@@ -30,8 +30,10 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Workspaces
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,7 +73,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ProViewModel @Inject constructor(
     private val billing: BillingManager,
-    entitlements: Entitlements,
+    private val entitlements: Entitlements,
 ) : ViewModel() {
     val state: StateFlow<EntitlementState> = entitlements.state
     val plans: StateFlow<List<PlanOption>> = billing.plans
@@ -80,6 +82,8 @@ class ProViewModel @Inject constructor(
     fun refresh() = billing.start()
 
     fun subscribe(activity: Activity, plan: PlanOption) = billing.subscribe(activity, plan)
+
+    fun redeem(code: String): Boolean = entitlements.redeem(code)
 }
 
 /** What Pro adds, in the order people care about it. */
@@ -104,6 +108,7 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
     val context = LocalContext.current
     val activity = context.findActivity()
     var chosen by rememberSaveable { mutableStateOf(Products.YEARLY) }
+    var askCode by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     val yearly = plans.firstOrNull { it.periodMonths == 12 }
@@ -144,6 +149,12 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     FEATURES.forEach { (icon, title, detail) -> FeatureRow(icon, title, detail) }
                 }
+            }
+
+            if (state.plan == Products.REVIEW_ACCESS) {
+                Text("Unlocked with an access code.", style = MaterialTheme.typography.bodyMedium, color = muted)
+                PrimaryButton(text = "Done", onClick = onClose)
+                return@Column
             }
 
             if (state.pro && !state.debugUnlocked) {
@@ -208,9 +219,37 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
                 TextButton(onClick = viewModel::refresh) { Text("Restore purchase") }
                 TextButton(onClick = onClose) { Text("Not now") }
             }
+            TextButton(onClick = { askCode = true }, modifier = Modifier.fillMaxWidth()) { Text("Have an access code?") }
             Spacer(Modifier.height(8.dp))
         }
     }
+
+    if (askCode) AccessCodeDialog(onRedeem = viewModel::redeem, onDismiss = { askCode = false })
+}
+
+/** Where Google Play's reviewers enter the access code from the App access declaration. */
+@Composable
+private fun AccessCodeDialog(onRedeem: (String) -> Boolean, onDismiss: () -> Unit) {
+    var code by rememberSaveable { mutableStateOf("") }
+    var wrong by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Access code") },
+        text = {
+            OutlinedTextField(
+                value = code,
+                onValueChange = { code = it; wrong = false },
+                singleLine = true,
+                isError = wrong,
+                supportingText = { if (wrong) Text("That code isn't valid") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (onRedeem(code)) onDismiss() else wrong = true }) { Text("Unlock") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

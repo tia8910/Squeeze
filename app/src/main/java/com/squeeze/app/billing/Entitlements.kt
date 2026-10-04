@@ -2,6 +2,7 @@ package com.squeeze.app.billing
 
 import android.content.Context
 import com.squeeze.app.BuildConfig
+import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,27 @@ object Products {
 
     /** Earlier one-time product: still honoured for anyone who bought it. */
     const val PRO_LIFETIME = "squeeze_pro_lifetime"
+
+    /** Pro unlocked with the access code given to Google Play's app reviewers. */
+    const val REVIEW_ACCESS = "review_access"
+}
+
+/**
+ * The access code for Google Play's app reviewers, who cannot buy or start a free trial.
+ *
+ * Only the SHA-256 of the code is in this public repository; the code itself is given to
+ * Play in the App access declaration. It is 16 random characters (80 bits), so it cannot be
+ * guessed from the hash. Like the entitlement cache, it guards a sale, not anyone's data.
+ */
+object ReviewAccess {
+    private const val CODE_SHA256 = "caac55522065838e4672a0526a3c19fa2c99fc08d15dcb84801b1793c0ba9a3b"
+
+    /** Spaces, dashes and case are ignored, so the code can be typed however it was copied. */
+    fun matches(code: String): Boolean {
+        val normalised = code.uppercase().filter(Char::isLetterOrDigit)
+        val digest = MessageDigest.getInstance("SHA-256").digest(normalised.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) } == CODE_SHA256
+    }
 }
 
 /**
@@ -48,17 +70,25 @@ class Entitlements @Inject constructor(
 
     /** Called by [BillingManager] after reconciling with the Play Store. */
     fun update(pro: Boolean, plan: String?) {
-        val next = EntitlementState(pro = pro || BuildConfig.DEBUG, plan = plan, debugUnlocked = BuildConfig.DEBUG && !pro)
         prefs.edit().putBoolean(KEY_PRO, pro).putString(KEY_PLAN, plan).apply()
-        _state.value = next
+        _state.value = load()
+    }
+
+    /** Unlocks Pro on this device when [code] is the reviewer access code. */
+    fun redeem(code: String): Boolean {
+        if (!ReviewAccess.matches(code)) return false
+        prefs.edit().putBoolean(KEY_REVIEW, true).apply()
+        _state.value = load()
+        return true
     }
 
     private fun load(): EntitlementState {
         val paid = prefs.getBoolean(KEY_PRO, false)
+        val review = prefs.getBoolean(KEY_REVIEW, false)
         return EntitlementState(
-            pro = paid || BuildConfig.DEBUG,
-            plan = prefs.getString(KEY_PLAN, null),
-            debugUnlocked = BuildConfig.DEBUG && !paid,
+            pro = paid || review || BuildConfig.DEBUG,
+            plan = if (paid) prefs.getString(KEY_PLAN, null) else if (review) Products.REVIEW_ACCESS else null,
+            debugUnlocked = BuildConfig.DEBUG && !paid && !review,
         )
     }
 
@@ -66,11 +96,13 @@ class Entitlements @Inject constructor(
         const val PREFS = "squeeze_entitlements"
         const val KEY_PRO = "pro"
         const val KEY_PLAN = "plan"
+        const val KEY_REVIEW = "review_access"
     }
 }
 
 /**
- * @param plan [Products.PRO_SUBSCRIPTION] or [Products.PRO_LIFETIME]; null when not Pro
+ * @param plan [Products.PRO_SUBSCRIPTION], [Products.PRO_LIFETIME] or [Products.REVIEW_ACCESS];
+ *   null when not Pro
  * @param debugUnlocked Pro only because this is a debug build
  */
 data class EntitlementState(
