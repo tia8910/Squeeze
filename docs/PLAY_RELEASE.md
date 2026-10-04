@@ -128,15 +128,15 @@ device; no Health Connect permissions are requested.
 | Can users request deletion? | Yes (sign out, delete hidden app data in Drive, or uninstall) |
 | Shared with third parties? | No |
 
-Data types collected (all: *optional*, purpose *App functionality*, *Account management* for
-name and email, processed only to back up to the user's own Drive, not shared):
+Data types collected (all: *optional*, purpose *App functionality*, processed only to back up
+to the user's own Drive, not shared):
 
-- Personal info: **Name**, **Email address** (from Google sign in)
 - Health and fitness: **Health info** (body measurements, body fat), **Fitness info**
   (workouts, training plan)
 - App activity: **Other user generated content** (favourite foods, goals, settings)
 
-Not collected: photos (analysed and stored only on the device), location, contacts,
+Not collected: name and email (Google sign in shows them on the phone; the backup never
+contains them), photos (analysed and stored only on the device), location, contacts,
 financial info (Play handles payment), device identifiers, analytics.
 
 **Camera permission:** used only to take scan photos and photograph gym machines.
