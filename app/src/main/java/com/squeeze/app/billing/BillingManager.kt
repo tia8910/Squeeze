@@ -13,7 +13,6 @@ import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.acknowledgePurchase
-import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
 import com.squeeze.app.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -128,10 +129,9 @@ class BillingManager @Inject constructor(
             .setProductId(Products.PRO_SUBSCRIPTION)
             .setProductType(BillingClient.ProductType.SUBS)
             .build()
-        val result = client.queryProductDetails(
+        val found = queryProductDetails(
             QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build(),
-        )
-        val found = result.productDetailsList?.firstOrNull() ?: return
+        ).firstOrNull() ?: return
         details = found
         _plans.value = found.subscriptionOfferDetails.orEmpty()
             .groupBy { it.basePlanId }
@@ -155,6 +155,18 @@ class BillingManager @Inject constructor(
             }
             .sortedByDescending { it.periodMonths }
     }
+
+    /**
+     * Billing Library 8 answers with a QueryProductDetailsResult (found and unfetched products)
+     * rather than a bare list, so this wraps the callback directly instead of the KTX helper.
+     */
+    private suspend fun queryProductDetails(params: QueryProductDetailsParams): List<ProductDetails> =
+        suspendCancellableCoroutine { cont ->
+            client.queryProductDetailsAsync(params) { result, details ->
+                val ok = result.responseCode == BillingClient.BillingResponseCode.OK
+                if (cont.isActive) cont.resume(if (ok) details.productDetailsList else emptyList())
+            }
+        }
 
     /** Opens Google Play's purchase sheet for [plan]. */
     fun subscribe(activity: Activity, plan: PlanOption) {
