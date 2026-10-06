@@ -1,5 +1,7 @@
 package com.squeeze.app.ui.components
 
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -103,8 +105,12 @@ fun BrandCard(
             .background(cardFill())
             .border(1.dp, lineColour(), shape)
             .padding(contentPadding),
-        content = content,
-    )
+    ) {
+        // Not a Surface either: titles without an explicit colour need the card's own ink.
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            content()
+        }
+    }
 }
 
 /**

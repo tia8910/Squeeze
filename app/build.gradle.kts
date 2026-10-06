@@ -40,7 +40,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.squeeze.app"
+        // The Play Store ID. com.squeeze.app was already taken on Play; this is squeeze.fit
+        // reversed. The Kotlin namespace above stays com.squeeze.app; only the ID changes.
+        applicationId = "fit.squeeze.app"
         minSdk = 26
         // Play requires new apps and updates to target the latest Android within a year of
         // its release; Android 16 is API 36.
@@ -65,6 +67,11 @@ android {
         // Play Console licensing key, used by PurchaseVerifier. Blank disables local
         // verification and falls back to trusting the Play Store's own response, which is
         // the right behaviour for a debug build with no Play Console behind it.
+        // Launch switch for Squeeze Pro. false: every feature is free, the paywall and Pro card
+        // are hidden. Set to true (once the squeeze_pro subscription is active in Play Console)
+        // to start selling Pro with its free trial.
+        buildConfigField("boolean", "PRO_ON_SALE", "false")
+
         buildConfigField("String", "PLAY_PUBLIC_KEY", "\"${secret("PLAY_PUBLIC_KEY")}\"")
 
         // The *Web* OAuth client ID from the Google Cloud project, used by Sign in with

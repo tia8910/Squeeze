@@ -22,6 +22,11 @@
 -keep class ai.onnxruntime.** { *; }
 -dontwarn com.google.mediapipe.**
 -dontwarn com.google.protobuf.**
+# MediaPipe logs through Flogger, which finds its backend by class name at start up. R8
+# strips that unseen backend, the scanner then throws while loading, and every photo in a
+# Play build fails with "could not be separated" while debug builds scan fine.
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**
 
 # Sign in with Google: the credential type is resolved by class name at runtime.
 -keep class com.google.android.libraries.identity.googleid.** { *; }
