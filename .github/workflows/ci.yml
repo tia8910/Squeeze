@@ -143,6 +143,11 @@ jobs:
       # The build Play gets: minified and shrunk by R8, unsigned here (signing is the release
       # workflow's job). R8 is where a missing keep rule breaks a release that debug never
       # shows, so it is built on every change, not discovered at upload time.
+      - name: Available MediaPipe versions
+        run: |
+          curl -sS https://dl.google.com/dl/android/maven2/com/google/mediapipe/tasks-vision/maven-metadata.xml \
+            | grep -o "<version>[^<]*</version>" | sed 's/<[^>]*>//g' | tail -8 | tr '\n' ' ' | xargs -I{} echo "::notice::tasks-vision versions: {}"
+
       - name: Build release bundle (R8)
         run: |
           set -o pipefail
@@ -157,6 +162,10 @@ jobs:
             done
             exit 1
           }
+
+      # Play rejects bundles whose native libraries are not aligned for 16 KB memory pages.
+      - name: Native libraries support 16 KB pages
+        run: python3 tools/check_16kb.py "$(find app/build/outputs/bundle/release -name '*.aab' | head -1)"
 
       - name: Rename APK
         run: |

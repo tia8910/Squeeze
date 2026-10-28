@@ -213,6 +213,9 @@ jobs:
       # Signing is the whole point of this workflow, so verify it rather than assuming it.
       # A missing signingConfig yields an unsigned artifact and no build error, which would
       # otherwise only surface when Play rejects the upload.
+      - name: Native libraries support 16 KB pages
+        run: python3 tools/check_16kb.py "$(find app/build/outputs/bundle/release -name '*.aab' | head -1)"
+
       - name: Verify signatures
         run: |
           set -euo pipefail
