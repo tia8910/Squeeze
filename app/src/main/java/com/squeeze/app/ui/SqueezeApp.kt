@@ -87,6 +87,7 @@ private const val ROUTE_CELEBRATION = "celebration"
 private const val ROUTE_LOG = "log"
 private const val ROUTE_MACHINE = "machine"
 private const val ROUTE_PROGRESS = "progress"
+private const val ROUTE_PRO = "pro"
 
 private enum class Destination(
     val route: String,
@@ -159,6 +160,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     }
 
     val navController = rememberNavController()
+    val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
+    val paywallSeen by viewModel.paywallSeen.collectAsStateWithLifecycle()
+    val isPro = entitlement.pro
+    val openPro: () -> Unit = { navController.navigate(ROUTE_PRO) }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
@@ -170,7 +175,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         currentRoute == ROUTE_CELEBRATION ||
         currentRoute == ROUTE_LOG ||
         currentRoute == ROUTE_MACHINE ||
-        currentRoute == ROUTE_PROGRESS
+        currentRoute == ROUTE_PROGRESS ||
+        currentRoute == ROUTE_PRO
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -188,6 +194,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         currentRoute == ROUTE_LOG -> Text("Log workout")
                         currentRoute == ROUTE_MACHINE -> Text("Scan a machine")
                         currentRoute == ROUTE_PROGRESS -> Text("Your progress")
+                        currentRoute == ROUTE_PRO -> Text("Squeeze Pro")
                         // The wordmark is the title on the home tab; a text label there
                         // would waste the one place the brand is always visible.
                         activeTab == Destination.COMPOSITION ->
@@ -256,6 +263,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         // the true one.
         LaunchedEffect(currentRoute) { viewModel.refresh() }
 
+        // The Pro screen once, right after onboarding, with "Not now" one tap away.
+        LaunchedEffect(isPro, paywallSeen) {
+            if (!isPro && !paywallSeen) {
+                viewModel.markPaywallSeen()
+                navController.navigate(ROUTE_PRO)
+            }
+        }
+
         val celebrate: () -> Unit = {
             viewModel.refresh()
             navController.navigate(ROUTE_CELEBRATION) {
@@ -293,7 +308,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onStartScan = { navController.navigate(ROUTE_SCAN) },
                         onAddMeasurement = { navController.navigate(ROUTE_ADD_MEASUREMENT) },
                         onDelete = viewModel::deleteMeasurement,
-                        summary = state.summary,
+                        // Coach tips are Pro; the journey and the body numbers are for everyone.
+                        summary = state.summary?.let { if (isPro) it else it.copy(tips = emptyList()) },
                         physiqueFor = viewModel::physiqueFor,
                         onStep = goToStep,
                         onOpenTraining = { goToTab(Destination.TRAINING) },
@@ -302,6 +318,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(Destination.TRAINING.route) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked(
+                            "Your training week",
+                            "A week built across your sports for your goal and weak points, with set by set coaching.",
+                            openPro,
+                        )
+                        return@composable
+                    }
                     TrainingScreen(
                         nextStep = nextStep?.takeIf { it.id != StepId.CHOOSE_SPORTS },
                         onNextStep = { nextStep?.let { goToStep(it.id) } },
@@ -314,6 +338,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(ROUTE_LOG) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked("Workout logging", "Log every set and get progressive overload advice for the next one.", openPro)
+                        return@composable
+                    }
                     WorkoutLogScreen(
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
                         // Back to the dashboard, where the next step is waiting.
@@ -326,10 +354,18 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(ROUTE_PROGRESS) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked("Your progress", "Progressive overload on every lift and a summary of every workout.", openPro)
+                        return@composable
+                    }
                     com.squeeze.app.ui.progress.ProgressScreen(onLog = { navController.navigate(ROUTE_LOG) })
                 }
 
                 composable(ROUTE_MACHINE) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked("Machine scan", "Photograph any gym machine to see how to use it and what to do on it.", openPro)
+                        return@composable
+                    }
                     MachineScanScreen(
                         onLog = {
                             // A fresh log with the machine's exercise, whether or not a log was
@@ -341,6 +377,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(Destination.NUTRITION.route) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked(
+                            "Your nutrition plan",
+                            "Calories, macros and 11 micronutrients from your body and goal, with meals built from foods you like.",
+                            openPro,
+                        )
+                        return@composable
+                    }
                     NutritionScreen(
                         nextStep = nextStep?.takeIf { it.id != StepId.PICK_FOODS },
                         onNextStep = { nextStep?.let { goToStep(it.id) } },
@@ -352,6 +396,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(LABEL_ROUTE) { LabelScreen() }
+
+                composable(ROUTE_PRO) {
+                    com.squeeze.app.ui.pro.PaywallScreen(onClose = { navController.popBackStack() })
+                }
 
                 composable(Destination.SETTINGS.route) {
                     val blockScreenshots by viewModel.blockScreenshots
@@ -381,6 +429,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         targetEpochDay = state.profile?.targetEpochDay,
                         onGoalChange = viewModel::setGoal,
                         onLabelPhotos = { navController.navigate(LABEL_ROUTE) },
+                        pro = entitlement,
+                        onOpenPro = openPro,
                     )
                 }
 

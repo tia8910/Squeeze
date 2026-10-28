@@ -73,6 +73,16 @@ class UiSettings @Inject constructor(context: Context) {
         _themeMode.value = mode
     }
 
+    private val _paywallSeen = MutableStateFlow(prefs.getBoolean(KEY_PAYWALL_SEEN, false))
+
+    /** False until the Pro screen has been shown once, right after onboarding. */
+    val paywallSeen: StateFlow<Boolean> = _paywallSeen.asStateFlow()
+
+    fun markPaywallSeen() {
+        prefs.edit().putBoolean(KEY_PAYWALL_SEEN, true).apply()
+        _paywallSeen.value = true
+    }
+
     fun markLandingSeen() {
         prefs.edit().putBoolean(KEY_LANDING_SEEN, true).apply()
         _landingSeen.value = true
@@ -92,6 +102,7 @@ class UiSettings @Inject constructor(context: Context) {
         const val PREFS = "squeeze_ui"
         const val KEY_THEME = "theme_mode"
         const val KEY_LANDING_SEEN = "landing_seen"
+        const val KEY_PAYWALL_SEEN = "paywall_seen"
         const val KEY_SOUND = "sound_enabled"
         const val KEY_AMBIENT = "ambient_enabled"
     }

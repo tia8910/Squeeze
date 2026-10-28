@@ -13,8 +13,7 @@ class SqueezeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Billing reaches the Play Store over binder IPC rather than this process's network
-        // stack, which is why it still works with no INTERNET permission declared.
+        // Restores Pro from the Play Store's cache (works offline) and loads the plans.
         billingManager.start()
     }
 }

@@ -1,6 +1,7 @@
 package com.squeeze.app.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,8 @@ fun SettingsScreen(
     onGoalChange: (Goal, Double?, Double?, Long?) -> Unit,
     @Suppress("UNUSED_PARAMETER") onLabelPhotos: () -> Unit = {},
     modifier: Modifier = Modifier,
+    pro: com.squeeze.app.billing.EntitlementState = com.squeeze.app.billing.EntitlementState(),
+    onOpenPro: () -> Unit = {},
 ) {
     val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     Column(
@@ -100,6 +103,8 @@ fun SettingsScreen(
             }
         }
 
+        if (pro.onSale) ProCard(pro, onOpenPro)
+
         ProfileSection(
             heightCm = heightCm,
             birthYear = birthYear,
@@ -117,7 +122,12 @@ fun SettingsScreen(
 
         GroupLabel("GOOGLE DRIVE BACKUP")
         BrandCard(Modifier.fillMaxWidth()) {
-            com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
+            if (pro.pro) {
+                com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
+            } else {
+                Text("Automatic backup to your own Google Drive is part of Pro.", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.TextButton(onClick = onOpenPro) { Text("See Squeeze Pro") }
+            }
         }
 
         // What happens to the data, as facts with a tick, then the one switch.
@@ -169,6 +179,41 @@ fun SettingsScreen(
         }
 
         AboutCard()
+    }
+}
+
+/** Pro status, and the way to it or to managing it. */
+@Composable
+private fun ProCard(pro: com.squeeze.app.billing.EntitlementState, onOpenPro: () -> Unit) {
+    val paid = pro.pro && !pro.debugUnlocked
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Brush.linearGradient(listOf(Brand.IconBlueDeep, Brand.BlueDeep, Brand.Navy)))
+            .clickable(onClick = onOpenPro)
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("SQUEEZE PRO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+            Text(
+                when {
+                    paid -> "Pro is active"
+                    pro.debugUnlocked -> "Unlocked in this test build"
+                    else -> "Try 7 days free"
+                },
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+            )
+            Text(
+                if (pro.plan == com.squeeze.app.billing.Products.REVIEW_ACCESS) "Unlocked with an access code"
+                else if (paid) "Manage or cancel in Google Play" else "Training, nutrition, coaching and backup",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.85f),
+            )
+        }
+        Text("›", style = MaterialTheme.typography.headlineSmall, color = Color.White)
     }
 }
 

@@ -92,10 +92,10 @@ background, at most hourly. It needs a Google Cloud project you own:
 2. **OAuth consent screen:** External; add the scope `.../auth/drive.appdata`. While the app
    is in *Testing*, add every Google account that will sign in as a **test user**.
 3. **Credentials › Create OAuth client ID › Android**, once per package:
-   - debug: package `com.squeeze.app.debug`, SHA-1
+   - debug: package `fit.squeeze.app.debug`, SHA-1
      `F8:42:9D:48:DF:EA:00:D7:01:A3:E9:45:1D:DC:3D:03:93:A3:2A:1A` (the committed
      `app/debug.keystore`, used by every debug build including CI's);
-   - release: package `com.squeeze.app`, SHA-1 of the release key, or Play's app-signing key
+   - release: package `fit.squeeze.app`, SHA-1 of the release key, or Play's app-signing key
      from Play Console › App integrity.
 4. **Web client ID:** the build uses Squeeze's Web client
    (`71286678065-4occld8qvre6itvgecp2mmrdeoqka9qe.apps.googleusercontent.com`, set as

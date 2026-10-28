@@ -66,7 +66,15 @@ class SqueezeViewModel @Inject constructor(
     private val photoStore: ScanPhotoStore,
     private val coach: com.squeeze.app.data.CoachRepository,
     private val backup: com.squeeze.app.data.backup.BackupManager,
+    entitlements: com.squeeze.app.billing.Entitlements,
 ) : ViewModel() {
+
+    /** Whether Pro is active; free users keep the body scan, history and trend. */
+    val entitlement: StateFlow<com.squeeze.app.billing.EntitlementState> = entitlements.state
+
+    val paywallSeen: StateFlow<Boolean> = uiSettings.paywallSeen
+
+    fun markPaywallSeen() = uiSettings.markPaywallSeen()
 
     val themeMode: StateFlow<ThemeMode> = uiSettings.themeMode
     val landingSeen: StateFlow<Boolean> = uiSettings.landingSeen

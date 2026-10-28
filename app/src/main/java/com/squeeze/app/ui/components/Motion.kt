@@ -1,5 +1,7 @@
 package com.squeeze.app.ui.components
 
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -89,12 +91,16 @@ fun AuroraBackground(
         dark -> 0.24f
         else -> 0.16f
     }
-    Box(
-        modifier
-            .background(ground)
-            .drawBehindAurora(a, b, glow, alpha),
-        content = content,
-    )
+    // A plain Box, not a Surface, so it must hand the theme's text colour down itself;
+    // otherwise any Text without an explicit colour falls back to black, unreadable in dark.
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+        Box(
+            modifier
+                .background(ground)
+                .drawBehindAurora(a, b, glow, alpha),
+            content = content,
+        )
+    }
 }
 
 private fun Modifier.drawBehindAurora(a: Float, b: Float, glow: Color, alpha: Float) = drawBehind {
