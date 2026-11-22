@@ -67,7 +67,18 @@ async function renderRange(port, tl, from, to, out, label) {
   const server = await serve();
   const port = server.address().port;
 
-  if (opt('--at')) {
+  if (opt('--export')) {
+    // node render.js timeline.json out.json --export 6.7
+    const { browser, page } = await openPage(port, tl);
+    writeFileSync(out, JSON.stringify(await page.evaluate(t => window.exportFrame(t), Number(opt('--export')))));
+    await browser.close();
+  } else if (opt('--over')) {
+    // node render.js timeline.json out.png --over 6.7 --bg cycles.png
+    const { browser, page } = await openPage(port, tl);
+    const bg = 'data:image/png;base64,' + readFileSync(opt('--bg')).toString('base64');
+    writeFileSync(out, decode(await page.evaluate(([t, b]) => window.drawOver(t, b), [Number(opt('--over')), bg])));
+    await browser.close();
+  } else if (opt('--at')) {
     mkdirSync(out, { recursive: true });
     const { browser, page } = await openPage(port, tl);
     for (const t of opt('--at').split(',').map(Number)) {

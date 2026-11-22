@@ -72,10 +72,10 @@ export function drawTitle(scene, local) {
   if (scene.kicker) {
     ctx.font = '600 32px Oswald'; ctx.letterSpacing = '10px'; ctx.fillStyle = C.sky;
     ctx.textAlign = 'center'; ctx.fillText(scene.kicker.toUpperCase(), 545, 196);
-    ctx.letterSpacing = '0px';
     const w = ctx.measureText(scene.kicker.toUpperCase()).width;
+    ctx.letterSpacing = '0px';
     ctx.strokeStyle = 'rgba(141,179,255,.5)'; ctx.lineWidth = 2;
-    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(540 + s * (w / 2 + 70), 185); ctx.lineTo(540 + s * (w / 2 + 24), 185); ctx.stroke(); }
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(540 + s * (w / 2 + 80), 185); ctx.lineTo(540 + s * (w / 2 + 30), 185); ctx.stroke(); }
   }
   const title = scene.title.toUpperCase();
   const px = font('128px Anton', title, 980, 1);

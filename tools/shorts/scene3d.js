@@ -240,4 +240,16 @@ export function project(v) {
 }
 
 export function render() { composer.render(); }
+
+export function exportState() {
+  const h = human.exportState();
+  const props = [];
+  for (const [name, o] of [['dumbbell', dbs.n], ['dumbbell', dbs.f], ['kettlebell', kb], ['bench', bench], ['box', box]]) {
+    if (!o.visible) continue;
+    o.updateMatrixWorld(true);
+    props.push({ type: name, matrix: o.matrixWorld.toArray() });
+  }
+  const tgt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+  return { ...h, props, camera: { pos: camera.position.toArray(), target: tgt.toArray(), fov: camera.fov } };
+}
 export { THREE };

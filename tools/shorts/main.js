@@ -22,7 +22,7 @@ window.setup = async tl => {
   return true;
 };
 
-function frame(t) {
+function frame(t, opts = {}) {
   const T = TL;
   const scene = T.scenes.find(s => t >= s.start && t < s.end) || T.scenes[T.scenes.length - 1];
   const local = t - scene.start, dur = scene.end - scene.start;
@@ -40,10 +40,10 @@ function frame(t) {
   const pulse = .5 + .5 * Math.sin(ph * Math.PI * 2 - Math.PI / 2);
   const { kbPos } = S3.applyPose(R, move, hl, pulse);
   if (move.scroll) S3.scrollFloor(-local * move.scroll * .25);
-  S3.render();
-
+  if (opts.skip3d) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(S3.renderer.domElement, 0, 0);
+  if (opts.bg) ctx.drawImage(opts.bg, 0, 0, 1080, 1920);
+  else { S3.render(); ctx.drawImage(S3.renderer.domElement, 0, 0); }
 
   if (move.track) {
     const pick = (R, kbp) => move.track === 'pelvis' ? [R.hip[0], R.hip[1], 0]
@@ -66,3 +66,14 @@ function frame(t) {
 }
 
 window.draw = (t, mime = 'image/jpeg') => { frame(t); return out.toDataURL(mime, .94); };
+
+// Pose the scene for time t (no 3D render) and return it for the offline renderer.
+window.exportFrame = t => { posed = true; frame(t, { skip3d: true }); return S3.exportState(); };
+let posed = false;
+
+// Overlays for time t drawn over an offline-rendered background image.
+window.drawOver = async (t, bgUrl) => {
+  const img = new Image(); img.src = bgUrl; await img.decode();
+  frame(t, { bg: img });
+  return out.toDataURL('image/png');
+};

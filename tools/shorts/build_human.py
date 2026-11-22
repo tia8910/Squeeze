@@ -183,6 +183,7 @@ def main():
         "license": "MakeHuman base mesh, targets and rig: CC0 1.0",
         "positions": [round(c, 5) for i in used for c in world[i]],
         "index": tris,
+        "faces": [[remap[i] for i in f] for f in body_faces],
         "bones": bones,
         "skinIndex": skin_i,
         "skinWeight": skin_w,

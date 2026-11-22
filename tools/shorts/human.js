@@ -156,5 +156,24 @@ export async function loadHuman(scene) {
     return { pos: w.clone().addScaledVector(dir, .05), dir };
   }
 
-  return { mesh, pose, setGlow, hand, scale: k };
+  // Posed vertex positions (rig units), rest positions/normals, and per-vertex glow, for
+  // handing a frame to an offline renderer.
+  function exportState() {
+    const pos = g.attributes.position, nor = g.attributes.normal, reg = d.region, rs = d.regionStrength;
+    const v = new THREE.Vector3(), out = new Float32Array(pos.count * 3);
+    mesh.updateMatrixWorld(true);
+    mesh.skeleton.update();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      mesh.applyBoneTransform(i, v);
+      v.applyMatrix4(mesh.matrixWorld);
+      out[i * 3] = v.x; out[i * 3 + 1] = v.y; out[i * 3 + 2] = v.z;
+    }
+    const glowV = reg.map((r, i) => +(glow.value[r] * rs[i]).toFixed(3));
+    return { posed: Array.from(out, x => +x.toFixed(5)), rest: Array.from(pos.array, x => +x.toFixed(5)),
+      restNormal: Array.from(nor.array, x => +x.toFixed(4)), faces: d.faces, glow: glowV,
+      bones: Object.fromEntries(['breast.R', 'breast.L', 'root', 'spine05', 'spine04', 'spine03', 'spine02', 'spine01', 'clavicle.R', 'upperleg02.R', 'lowerleg01.R', 'shoulder01.R'].map(n => [n, d.bones[byName[n]].head.map(c => c * k)])) };
+  }
+
+  return { mesh, pose, setGlow, hand, exportState, scale: k };
 }
