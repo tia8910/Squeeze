@@ -61,32 +61,103 @@ def principled(name, color, rough=.4, metal=0., coat=0., coat_rough=.1, emit=Non
     return m
 
 
-def ceramic_material():
-    m = principled("ceramic", (.70, .74, .80), rough=.36, coat=.5, coat_rough=.2)
+def skin_material():
+    """Realistic skin: tanned base, subsurface scattering, pore bump, a light oil sheen.
+    Per-vertex attributes switch to short hair ("hair") and training shorts ("shorts"),
+    and add the working-muscle glow ("glow")."""
+    m = bpy.data.materials.new("skin")
+    m.use_nodes = True
     nt = m.node_tree
-    b = nt.nodes["Principled BSDF"]
-    b.inputs["Subsurface Weight"].default_value = .08
-    b.inputs["Subsurface Radius"].default_value = (.6, .7, 1.0)
-    b.inputs["Subsurface Scale"].default_value = .01
-    b.inputs["Specular IOR Level"].default_value = .55
-    # working-muscle glow from the per-vertex "glow" attribute
-    attr = nt.nodes.new("ShaderNodeAttribute"); attr.attribute_name = "glow"
-    clampn = nt.nodes.new("ShaderNodeClamp")
-    nt.links.new(attr.outputs["Fac"], clampn.inputs["Value"])
-    mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"
-    mix.inputs["A"].default_value = (.70, .74, .80, 1)
-    mix.inputs["B"].default_value = (.95, .08, .14, 1)
-    nt.links.new(clampn.outputs["Result"], mix.inputs["Factor"])
-    nt.links.new(mix.outputs["Result"], b.inputs["Base Color"])
-    b.inputs["Emission Color"].default_value = (1, .06, .12, 1)
-    strength = nt.nodes.new("ShaderNodeMath"); strength.operation = "MULTIPLY"
-    strength.inputs[1].default_value = 4.0
-    nt.links.new(clampn.outputs["Result"], strength.inputs[0])
-    nt.links.new(strength.outputs[0], b.inputs["Emission Strength"])
+    N, Lk = nt.nodes, nt.links.new
+    b = N["Principled BSDF"]
+
+    def attr(name):
+        a = N.new("ShaderNodeAttribute"); a.attribute_name = name
+        c = N.new("ShaderNodeClamp"); Lk(a.outputs["Fac"], c.inputs["Value"])
+        return c.outputs["Result"]
+
+    def mix_rgb(fac, a, b_):
+        mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"
+        Lk(fac, mx.inputs["Factor"])
+        for sock, v in (("A", a), ("B", b_)):
+            if isinstance(v, tuple): mx.inputs[sock].default_value = (*v, 1)
+            else: Lk(v, mx.inputs[sock])
+        return mx.outputs["Result"]
+
+    def mix_f(fac, a, b_):
+        mx = N.new("ShaderNodeMix"); mx.data_type = "FLOAT"
+        Lk(fac, mx.inputs["Factor"])
+        for sock, v in (("A", a), ("B", b_)):
+            if isinstance(v, float): mx.inputs[sock].default_value = v
+            else: Lk(v, mx.inputs[sock])
+        return mx.outputs["Result"]
+
+    hair, shorts, glow = attr("hair"), attr("shorts"), attr("glow")
+    coord = N.new("ShaderNodeTexCoord")
+    # subtle blotchy variation in skin tone
+    var = N.new("ShaderNodeTexNoise"); var.inputs["Scale"].default_value = 18; var.inputs["Detail"].default_value = 3
+    Lk(coord.outputs["Object"], var.inputs["Vector"])
+    tone = N.new("ShaderNodeValToRGB")
+    tone.color_ramp.elements[0].color = (.27, .135, .07, 1)
+    tone.color_ramp.elements[1].color = (.38, .2, .11, 1)
+    Lk(var.outputs["Fac"], tone.inputs["Fac"])
+    col = mix_rgb(glow, tone.outputs["Color"], (.75, .06, .08))
+    col = mix_rgb(hair, col, (.006, .0045, .004))
+    col = mix_rgb(shorts, col, (.010, .011, .014))
+    Lk(col, b.inputs["Base Color"])
+
+    b.inputs["Subsurface Weight"].default_value = 1.0
+    b.inputs["Subsurface Radius"].default_value = (1.0, .35, .2)
+    b.inputs["Subsurface Scale"].default_value = .0035
+    no_sss = mix_f(hair, .55, 0.0); no_sss = mix_f(shorts, no_sss, 0.0)
+    Lk(no_sss, b.inputs["Subsurface Weight"])
+    rough = mix_f(hair, .38, .9); rough = mix_f(shorts, rough, .62)
+    Lk(rough, b.inputs["Roughness"])
+    coat = mix_f(hair, .28, 0.0); coat = mix_f(shorts, coat, 0.0)
+    Lk(coat, b.inputs["Coat Weight"])
+    b.inputs["Coat Roughness"].default_value = .2
+    spec = mix_f(hair, .5, .12); Lk(spec, b.inputs["Specular IOR Level"])
+    sheen = mix_f(shorts, 0.0, .25); Lk(sheen, b.inputs["Sheen Weight"])
+    b.inputs["Sheen Tint"].default_value = (.35, .38, .45, 1)
+    b.inputs["Sheen Roughness"].default_value = .4
+
+    # micro detail: pores on skin, stubble on the scalp, weave on the shorts
+    pores = N.new("ShaderNodeTexNoise"); pores.inputs["Scale"].default_value = 900; pores.inputs["Detail"].default_value = 6
+    Lk(coord.outputs["Object"], pores.inputs["Vector"])
+    fine = N.new("ShaderNodeTexNoise"); fine.inputs["Scale"].default_value = 4000; fine.inputs["Detail"].default_value = 2
+    Lk(coord.outputs["Object"], fine.inputs["Vector"])
+    height = mix_f(hair, pores.outputs["Fac"], fine.outputs["Fac"])
+    bump = N.new("ShaderNodeBump"); bump.inputs["Distance"].default_value = .0004
+    strength = mix_f(hair, .12, 1.0); strength = mix_f(shorts, strength, .25)
+    Lk(strength, bump.inputs["Strength"]); Lk(height, bump.inputs["Height"])
+    Lk(bump.outputs["Normal"], b.inputs["Normal"])
+
+    b.inputs["Emission Color"].default_value = (1, .08, .1, 1)
+    em = N.new("ShaderNodeMath"); em.operation = "MULTIPLY"; em.inputs[1].default_value = 1.6
+    Lk(glow, em.inputs[0]); Lk(em.outputs[0], b.inputs["Emission Strength"])
     return m
 
 
-CERAMIC = ceramic_material()
+def eye_material():
+    m = bpy.data.materials.new("eye"); m.use_nodes = True
+    nt = m.node_tree; N, Lk = nt.nodes, nt.links.new
+    b = N["Principled BSDF"]
+    tc = N.new("ShaderNodeTexCoord"); sep = N.new("ShaderNodeSeparateXYZ")
+    Lk(tc.outputs["Normal"], sep.inputs[0])            # object-space normal: +z looks forward
+    ramp = N.new("ShaderNodeValToRGB")
+    e = ramp.color_ramp.elements
+    e[0].position = .80; e[0].color = (.75, .72, .70, 1)     # sclera
+    e[1].position = .83; e[1].color = (.12, .06, .03, 1)     # iris
+    e3 = e.new(.95); e3.color = (.01, .008, .006, 1)          # pupil
+    Lk(sep.outputs["Z"], ramp.inputs["Fac"])
+    Lk(ramp.outputs["Color"], b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = .25
+    b.inputs["Coat Weight"].default_value = 1.0; b.inputs["Coat Roughness"].default_value = .02
+    return m
+
+
+SKIN = skin_material()
+EYE = eye_material()
 NEON = principled("neon", (.1, .3, 1), emit=(.25, .5, 1), emit_strength=12)
 RUBBER = principled("rubber", (.012, .016, .028), rough=.5, coat=.3)
 STEEL = principled("steel", (.75, .78, .85), rough=.15, metal=1)
@@ -188,12 +259,48 @@ def build_body():
     RN /= np.linalg.norm(RN, axis=1, keepdims=True) + 1e-9
     NN = np.zeros(n * 3, np.float32); hi.vertices.foreach_get("normal", NN); NN = NN.reshape(-1, 3)
     h = definition(R, RN).astype(np.float32)
+    # short hair on the scalp, training shorts from the waist to mid-thigh
+    y, x, az = R[:, 1], R[:, 0], np.abs(R[:, 2])
+    top = y.max()
+    headx = x[y > top - .2].mean()
+    hair = np.clip((y - (top - .072)) / .012, 0, 1)
+    hair = np.maximum(hair, np.clip((y - (top - .155)) / .012, 0, 1) * np.clip((headx - .015 - x) / .012, 0, 1))
+    hair *= (y > top - .2)
+    shorts = band(y, .675, .995, .004) * (az < .26)
+    shorts = shorts * np.clip((.245 - az) / .01, 0, 1)
+    waist = band(y, .962, .992, .003) * (shorts > 0)
+    h = h * (1 - shorts) + shorts * .006 + waist * .003
+    h += hair * .0015
     P += NN * h[:, None]
+    for name, vals in (("hair", hair), ("shorts", shorts)):
+        a_ = hi.attributes.new(name, "FLOAT", "POINT"); a_.data.foreach_set("value", vals.astype(np.float32))
     hi.vertices.foreach_set("co", P.ravel())
     hi.update()
     hi.polygons.foreach_set("use_smooth", [True] * len(hi.polygons))
     body = link(bpy.data.objects.new("body", hi))
-    body.data.materials.append(CERAMIC)
+    body.data.materials.append(SKIN)
+    # eyeballs: MakeHuman's eye spheres, carried from the rest pose onto the posed head by
+    # the rigid transform that best maps the head's rest vertices onto their posed positions
+    from mathutils import Vector, Matrix as M3
+    Rv = np.array(D["rest"], np.float64).reshape(-1, 3)
+    head = Rv[:, 1] > Rv[:, 1].max() - .17
+    A, B = Rv[head], V.astype(np.float64)[head]
+    ca, cb = A.mean(0), B.mean(0)
+    U, _, Wt = np.linalg.svd((A - ca).T @ (B - cb))
+    Rot = (U @ Wt).T
+    if np.linalg.det(Rot) < 0:
+        Wt[-1] *= -1; Rot = (U @ Wt).T
+    fwd = Vector((Rot @ np.array([1., 0, 0])).tolist())
+    for e in D["eyeballs"]:
+        c = Rot @ (np.array(e["center"]) - ca) + cb
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=e["radius"], segments=48, ring_count=24)
+        ob = bpy.context.active_object
+        for cc in ob.users_collection: cc.objects.unlink(ob)
+        link(ob)
+        ob.location = Vector(c.tolist())
+        ob.rotation_euler = fwd.to_track_quat("Z", "Y").to_euler()
+        ob.data.materials.append(EYE)
+        for p_ in ob.data.polygons: p_.use_smooth = True
     print(f"body: {n} vertices, definition depth {h.min()*1000:.1f}..{h.max()*1000:.1f} mm")
     return body
 
@@ -260,7 +367,7 @@ def stage():
     floor.data.materials.append(fm)
     # stage disc with a glowing ring and the wordmark
     disc = prim("primitive_cylinder_add", radius=1.25, depth=.04, vertices=128, location=(0, 0, -.019))
-    disc.data.materials.append(principled("disc", (.002, .005, .014), rough=.35, coat=.7, coat_rough=.06))
+    disc.data.materials.append(principled("disc", (.002, .005, .014), rough=.5, coat=.3, coat_rough=.2))
     ring = prim("primitive_torus_add", major_radius=1.255, minor_radius=.009, major_segments=256, minor_segments=8, location=(0, 0, .002))
     ring.data.materials.append(principled("ringneon", (.1, .3, 1), emit=(.25, .5, 1), emit_strength=8))
     if FONT.exists():

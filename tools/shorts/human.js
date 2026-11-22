@@ -69,8 +69,10 @@ export async function loadHuman(scene) {
 
   // eyes: smooth ceramic globes so the sockets read as a sculpture, not hollows
   const eyeGeo = new THREE.SphereGeometry(.0125 * k / .95, 24, 16);
+  const eyes = [];
   for (const s of ['L', 'R']) {
     const e = new THREE.Mesh(eyeGeo, mat.clone());
+    eyes.push(e);
     const hb = bones[byName['head']];
     e.position.copy(new THREE.Vector3(...d.eyes[s]).multiplyScalar(k).sub(new THREE.Vector3(...d.bones[byName['head']].head).multiplyScalar(k)));
     e.position.x -= .006;
@@ -170,7 +172,12 @@ export async function loadHuman(scene) {
       out[i * 3] = v.x; out[i * 3 + 1] = v.y; out[i * 3 + 2] = v.z;
     }
     const glowV = reg.map((r, i) => +(glow.value[r] * rs[i]).toFixed(3));
-    return { posed: Array.from(out, x => +x.toFixed(5)), rest: Array.from(pos.array, x => +x.toFixed(5)),
+    const eyeW = eyes.map(e => e.getWorldPosition(new THREE.Vector3()).toArray());
+    const hq = bones[byName['head']].getWorldQuaternion(new THREE.Quaternion());
+    const eyeDir = new THREE.Vector3(1, 0, 0).applyQuaternion(hq).toArray();
+    const faceDir = new THREE.Vector3(1, 0, 0).applyQuaternion(bones[byName['head']].getWorldQuaternion(new THREE.Quaternion())).toArray();
+    const eyeballs = Object.values(d.eyeballs).map(e => ({ center: e.center.map(c => c * k), radius: e.radius * k }));
+    return { eyeballs, faceDir, posed: Array.from(out, x => +x.toFixed(5)), rest: Array.from(pos.array, x => +x.toFixed(5)),
       restNormal: Array.from(nor.array, x => +x.toFixed(4)), faces: d.faces, glow: glowV,
       bones: Object.fromEntries(['breast.R', 'breast.L', 'root', 'spine05', 'spine04', 'spine03', 'spine02', 'spine01', 'clavicle.R', 'upperleg02.R', 'lowerleg01.R', 'shoulder01.R'].map(n => [n, d.bones[byName[n]].head.map(c => c * k)])) };
   }

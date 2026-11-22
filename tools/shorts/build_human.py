@@ -24,23 +24,24 @@ TARGETS = {
     "targets/macrodetails/african-male-young.target": 1 / 3,
     "targets/macrodetails/asian-male-young.target": 1 / 3,
     "targets/macrodetails/universal-male-young-maxmuscle-averageweight.target": 1.0,
-    "targets/macrodetails/universal-male-young-maxmuscle-minweight.target": 0.45,
+    "targets/macrodetails/universal-male-young-maxmuscle-minweight.target": 0.3,
+    "targets/macrodetails/universal-male-young-maxmuscle-maxweight.target": 0.25,
     "targets/macrodetails/proportions/male-young-maxmuscle-averageweight-idealproportions.target": 1.0,
     "targets/macrodetails/height/male-young-maxmuscle-averageweight-maxheight.target": 0.1,
-    # Aesthetic sculpt: a fitness-model V-taper rather than bulk. Broad lats and delts,
-    # full chest, a narrow toned waist, and defined arms and legs.
-    "targets/torso/torso-vshape-incr.target": 0.9,
-    "targets/torso/torso-muscle-dorsi-incr.target": 0.8,
-    "targets/torso/torso-muscle-pectoral-incr.target": 0.7,
-    "targets/torso/torso-scale-horiz-incr.target": 0.15,
+    # Stage-ready physique: a strong V-taper with real mass. Broad lats and capped delts,
+    # a full chest, big arms, a narrow toned waist, and defined legs.
+    "targets/torso/torso-vshape-incr.target": 1.0,
+    "targets/torso/torso-muscle-dorsi-incr.target": 1.0,
+    "targets/torso/torso-muscle-pectoral-incr.target": 1.0,
+    "targets/torso/torso-scale-horiz-incr.target": 0.3,
     "targets/stomach/stomach-tone-incr.target": 1.0,
     "targets/stomach/stomach-pregnant-decr.target": 0.5,
     "targets/hip/hip-scale-horiz-decr.target": 0.3,
     "targets/buttocks/buttocks-volume-incr.target": 0.3,
-    "targets/neck/neck-scale-horiz-incr.target": 0.3,
+    "targets/neck/neck-scale-horiz-incr.target": 0.6,
     **{f"targets/armslegs/{s}-{part}-incr.target": w for s in "lr" for part, w in (
-        ("upperarm-shoulder-muscle", 0.9), ("upperarm-muscle", 0.8), ("lowerarm-muscle", 0.6),
-        ("upperleg-muscle", 0.7), ("lowerleg-muscle", 0.6))},
+        ("upperarm-shoulder-muscle", 1.0), ("upperarm-muscle", 1.0), ("lowerarm-muscle", 0.9),
+        ("upperleg-muscle", 0.9), ("lowerleg-muscle", 0.8), ("upperarm-scale-horiz", 0.35), ("upperleg-scale-horiz", 0.2))},
 }
 FILES = ["3dobjs/base.obj", "rigs/default.mhskel", "rigs/default_weights.mhw", *TARGETS]
 
@@ -179,6 +180,22 @@ def main():
         if len(f) == 4:
             tris += [f[0], f[2], f[3]]
 
+    # Eyeballs: MakeHuman's eye helper spheres (centre and radius, rest pose).
+    eye_v = {"R": set(), "L": set()}
+    group = None
+    for line in (SRC / "base.obj").read_text().splitlines():
+        if line.startswith("g "):
+            group = line[2:].strip()
+        elif line.startswith("f ") and group in ("helper-r-eye", "helper-l-eye"):
+            # helper-r-eye is the character's right, which is +z in our frame
+            eye_v["R" if group == "helper-r-eye" else "L"].update(int(p.split("/")[0]) - 1 for p in line.split()[1:])
+    eyeballs = {}
+    for k, vs in eye_v.items():
+        pts = [world[i] for i in vs]
+        c = [sum(p[j] for p in pts) / len(pts) for j in range(3)]
+        r = sum(sum((p[j] - c[j]) ** 2 for j in range(3)) ** .5 for p in pts) / len(pts)
+        eyeballs[k] = {"center": [round(x, 5) for x in c], "radius": round(r, 5)}
+
     data = {
         "license": "MakeHuman base mesh, targets and rig: CC0 1.0",
         "positions": [round(c, 5) for i in used for c in world[i]],
@@ -190,6 +207,7 @@ def main():
         "regions": REGIONS,
         "region": region,
         "regionStrength": rstr,
+        "eyeballs": eyeballs,
         "eyes": {k: [round(c, 5) for c in joint[skel["bones"][f"oculi01.{k}"]["head"]]] for k in ("L", "R")},
     }
     OUT.write_text(json.dumps(data, separators=(",", ":")))
