@@ -27,12 +27,12 @@ function serve() {
   return new Promise(r => server.listen(0, '127.0.0.1', () => r(server)));
 }
 
-async function openPage(port, tl) {
+async function openPage(port, tl, pagePath = '/') {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   page.on('pageerror', e => console.error('page error:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}${pagePath}`);
   await page.waitForFunction(() => typeof window.setup === 'function');
   await page.evaluate(t => window.setup(t), tl);
   return { browser, page };
@@ -67,7 +67,22 @@ async function renderRange(port, tl, from, to, out, label) {
   const server = await serve();
   const port = server.address().port;
 
-  if (opt('--export')) {
+  if (args.includes('--overlay')) {
+    // node render.js timeline.json overlay.mov --overlay   -> transparent overlay video (qtrle)
+    const fps = tl.fps || 30, n = Math.ceil(tl.duration * fps);
+    const { browser, page } = await openPage(port, tl, '/compose.html');
+    await page.evaluate(() => { document.body.style.background = 'transparent'; });
+    const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-c:v', 'png', '-framerate', String(fps), '-i', '-',
+      '-c:v', 'qtrle', '-pix_fmt', 'argb', out], { stdio: ['pipe', 'inherit', 'inherit'] });
+    for (let i = 0; i < n; i++) {
+      const buf = decode(await page.evaluate(t => window.draw(t), i / fps));
+      if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
+      if (i % 150 === 0) console.log(`overlay frame ${i}/${n}`);
+    }
+    ff.stdin.end();
+    await new Promise((res, rej) => ff.on('close', c => (c === 0 ? res() : rej(new Error('ffmpeg exit ' + c)))));
+    await browser.close();
+  } else if (opt('--export')) {
     // node render.js timeline.json out.json --export 6.7
     const { browser, page } = await openPage(port, tl);
     writeFileSync(out, JSON.stringify(await page.evaluate(t => window.exportFrame(t), Number(opt('--export')))));
