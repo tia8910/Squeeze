@@ -14,8 +14,11 @@ window.setup = async tl => {
   TL = tl;
   icon.src = '/icon.png'; await icon.decode();
   for (const w of [600, 700, 800]) await document.fonts.load(`${w} 40px J`);
+  await document.fonts.load('40px Anton');
+  for (const w of [500, 600, 700]) await document.fonts.load(`${w} 40px Oswald`);
   O.bind(ctx, icon);
   S3.initTextures();
+  await S3.initHuman();
   return true;
 };
 
