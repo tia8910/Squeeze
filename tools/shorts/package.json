@@ -1,0 +1,10 @@
+{
+  "name": "squeeze-shorts",
+  "private": true,
+  "description": "Renders Squeeze Fit training shorts (3D mannequin, voiceover, captions) to MP4.",
+  "dependencies": {
+    "@fontsource/anton": "^5.1.0",
+    "@fontsource/oswald": "^5.1.0",
+    "three": "0.170.0"
+  }
+}
