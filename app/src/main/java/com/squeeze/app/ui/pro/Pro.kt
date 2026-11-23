@@ -446,3 +446,139 @@ private fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+/**
+ * The last step of first launch: the plan built from the user's answers, and the free week.
+ *
+ * Shown once, instead of the general Pro screen, to anyone who is not Pro yet. It sells with
+ * their own goal rather than a feature list, marks plainly which parts are free, and keeps the
+ * free path one tap away so nobody is cornered into a trial.
+ */
+@Composable
+fun PlanOfferScreen(
+    goal: com.squeeze.core.model.Goal,
+    targetBodyFatPercent: Double?,
+    targetEpochDay: Long?,
+    onClose: () -> Unit,
+    viewModel: ProViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val plans by viewModel.plans.collectAsStateWithLifecycle()
+    val activity = LocalContext.current.findActivity()
+    LaunchedEffect(Unit) { viewModel.refresh() }
+    // A purchase made here lands back on the dashboard, already unlocked.
+    LaunchedEffect(state.pro) { if (state.pro && !state.debugUnlocked) onClose() }
+
+    val yearly = plans.firstOrNull { it.periodMonths == 12 }
+    val trialDays = yearly?.trialDays ?: 7
+    val goalName = when (goal) {
+        com.squeeze.core.model.Goal.CUT -> "Lose fat"
+        com.squeeze.core.model.Goal.HYPERTROPHY -> "Build muscle"
+        com.squeeze.core.model.Goal.RECOMP -> "Recomp"
+        com.squeeze.core.model.Goal.STRENGTH -> "Get stronger"
+        com.squeeze.core.model.Goal.MAKE_WEIGHT -> "Make your weight"
+    }
+    val weeks = targetEpochDay?.let { ((it - java.time.LocalDate.now().toEpochDay()) / 7).toInt() }?.takeIf { it > 0 }
+    val headline = when {
+        targetBodyFatPercent != null && weeks != null -> "$goalName to ${"%.0f".format(targetBodyFatPercent)}% in $weeks weeks"
+        else -> "Your $goalName plan"
+    }
+    val soft = Color.White.copy(alpha = 0.78f)
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF0A1E4A), Color(0xFF050B18)))),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("YOUR PLAN IS READY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Brand.OutlineBlue)
+            Text(headline, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(
+                "Built from your height, age and goal. Your first scan sets the starting point.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = soft,
+            )
+
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(22.dp))
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            ) {
+                PlanLine(Icons.Rounded.Workspaces, "Body scan and trend", "Weekly check in from one photo", free = true)
+                PlanLine(Icons.Rounded.FitnessCenter, "A training week for your goal", "Built around your weak points", free = false)
+                PlanLine(Icons.Rounded.Restaurant, "Calories, macros and meals", "From your body and foods you like", free = false)
+                PlanLine(Icons.Rounded.TrendingUp, "Coaching set by set", "What to lift next, every session", free = false)
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.White)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("$trialDays days free", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Brand.Navy)
+                    Text(
+                        "Then ${yearly?.price ?: "$49.99"} a year, about ${yearly?.let { perMonth(it) } ?: "$4.17"} a month",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Brand.Muted,
+                    )
+                }
+            }
+
+            PrimaryButton(
+                text = if (yearly == null) "Connecting to Google Play…" else "Start my free week",
+                enabled = yearly != null && activity != null,
+                onClick = { if (yearly != null && activity != null) viewModel.subscribe(activity, yearly) },
+            )
+            TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+                Text("Continue with the free scan", color = Brand.OutlineBlue)
+            }
+            Text(
+                "No charge today. Cancel in Google Play before the trial ends and you pay nothing. " +
+                    "A monthly plan is on the Pro screen in Profile.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.62f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlanLine(icon: ImageVector, title: String, detail: String, free: Boolean) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Brand.OutlineBlue.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = Brand.OutlineBlue, modifier = Modifier.size(18.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+        }
+        Text(
+            if (free) "Free" else "Pro",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (free) Color(0xFF4ADE80) else Brand.OutlineBlue,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background((if (free) Color(0xFF4ADE80) else Brand.OutlineBlue).copy(alpha = 0.16f))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}

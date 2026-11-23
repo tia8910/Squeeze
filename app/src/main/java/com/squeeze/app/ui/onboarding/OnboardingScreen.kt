@@ -257,7 +257,7 @@ fun OnboardingScreen(
                 text = when (pager.currentPage) {
                     0 -> "Continue"
                     1 -> "Next: your goal"
-                    else -> "Start tracking"
+                    else -> "See my plan"
                 },
                 onClick = {
                     when {
@@ -288,8 +288,8 @@ private class Step(val title: String, val subtitle: String)
 
 private val STEPS = listOf(
     Step("Welcome to Squeeze", "Your private body coach. Here's exactly what happens to your data."),
-    Step("Your body", "Three details every measurement is calculated from."),
-    Step("Your goal", "What you're training for shapes your plan, your food and your coaching."),
+    Step("Your body", "Three details every measurement is worked out from."),
+    Step("Your goal", "It shapes your training, your food and your coaching."),
 )
 
 /** Step 1: the animated scan, and Google sign-in with restore. */
@@ -426,13 +426,11 @@ private fun BodyStep(
             )
         }
         BrandCard(Modifier.fillMaxWidth().entrance(2)) {
-            Text("Equation variant", style = MaterialTheme.typography.titleSmall)
+            Text("Measured as", style = MaterialTheme.typography.titleSmall)
             Text(
                 // Said explicitly, because the field is unavoidable and its purpose is
                 // narrow. It picks a formula; it is not a question about identity.
-                text = "The validated equations were derived from sex-separated study " +
-                    "groups and have no defined form outside them. This picks which one is " +
-                    "used, and nothing else.",
+                text = "Picks which validated body fat formula is used. Nothing else.",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),

@@ -89,6 +89,7 @@ private const val ROUTE_LOG = "log"
 private const val ROUTE_MACHINE = "machine"
 private const val ROUTE_PROGRESS = "progress"
 private const val ROUTE_PRO = "pro"
+private const val ROUTE_PLAN_OFFER = "plan_offer"
 
 private enum class Destination(
     val route: String,
@@ -177,13 +178,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         currentRoute == ROUTE_LOG ||
         currentRoute == ROUTE_MACHINE ||
         currentRoute == ROUTE_PROGRESS ||
-        currentRoute == ROUTE_PRO
+        currentRoute == ROUTE_PRO ||
+        currentRoute == ROUTE_PLAN_OFFER
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
-            if (currentRoute == ROUTE_SCAN || currentRoute == ROUTE_CELEBRATION) return@Scaffold
+            if (currentRoute == ROUTE_SCAN || currentRoute == ROUTE_CELEBRATION || currentRoute == ROUTE_PLAN_OFFER) return@Scaffold
 
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -265,11 +267,12 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         // the true one.
         LaunchedEffect(currentRoute) { viewModel.refresh() }
 
-        // The Pro screen once, right after onboarding, with "Not now" one tap away.
+        // Once, right after onboarding: the plan built from their answers and the free week,
+        // with the free scan one tap away.
         LaunchedEffect(isPro, paywallSeen) {
             if (!isPro && !paywallSeen) {
                 viewModel.markPaywallSeen()
-                navController.navigate(ROUTE_PRO)
+                navController.navigate(ROUTE_PLAN_OFFER)
             }
         }
 
@@ -401,6 +404,15 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                 }
 
                 composable(LABEL_ROUTE) { LabelScreen() }
+
+                composable(ROUTE_PLAN_OFFER) {
+                    com.squeeze.app.ui.pro.PlanOfferScreen(
+                        goal = state.profile?.goal ?: Goal.HYPERTROPHY,
+                        targetBodyFatPercent = state.profile?.targetBodyFatPercent,
+                        targetEpochDay = state.profile?.targetEpochDay,
+                        onClose = { navController.popBackStack() },
+                    )
+                }
 
                 composable(ROUTE_PRO) {
                     com.squeeze.app.ui.pro.PaywallScreen(onClose = { navController.popBackStack() })
