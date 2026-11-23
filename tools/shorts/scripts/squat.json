@@ -1,23 +1,50 @@
 {
   "id": "bodyweight-squat",
   "clip": "../clips/squat.mp4",
-  "crop": [133, 0, 400, 400],
+  "crop": [
+    133,
+    0,
+    400,
+    400
+  ],
+  "highlight": [
+    "quads"
+  ],
   "voice": "en-US-AndrewNeural",
   "rate": "+4%",
-  "emphasis": ["squats", "hips", "knees", "glutes", "quads", "squeeze"],
+  "emphasis": [
+    "squats",
+    "hips",
+    "knees",
+    "glutes",
+    "quads",
+    "squeeze"
+  ],
   "scenes": [
     {
       "kind": "exercise",
       "kicker": "Hybrid basics",
       "title": "Bodyweight squat",
       "dose": "3 × 15",
-      "muscles": ["Quads", "Glutes"],
-      "reps": [1.33, 4.17, 6.33, 7.5, 8.83],
+      "muscles": [
+        "Quads",
+        "Glutes"
+      ],
+      "reps": [
+        1.33,
+        4.17,
+        6.33,
+        7.5,
+        8.83
+      ],
       "narration": "Bodyweight squats. Arms forward, sit your hips back, chest up. Push your knees out and drive up through your whole foot."
     },
     {
       "kind": "cta",
-      "lines": ["Your full training week,", "planned from one photo."],
+      "lines": [
+        "Your full training week,",
+        "planned from one photo."
+      ],
       "button": "Free on Google Play",
       "narration": "Get your full plan, free, in Squeeze Fit."
     }

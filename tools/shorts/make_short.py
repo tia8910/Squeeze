@@ -142,6 +142,13 @@ def main(script_path):
         clip = (pathlib.Path(script_path).parent / clip).resolve()
     out_dir = HERE / "out"; out_dir.mkdir(exist_ok=True)
     work = pathlib.Path(tempfile.mkdtemp(prefix="short-"))
+    if S.get("highlight"):
+        # paint the working muscles on the cropped clip first, then use it uncropped
+        hl = work / "highlighted.mp4"
+        cx, cy, cw, ch = S["crop"]
+        run(sys.executable, HERE / "highlight.py", clip, hl, "--crop", f"{cx},{cy},{cw},{ch}",
+            "--muscles", ",".join(S["highlight"]))
+        clip, S["crop"] = hl, [0, 0, cw, ch]
     clip_dur = probe_duration(clip)
     emph = {w.lower() for w in S.get("emphasis", [])}
 
