@@ -4,8 +4,8 @@ import { clamp, lerp, easeOut, ccw, cw, norm, len } from './rig.js';
 
 const W = 1080, H = 1920;
 const C = { blue: '#1768FF', sky: '#8DB3FF', ice: '#DDE8FF', hot: '#FF4D5E', white: '#FFFFFF', ink: '#030a1c' };
-let ctx, icon, badge;
-export function bind(context, iconImage, badgeImage) { ctx = context; icon = iconImage; badge = badgeImage; }
+let ctx, icon, badge, emblem;
+export function bind(context, iconImage, badgeImage, emblemImage) { ctx = context; icon = iconImage; badge = badgeImage; emblem = emblemImage; }
 
 function font(f, text, maxW, spacing = 0) {
   // f like "120px Anton": shrinks the size until text fits maxW
@@ -171,19 +171,29 @@ export function drawCTA(scene, local) {
   ctx.globalAlpha = a;
   ctx.translate(0, (1 - a) * 50);
   const s = 260, iy = 300;
-  ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 110;
-  ctx.fillStyle = C.blue; ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.save(); ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.clip();
-  ctx.drawImage(icon, 540 - s / 2, iy, s, s); ctx.restore();
+  if (emblem && emblem.naturalWidth) {
+    // the app's figure emblem on its own, no tile behind it: a soft brand-blue halo
+    const halo = ctx.createRadialGradient(540, iy + s / 2, 10, 540, iy + s / 2, s * .95);
+    halo.addColorStop(0, 'rgba(23,104,255,.45)'); halo.addColorStop(1, 'rgba(23,104,255,0)');
+    ctx.fillStyle = halo; ctx.fillRect(540 - s, iy - s / 2, s * 2, s * 2);
+    ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 40;
+    ctx.drawImage(emblem, 540 - s / 2, iy, s, s);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 110;
+    ctx.fillStyle = C.blue; ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.save(); ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.clip();
+    ctx.drawImage(icon, 540 - s / 2, iy, s, s); ctx.restore();
+  }
   display('SQUEEZE FIT', 540, iy + s + 150, 120, { spacing: 3 });
   ctx.textAlign = 'center';
-  ctx.fillStyle = C.ice;
+  ctx.fillStyle = 'rgba(221,232,255,.82)';
   (scene.lines || []).forEach((ln, i) => {
-    const px = font(`600 50px J`, ln, 920);
-    ctx.font = `600 ${px}px J`; ctx.fillText(ln, 540, iy + s + 240 + i * 66);
+    const px = font(`500 42px J`, ln, 860);
+    ctx.font = `500 ${px}px J`; ctx.fillText(ln, 540, iy + s + 262 + i * 58);
   });
-  const by = iy + s + 240 + (scene.lines || []).length * 66 + 40;
+  const by = iy + s + 262 + (scene.lines || []).length * 58 + 70;
   const pulse = 1 + .02 * Math.sin(local * 5);
   ctx.translate(540, by + 75); ctx.scale(pulse, pulse);
   if (badge && badge.naturalWidth) {
