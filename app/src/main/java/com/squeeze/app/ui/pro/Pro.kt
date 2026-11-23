@@ -103,6 +103,14 @@ private val FEATURES = listOf(
  */
 @Composable
 fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()) {
+    // Always the dark premium look, whatever the app theme: the one screen that is a showcase.
+    com.squeeze.app.ui.theme.SqueezeTheme(themeMode = com.squeeze.app.ui.theme.ThemeMode.DARK) {
+        PaywallContent(onClose, viewModel)
+    }
+}
+
+@Composable
+private fun PaywallContent(onClose: () -> Unit, viewModel: ProViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val plans by viewModel.plans.collectAsStateWithLifecycle()
     val context = LocalContext.current
