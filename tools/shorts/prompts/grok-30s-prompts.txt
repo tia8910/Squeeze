@@ -1,0 +1,252 @@
+SQUEEZE FIT: GROK PROMPTS FOR 30-SECOND SHORTS
+Three clips per exercise, joined into one 30-second Short:
+
+  Clip A  HOOK      0–3 s    close-up of the body part, a glowing measuring ring
+  Clip B  ANATOMY   3–10 s   the limb on its own, muscles lighting up one by one in
+                             blue, green and red (I add the coloured name labels)
+  Clip C  DEMO      10–27 s  the exercise, the working muscle glowing red
+          END CARD  27–30 s  added by me
+
+How to use:
+- Image-to-video in Grok, highest quality. Start every clip from start-frame.png (the
+  sculpture in the Squeeze Fit studio). For Clip B you can also start from a plain
+  navy image; the studio does not need to show.
+- Paste the whole prompt for each clip. Generate 2 versions of Clip C and keep the best.
+- No text in any clip: every label and title is added by me, in the brand style.
+- Name the files by exercise and letter, e.g. 01A.mp4, 01B.mp4, 01C.mp4.
+- The colours matter: keep blue, green and red in the order given, because the labels
+  and the voiceover follow that order.
+
+
+====================================================================================
+01. FALSE-GRIP HANG (BAR)                         muscles: forearm
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, glossy white skin with every muscle visible, plain black shorts with no logo. Extreme close-up of his right forearm against the dark navy studio. A thin glowing white measuring ring wraps around the thickest part of the forearm and pulses once, while the forearm muscles glow soft red. Slow camera push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm alone, held horizontally against a dark navy background, rotating slowly so we see the top and the inside. The muscles light up one group at a time: first the extensors on the top of the forearm glow bright blue, then fade; then the flexors on the inside of the forearm glow bright green, then fade; then the brachioradialis, the thick muscle on the thumb side near the elbow, glows bright red. Clean, sharp, anatomical. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He hangs from a black pull-up bar with a FALSE GRIP: the heels of both palms rest on top of the bar, wrists bent sharply over it, knuckles pointing forward. Arms straight, legs together, body perfectly still. His forearms glow red and pulse. Camera: side view, slowly arcs to a 3/4 view, then pushes in on the wrists bent over the bar. End holding still. Do not show a normal overhand grip, logos or text.
+
+
+====================================================================================
+02. WRIST ROLLER                                  muscles: forearm
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, glossy white skin with every muscle visible, plain black shorts with no logo. Extreme close-up of both forearms held straight out in front of him against the dark navy studio. A thin glowing white measuring ring wraps around one forearm and pulses, the forearm muscles glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm alone, held horizontally against a dark navy background, rotating slowly. The muscles light up one group at a time: first the extensors on top of the forearm glow bright blue, then fade; then the flexors on the inside glow bright green, then fade; then the brachioradialis near the elbow on the thumb side glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Arms straight out at shoulder height, he turns a black wrist roller with alternating wrist rolls, winding the rope so a small black weight plate rises to the handle, then lowers it slowly. Shoulders still, only the wrists move. His forearms glow red. Camera: front view, then side view, then close-up of the turning wrists. End holding the plate up. No logos, no text.
+
+
+====================================================================================
+03. RICE BUCKET TRAINING                          muscles: forearm and hand
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his open hand and forearm against the dark navy studio, fingers spreading wide. A thin glowing white measuring ring wraps around the forearm and pulses, the forearm glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm and hand alone against a dark navy background, rotating slowly. One group at a time: first the extensors on top of the forearm glow bright blue, then fade; then the flexors on the inside glow bright green, then fade; then the small muscles of the palm and the base of the thumb glow bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He kneels at a tall black bucket full of white rice, both hands deep in it to mid-forearm, squeezing into fists, spreading his fingers wide and twisting his wrists, the rice rippling. His forearms glow red. Camera: front 3/4 view, then close-up on the rice surface. End with hands still in the rice. No logos, no text.
+
+
+====================================================================================
+04. PLATE PINCH HOLD                              muscles: thumb and forearm
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his hand against the dark navy studio, thumb pressing hard against his fingers. A thin glowing white measuring ring circles the base of the thumb and pulses, the thumb muscle glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right hand and forearm alone against a dark navy background, palm facing the camera, rotating slightly. One group at a time: first the flexors on the inside of the forearm glow bright blue, then fade; then the finger tendons running into the fingers glow bright green, then fade; then the thick thumb muscle at the base of the thumb glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He stands tall pinching two flat black weight plates together in his right hand, smooth sides out, thumb flat on one side and fingers flat on the other, no fingers over the top, arm straight at his side, holding still while his grip trembles. His forearm and thumb glow red. Camera: front view, then close-up of the pinching hand. End holding still. No logos, no text.
+
+
+====================================================================================
+05. TOWEL HANG                                    muscles: grip and back
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his fist crushing a thick grey towel against the dark navy studio. A thin glowing white measuring ring wraps around his forearm and pulses, the forearm glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+The same white sculpture shown from behind from the waist up, arms raised overhead as if hanging, against a dark navy background, rotating slowly. One group at a time: first the wide back muscles (lats) glow bright blue, then fade; then the flexors on the inside of the forearms glow bright green, then fade; then the brachioradialis near the elbows glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Two thick plain grey towels hang over a black pull-up bar. He grips one towel in each fist and hangs with straight arms, body still, no swinging. His forearms glow red. Camera: front view, arcs to the side, then close-up of the fists on the towels. End hanging still. No logos, no text.
+
+
+====================================================================================
+06. SLEDGEHAMMER LEVERING                         muscles: forearm and wrist
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his right wrist and forearm gripping the end of a wooden sledgehammer handle against the dark navy studio. A thin glowing white measuring ring wraps around the wrist and pulses, the forearm glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm alone, held forward with the thumb on top, against a dark navy background, rotating slowly. One group at a time: first the extensors on top of the forearm glow bright blue, then fade; then the flexors underneath glow bright green, then fade; then the brachioradialis along the thumb side from the elbow glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Elbow tucked at his side and bent at ninety degrees, holding a black sledgehammer at the end of the handle with the head pointing up, he slowly tilts the head forward toward the floor using only his wrist, then raises it back. Elbow never moves. His forearm glows red on the thumb side. Camera: side view, then close-up of the wrist. End holding the hammer upright. No swinging, no logos, no text.
+
+
+====================================================================================
+07. THICK-BAR HOLD                                muscles: forearm and thumb
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his hand wrapped around a very thick black dumbbell grip against the dark navy studio, fingers barely closing. A thin glowing white measuring ring wraps around his forearm and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm and hand alone against a dark navy background, rotating slowly. One group at a time: first the extensors on top of the forearm glow bright blue, then fade; then the flexors on the inside glow bright green, then fade; then the thumb muscle at the base of the thumb glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He stands tall holding a heavy black hexagonal dumbbell in each hand at his sides, each handle wrapped in a thick black rubber grip, squeezing hard, standing still. His forearms glow red. Camera: front view, then close-up of one hand on the thick grip. End holding still. No logos, no text.
+
+
+====================================================================================
+08. ZOTTMAN CURL                                  muscles: arm
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his bent right arm against the dark navy studio. A thin glowing white measuring ring wraps around the upper arm and pulses, then a second ring around the forearm, both glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right arm alone, bent at the elbow, against a dark navy background, rotating slowly. One group at a time: first the biceps on the front of the upper arm glows bright blue, then fades; then the brachialis, the muscle under the biceps near the elbow, glows bright green, then fades; then the brachioradialis on the forearm near the elbow glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Holding a black hexagonal dumbbell in each hand, elbows pinned to his sides, he curls up with palms facing up, rotates the palms down at the top, then lowers slowly with palms down. Biceps glow red going up, forearms glow red coming down. Camera: front view, then close-up of the wrist turning at the top. End standing still. No swinging, no logos, no text.
+
+
+====================================================================================
+09. RUBBER BAND FINGER EXTENSIONS                 muscles: forearm (back)
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his bent elbow against the dark navy studio. A thin glowing white measuring ring wraps around the outer elbow and pulses, glowing soft red, as if pointing to elbow pain. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm and hand alone, back of the hand facing the camera, against a dark navy background, rotating slowly. One group at a time: first the finger extensors on the back of the forearm glow bright blue, then fade; then the flexors on the inside of the forearm glow bright green, then fade; then the tendons on the outer elbow glow bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. His right hand is raised in front of his chest with a thick black rubber band around all five fingertips. He spreads his fingers wide against the band, pauses, then closes them slowly, repeating. The back of his forearm glows red. Camera: medium shot, then close-up of the hand. End with fingers spread. No logos, no text.
+
+
+====================================================================================
+10. BEHIND-THE-BACK WRIST CURL                    muscles: forearm (inside)
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of the inside of his forearm against the dark navy studio. A thin glowing white measuring ring wraps around the forearm and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right forearm alone, palm facing up, against a dark navy background, rotating slowly. One group at a time: first the wrist flexors on the inside of the forearm glow bright blue, then fade; then the deep finger flexors running into the palm glow bright green, then fade; then the tendons at the wrist glow bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. With his back to the camera he holds a black barbell behind his body, arms straight, palms facing back. He lets the bar roll down to his fingertips, then curls it back up with his fingers and wrists only. His forearms glow red. Camera: back view, then close-up of the hands and bar. End holding the bar curled up. No logos, no text.
+
+
+====================================================================================
+11. SEATED SOLEUS RAISE                           muscles: lower leg
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his lower leg from the side against the dark navy studio. A thin glowing white measuring ring wraps around the calf and pulses, the lower calf glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right lower leg alone, seen from behind and the side, against a dark navy background, rotating slowly. One group at a time: first the gastrocnemius, the upper calf bulge, glows bright blue, then fades; then the soleus, the flatter muscle underneath and lower, glows bright red, then fades; then the Achilles tendon glows bright green. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He sits on a black bench, knees bent at ninety degrees, a black weight plate on his thighs, and rises high onto the balls of his feet, pauses, then lowers his heels slowly. His lower calves glow red. Camera: low side view, then close-up of the heels. End with heels raised. No logos, no text.
+
+
+====================================================================================
+12. POGO HOPS                                     muscles: lower leg
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his ankle and Achilles tendon from behind against the dark navy studio. A thin glowing white measuring ring wraps around the ankle and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right lower leg alone, seen from behind, against a dark navy background, rotating slowly. One group at a time: first the gastrocnemius, the upper calf bulge, glows bright blue, then fades; then the Achilles tendon glows bright green, then fades; then the soleus, the lower calf muscle, glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Standing tall with knees almost straight, he does quick small bounces on the balls of his feet, heels never touching, landing in the same spot. His calves glow red. Camera: full-body side view, then low close-up of the feet. End standing still on the balls of his feet. No big jumps, no logos, no text.
+
+
+====================================================================================
+13. BACKWARD SLED DRAG                            muscles: thigh (front)
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his knee and lower thigh from the front against the dark navy studio. A thin glowing white measuring ring wraps around the thigh just above the knee and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right thigh alone, seen from the front, against a dark navy background, rotating slowly. One group at a time: first the rectus femoris down the middle of the thigh glows bright blue, then fades; then the vastus lateralis on the outer thigh glows bright green, then fades; then the teardrop-shaped muscle just above and inside the knee (vastus medialis) glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Holding two black straps attached to a low black weight sled, he walks backward with short quick steps on the balls of his feet, knees pushing forward, dragging the sled toward him. The fronts of his thighs glow red. Camera: side tracking shot, then close-up of the knees. End standing still with the straps taut. No logos, no text.
+
+
+====================================================================================
+14. POLIQUIN STEP-UP                              muscles: thigh (inner, above knee)
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of the inside of his knee against the dark navy studio. A thin glowing white measuring ring circles the teardrop muscle above the knee and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right thigh and knee alone, seen from the front, against a dark navy background, rotating slowly. One group at a time: first the large thigh muscles (quadriceps) glow bright blue, then fade; then the patellar tendon below the kneecap glows bright green, then fades; then the teardrop muscle just above and inside the knee (vastus medialis) glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He stands on one leg on a low black step with that heel raised on a small wedge, bends the knee forward far over his toes until his other heel taps the floor, then drives back up. The inner thigh above the knee glows red. Camera: side view, then close-up of the knee. End standing tall on the step. No logos, no text.
+
+
+====================================================================================
+15. SPANISH SQUAT                                 muscles: thigh and knee
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of his kneecap from the front against the dark navy studio. A thin glowing white measuring ring circles the knee and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right thigh and knee alone, seen from the front, against a dark navy background, rotating slowly. One group at a time: first the quadriceps on the front of the thigh glow bright blue, then fade; then the patellar tendon below the kneecap glows bright green, then fades; then the teardrop muscle above and inside the knee glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. A thick black band anchored to a post in front loops behind both knees. He sits back into the band with vertical shins and chest up and holds still, legs trembling. The fronts of his thighs glow red. Camera: side view showing the vertical shins, then close-up of the band behind the knees. End holding the squat. No logos, no text.
+
+
+====================================================================================
+16. HIP AIRPLANE                                  muscles: hip
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of the side of his hip against the dark navy studio. A thin glowing white measuring ring circles the side of the hip and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+The same white sculpture's hips and upper thighs alone, seen from behind and the side, against a dark navy background, rotating slowly. One group at a time: first the large glute (gluteus maximus) glows bright blue, then fades; then the deep hip rotators under it glow bright green, then fade; then the side glute at the top of the hip (gluteus medius) glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Standing on his left leg, hinged forward with his torso nearly level and his right leg straight behind him, arms out like wings, he slowly rotates his hips open toward the side, then back to face the floor. The side of his standing hip glows red. Camera: front 3/4 view, then close-up of the hip. End balanced and still. No logos, no text.
+
+
+====================================================================================
+17. SUITCASE CARRY                                muscles: core and grip
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of the side of his waist against the dark navy studio. A thin glowing white measuring ring wraps around his waist and pulses, the side of the waist glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+The same white sculpture's torso alone, from the hips to the chest, against a dark navy background, rotating slowly. One group at a time: first the deep lower-back muscle on the side of the spine (quadratus lumborum) glows bright blue, then fades; then the forearm flexors of the right arm glow bright green, then fade; then the obliques on the side of the waist glow bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. He walks slowly toward the camera holding one heavy black kettlebell in his right hand at his side, torso perfectly upright, not leaning at all. The left side of his waist and his right forearm glow red. Camera: moving backward ahead of him, then side view. End standing still holding the kettlebell. No logos, no text.
+
+
+====================================================================================
+18. SISSY SQUAT                                   muscles: thigh (front)
+====================================================================================
+A  HOOK
+Same white anatomical sculpture man from the image, plain black shorts with no logo. Extreme close-up of the front of his thigh against the dark navy studio. A thin glowing white measuring ring wraps around the middle of the thigh and pulses, glowing soft red. Slow push-in. No text.
+
+B  ANATOMY
+Close-up of the same white sculpture's right thigh alone, seen from the front, against a dark navy background, rotating slowly. One group at a time: first the vastus lateralis on the outer thigh glows bright blue, then fades; then the teardrop muscle above and inside the knee glows bright green, then fades; then the rectus femoris down the middle of the thigh glows bright red. No text, no labels.
+
+C  DEMO
+Same white anatomical sculpture man from the image, plain black shorts with no logo, in the Squeeze Fit studio from the image, keeping the logo sign and stage unchanged. Holding a black pole for balance, he rises onto his toes and leans his whole body back in a straight line from knees to head as his knees travel forward, lowering under control, then returns up. The fronts of his thighs glow red. Camera: side view, then close-up of the thighs. End standing tall holding the pole. Do not bend at the hips, no logos, no text.
