@@ -6,6 +6,7 @@ import * as O from './overlay.js';
 const out = document.getElementById('out');
 const ctx = out.getContext('2d');
 const icon = new Image();
+const badge = new Image();
 let TL = null;
 
 const NONE = { quads: 0, hamstrings: 0, glutes: 0, calves: 0, core: 0, chest: 0, back: 0, shoulders: 0, arms: 0 };
@@ -13,10 +14,11 @@ const NONE = { quads: 0, hamstrings: 0, glutes: 0, calves: 0, core: 0, chest: 0,
 window.setup = async tl => {
   TL = tl;
   icon.src = '/icon.png'; await icon.decode();
+  badge.src = '/badge.png'; await badge.decode().catch(() => {});
   for (const w of [600, 700, 800]) await document.fonts.load(`${w} 40px J`);
   await document.fonts.load('40px Anton');
   for (const w of [500, 600, 700]) await document.fonts.load(`${w} 40px Oswald`);
-  O.bind(ctx, icon);
+  O.bind(ctx, icon, badge);
   S3.initTextures();
   await S3.initHuman();
   return true;

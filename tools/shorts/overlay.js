@@ -4,8 +4,8 @@ import { clamp, lerp, easeOut, ccw, cw, norm, len } from './rig.js';
 
 const W = 1080, H = 1920;
 const C = { blue: '#1768FF', sky: '#8DB3FF', ice: '#DDE8FF', hot: '#FF4D5E', white: '#FFFFFF', ink: '#030a1c' };
-let ctx, icon;
-export function bind(context, iconImage) { ctx = context; icon = iconImage; }
+let ctx, icon, badge;
+export function bind(context, iconImage, badgeImage) { ctx = context; icon = iconImage; badge = badgeImage; }
 
 function font(f, text, maxW, spacing = 0) {
   // f like "120px Anton": shrinks the size until text fits maxW
@@ -183,18 +183,22 @@ export function drawCTA(scene, local) {
     const px = font(`600 50px J`, ln, 920);
     ctx.font = `600 ${px}px J`; ctx.fillText(ln, 540, iy + s + 240 + i * 66);
   });
-  const by = iy + s + 240 + (scene.lines || []).length * 66 + 60;
-  const pulse = 1 + .025 * Math.sin(local * 5);
-  ctx.translate(540, by + 55); ctx.scale(pulse, pulse);
-  const label = (scene.button || 'Free on Google Play').toUpperCase();
-  ctx.font = '600 44px Oswald'; ctx.letterSpacing = '4px';
-  const w = ctx.measureText(label).width + 120;
-  const bg = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  bg.addColorStop(0, '#2b7bff'); bg.addColorStop(1, '#1257e0');
-  ctx.fillStyle = bg; ctx.shadowColor = C.blue; ctx.shadowBlur = 60;
-  ctx.beginPath(); ctx.roundRect(-w / 2, -55, w, 110, 55); ctx.fill();
-  ctx.shadowBlur = 0; ctx.fillStyle = C.white; ctx.textBaseline = 'middle';
-  ctx.fillText(label, 0, 3);
+  const by = iy + s + 240 + (scene.lines || []).length * 66 + 40;
+  const pulse = 1 + .02 * Math.sin(local * 5);
+  ctx.translate(540, by + 75); ctx.scale(pulse, pulse);
+  if (badge && badge.naturalWidth) {
+    // Google's "Get it on Google Play" badge, at its own proportions
+    const bw = 470, bh = bw * badge.naturalHeight / badge.naturalWidth;
+    ctx.shadowColor = 'rgba(23,104,255,.55)'; ctx.shadowBlur = 50;
+    ctx.drawImage(badge, -bw / 2, -bh / 2, bw, bh);
+    ctx.shadowBlur = 0;
+  } else {
+    const label = (scene.button || 'Free on Google Play').toUpperCase();
+    ctx.font = '600 44px Oswald'; ctx.letterSpacing = '4px';
+    const w = ctx.measureText(label).width + 120;
+    ctx.fillStyle = C.blue; ctx.beginPath(); ctx.roundRect(-w / 2, -55, w, 110, 55); ctx.fill();
+    ctx.fillStyle = C.white; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 3);
+  }
   ctx.restore();
   ctx.letterSpacing = '0px';
 }

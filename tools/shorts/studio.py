@@ -67,10 +67,10 @@ def text(body, size, loc, rot, material, extrude=.0, spacing=1.0):
 # ── materials ─────────────────────────────────────────────────────────────────
 FLOOR = mat("floor", (.004, .009, .026), rough=.22, metal=.2, coat=.6, coat_rough=.04)
 WALL = mat("wall", (.006, .014, .04), rough=.55)
-PANEL = mat("panel", (.004, .009, .028), rough=.35, coat=.3)
+PANEL = mat("panel", (.002, .004, .013), rough=.45, coat=.2)
 STAGE = mat("stage", (.003, .006, .018), rough=.3, coat=.7, coat_rough=.05)
-NEON = mat("neon", BLUE, emit=BLUE, strength=18)
-NEON_SOFT = mat("neon_soft", BLUE, emit=SKY, strength=6)
+NEON = mat("neon", BLUE, emit=BLUE, strength=9)
+NEON_SOFT = mat("neon_soft", BLUE, emit=SKY, strength=2.5)
 LETTER = mat("letter", (.9, .93, 1), rough=.3, emit=(.82, .88, 1), strength=4.5)
 LETTER_FLOOR = mat("letter_floor", (.1, .2, .5), rough=.5, emit=SKY, strength=1.2)
 
@@ -84,31 +84,48 @@ bpy.ops.mesh.primitive_plane_add(size=40); obj().data.materials.append(FLOOR)
 bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 3.2, 3)); wall = obj()
 wall.scale = (14, 1, 6); wall.rotation_euler = (math.radians(90), 0, 0)
 wall.data.materials.append(WALL)
-# vertical wall panels with thin neon seams
-for x in (-1.55, -.75, .75, 1.55):
+# two thin neon seams on the wall
+for x in (-.95, .95):
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x, 3.15, 2.2)); s_ = obj()
-    s_.scale = (.018, .02, 4.4); s_.data.materials.append(NEON_SOFT)
+    s_.scale = (.014, .02, 4.4); s_.data.materials.append(NEON_SOFT)
 
-# logo lockup above head height: app icon + SQUEEZE FIT wordmark, on a backlit plate
-LOCK_Z = 2.95
+
+def picture(path, size, loc, glow):
+    """A flat image on the wall in its true colours: self-lit like a screen, so the studio
+    lights do not wash it out."""
+    im = bpy.data.materials.new(pathlib.Path(path).stem); im.use_nodes = True
+    nt = im.node_tree; N = nt.nodes; N.clear()
+    out_ = N.new("ShaderNodeOutputMaterial")
+    tex = N.new("ShaderNodeTexImage"); tex.image = bpy.data.images.load(str(path))
+    em = N.new("ShaderNodeEmission"); em.inputs["Strength"].default_value = glow
+    tr = N.new("ShaderNodeBsdfTransparent")
+    mix = N.new("ShaderNodeMixShader")
+    nt.links.new(tex.outputs["Color"], em.inputs["Color"])
+    nt.links.new(tex.outputs["Alpha"], mix.inputs["Fac"])
+    nt.links.new(tr.outputs[0], mix.inputs[1]); nt.links.new(em.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out_.inputs["Surface"])
+    w, h = tex.image.size
+    bpy.ops.mesh.primitive_plane_add(size=1, location=loc, rotation=(math.radians(90), 0, 0))
+    o = obj(); o.scale = (size, size * h / w, 1); o.data.materials.append(im)
+    o.visible_shadow = False
+    return o
+
+
+# logo lockup above head height: full-colour app icon, the wordmark, and the Google Play
+# badge underneath, on a backlit plate
+LOCK_Z = 3.0
 bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 3.06, LOCK_Z)); p = obj()
-p.scale = (3.3, .1, .78); p.data.materials.append(PANEL)
+p.scale = (2.75, .1, 1.0); p.data.materials.append(PANEL)
 bev = p.modifiers.new("b", "BEVEL"); bev.width = .03; bev.segments = 3
-for dz in (-.4, .4):
+for dz in (-.51, .51):
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 2.995, LOCK_Z + dz)); e = obj()
-    e.scale = (3.3, .015, .015); e.data.materials.append(NEON)
+    e.scale = (2.75, .015, .012); e.data.materials.append(NEON)
 if ICON.exists():
-    im = bpy.data.materials.new("icon"); im.use_nodes = True
-    nt = im.node_tree; N = nt.nodes
-    b = N["Principled BSDF"]
-    tex = N.new("ShaderNodeTexImage"); tex.image = bpy.data.images.load(str(ICON))
-    nt.links.new(tex.outputs["Color"], b.inputs["Base Color"])
-    nt.links.new(tex.outputs["Color"], b.inputs["Emission Color"])
-    b.inputs["Emission Strength"].default_value = 1.2
-    b.inputs["Roughness"].default_value = .35
-    bpy.ops.mesh.primitive_plane_add(size=.56, location=(-1.12, 2.99, LOCK_Z), rotation=(math.radians(90), 0, 0))
-    ic = obj(); ic.data.materials.append(im)
-t = text("SQUEEZE FIT", .34, (.32, 2.985, LOCK_Z), (math.radians(90), 0, 0), LETTER, extrude=.015, spacing=1.08)
+    picture(ICON, .56, (-.93, 2.99, LOCK_Z + .02), .9)
+text("SQUEEZE FIT", .27, (.3, 2.985, LOCK_Z + .19), (math.radians(90), 0, 0), LETTER, extrude=.015, spacing=1.06)
+BADGE = HERE / "brand/google-play-badge.png"
+if BADGE.exists():
+    picture(BADGE, .86, (.3, 2.99, LOCK_Z - .17), .9)
 
 # tall neon light bars framing the stage
 for x in (-1.2, 1.2):
