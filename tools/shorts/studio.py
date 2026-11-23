@@ -111,15 +111,9 @@ def picture(path, size, loc, glow):
     return o
 
 
-# logo lockup above head height: full-colour app icon, the wordmark, and the Google Play
-# badge underneath, on a backlit plate
+# logo lockup above head height, straight on the wall: full-colour app icon, the
+# wordmark, and the Google Play badge underneath
 LOCK_Z = 3.0
-bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 3.06, LOCK_Z)); p = obj()
-p.scale = (2.75, .1, 1.0); p.data.materials.append(PANEL)
-bev = p.modifiers.new("b", "BEVEL"); bev.width = .03; bev.segments = 3
-for dz in (-.51, .51):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 2.995, LOCK_Z + dz)); e = obj()
-    e.scale = (2.75, .015, .012); e.data.materials.append(NEON)
 if ICON.exists():
     picture(ICON, .56, (-.93, 2.99, LOCK_Z + .02), .9)
 text("SQUEEZE FIT", .27, (.3, 2.985, LOCK_Z + .19), (math.radians(90), 0, 0), LETTER, extrude=.015, spacing=1.06)
