@@ -72,6 +72,9 @@ class BillingManager @Inject constructor(
     private var connected = false
     private var details: ProductDetails? = null
 
+    /** Trial length of the plan whose purchase sheet is open, so its end can be recorded. */
+    private var pendingTrialDays = 0
+
     private val _plans = MutableStateFlow<List<PlanOption>>(emptyList())
 
     /** The plans on offer, once Play has answered; empty before that or when offline. */
@@ -171,6 +174,7 @@ class BillingManager @Inject constructor(
     /** Opens Google Play's purchase sheet for [plan]. */
     fun subscribe(activity: Activity, plan: PlanOption) {
         val product = details ?: return
+        pendingTrialDays = plan.trialDays
         client.launchBillingFlow(
             activity,
             BillingFlowParams.newBuilder()
@@ -187,7 +191,14 @@ class BillingManager @Inject constructor(
     }
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
-        if (result.responseCode != BillingClient.BillingResponseCode.OK) return
+        if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+            pendingTrialDays = 0
+            return
+        }
+        purchases
+            ?.firstOrNull { Products.PRO_SUBSCRIPTION in it.products && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            ?.let { entitlements.trialStarted(it.purchaseTime, pendingTrialDays) }
+        pendingTrialDays = 0
         scope.launch { reconcile() }
     }
 

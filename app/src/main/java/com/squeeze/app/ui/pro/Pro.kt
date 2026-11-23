@@ -134,7 +134,12 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
             Column(Modifier.entrance(0)) {
                 Text("SQUEEZE PRO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    if (state.pro && !state.debugUnlocked) "You're Pro" else "Turn your scan into a plan",
+                    when {
+                        state.pro && !state.debugUnlocked && state.trialDaysLeft != null ->
+                            com.squeeze.app.ui.settings.trialLine(state.trialDaysLeft!!)
+                        state.pro && !state.debugUnlocked -> "You're Pro"
+                        else -> "Turn your scan into a plan"
+                    },
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
@@ -158,6 +163,16 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
             }
 
             if (state.pro && !state.debugUnlocked) {
+                if (state.trialDaysLeft != null) {
+                    Text(
+                        "Everything in Pro is unlocked during your trial. It turns into your chosen plan " +
+                            "when it ends, unless you cancel in Google Play first.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 PrimaryButton(text = "Manage subscription", onClick = { openSubscriptions(context) })
                 TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
                 return@Column
@@ -333,12 +348,16 @@ private fun PlanCard(
 @Composable
 fun ProLocked(title: String, detail: String, onUpgrade: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(22.dp),
-        verticalArrangement = Arrangement.Center,
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier
+                .padding(top = 12.dp)
                 .size(72.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .background(Brush.linearGradient(listOf(Brand.IconBlueLight, Brand.IconBlueDeep))),
@@ -346,21 +365,68 @@ fun ProLocked(title: String, detail: String, onUpgrade: () -> Unit) {
         ) {
             Icon(Icons.Rounded.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(34.dp))
         }
-        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Text(
             detail,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp, bottom = 22.dp),
         )
-        PrimaryButton(text = "Try Pro free for 7 days", onClick = onUpgrade)
+        // What the unlock actually buys, so the button is a choice rather than a guess.
+        BrandCard(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FEATURES.take(4).forEach { (icon, name, line) -> FeatureRow(icon, name, line) }
+            }
+        }
+        PrimaryButton(text = "See Squeeze Pro", onClick = onUpgrade)
         Text(
-            "Your body scan and history stay free.",
+            "New subscribers get 7 days free. Your body scan and history stay free.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
+            textAlign = TextAlign.Center,
         )
+    }
+}
+
+/**
+ * The one Pro prompt on the free screens: shown where Pro would act on something the user just
+ * did, never as a banner on every screen. Free users only.
+ */
+@Composable
+fun ProTeaserCard(headline: String, detail: String, onOpenPro: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(listOf(Brand.IconBlueDeep, Brand.BlueDeep, Brand.Navy)))
+            .clickable(onClick = onOpenPro)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("SQUEEZE PRO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+        Text(headline, style = MaterialTheme.typography.titleLarge, color = Color.White)
+        Text(detail, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.88f))
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            listOf(
+                Icons.Rounded.FitnessCenter to "Training",
+                Icons.Rounded.Restaurant to "Meals",
+                Icons.Rounded.TrendingUp to "Coaching",
+            ).forEach { (icon, label) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text(" $label", style = MaterialTheme.typography.labelMedium, color = Color.White)
+                }
+            }
+        }
+        Box(
+            Modifier
+                .padding(top = 10.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White)
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Text("Try 7 days free", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Brand.BlueDeep)
+        }
     }
 }
 

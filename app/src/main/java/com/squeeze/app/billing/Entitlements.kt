@@ -70,7 +70,21 @@ class Entitlements @Inject constructor(
 
     /** Called by [BillingManager] after reconciling with the Play Store. */
     fun update(pro: Boolean, plan: String?) {
-        prefs.edit().putBoolean(KEY_PRO, pro).putString(KEY_PLAN, plan).apply()
+        val edit = prefs.edit().putBoolean(KEY_PRO, pro).putString(KEY_PLAN, plan)
+        // A lapsed subscription takes its trial with it, so a later one starts clean.
+        if (!pro) edit.remove(KEY_TRIAL_ENDS)
+        edit.apply()
+        _state.value = load()
+    }
+
+    /**
+     * Records the end of a free trial bought through this app, from the purchase time Play
+     * reports. Play does not say which offer a purchase used, so this is only ever set by the
+     * purchase flow that started the trial; a restore on a new phone shows plain Pro.
+     */
+    fun trialStarted(purchaseTimeMs: Long, days: Int) {
+        if (days <= 0) return
+        prefs.edit().putLong(KEY_TRIAL_ENDS, purchaseTimeMs + days * DAY_MS).apply()
         _state.value = load()
     }
 
@@ -90,7 +104,15 @@ class Entitlements @Inject constructor(
             plan = if (paid) prefs.getString(KEY_PLAN, null) else if (review) Products.REVIEW_ACCESS else null,
             debugUnlocked = BuildConfig.DEBUG && !paid && !review,
             onSale = BuildConfig.PRO_ON_SALE,
+            trialDaysLeft = if (paid) trialDaysLeft() else null,
         )
+    }
+
+    /** Whole days left in the trial, 0 on its last day; null when there is no trial running. */
+    private fun trialDaysLeft(): Int? {
+        val ends = prefs.getLong(KEY_TRIAL_ENDS, 0L)
+        val left = ends - System.currentTimeMillis()
+        return if (ends == 0L || left <= 0) null else (left / DAY_MS).toInt()
     }
 
     private companion object {
@@ -98,6 +120,8 @@ class Entitlements @Inject constructor(
         const val KEY_PRO = "pro"
         const val KEY_PLAN = "plan"
         const val KEY_REVIEW = "review_access"
+        const val KEY_TRIAL_ENDS = "trial_ends_at"
+        const val DAY_MS = 24L * 60 * 60 * 1000
     }
 }
 
@@ -107,10 +131,13 @@ class Entitlements @Inject constructor(
  * @param debugUnlocked Pro only because this is a debug build
  * @param onSale whether Pro is sold yet; while false every feature is free and nothing
  *   about Pro is shown
+ * @param trialDaysLeft days left in a free trial started in this app, 0 on the last day;
+ *   null when no trial is running
  */
 data class EntitlementState(
     val pro: Boolean = false,
     val plan: String? = null,
     val debugUnlocked: Boolean = false,
     val onSale: Boolean = true,
+    val trialDaysLeft: Int? = null,
 )

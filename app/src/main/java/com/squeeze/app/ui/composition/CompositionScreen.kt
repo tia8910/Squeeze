@@ -98,6 +98,11 @@ fun CompositionScreen(
     onStep: (com.squeeze.core.coach.StepId) -> Unit = {},
     onOpenNutrition: () -> Unit = {},
     onOpenTraining: () -> Unit = {},
+    /** Free users see one Pro card under their numbers; Pro users never do. */
+    pro: Boolean = true,
+    onOpenPro: () -> Unit = {},
+    /** Days left in a Google Play free trial; a reminder shows on the last day or two. */
+    trialDaysLeft: Int? = null,
 ) {
     Column(
         modifier = modifier
@@ -115,6 +120,26 @@ fun CompositionScreen(
         // The dashboard is the way into everything, and each finished step knocks over the next.
         if (latest != null) {
             HeroCard(latest, calibration, trend, leanMassTrend.lastOrNull()?.level)
+        }
+
+        // A free user with a scan has the one thing Pro builds on, so this is where it pays.
+        if (!pro && latest != null) {
+            com.squeeze.app.ui.pro.ProTeaserCard(
+                headline = "Turn your scan into a plan",
+                detail = "A training week and meals built around your body and goal, " +
+                    "with coaching set by set.",
+                onOpenPro = onOpenPro,
+            )
+        }
+
+        if (trialDaysLeft != null && trialDaysLeft <= 1) {
+            InfoCard(
+                if (trialDaysLeft == 0) {
+                    "Your free trial ends today. Your plan continues automatically; you can cancel in Google Play."
+                } else {
+                    "Your free trial ends tomorrow. Your plan continues automatically; you can cancel in Google Play."
+                },
+            )
         }
 
         summary?.let {

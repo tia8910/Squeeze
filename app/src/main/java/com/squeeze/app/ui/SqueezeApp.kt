@@ -314,6 +314,9 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onStep = goToStep,
                         onOpenTraining = { goToTab(Destination.TRAINING) },
                         onOpenNutrition = { goToTab(Destination.NUTRITION) },
+                        pro = isPro,
+                        onOpenPro = openPro,
+                        trialDaysLeft = entitlement.trialDaysLeft,
                     )
                 }
 
@@ -458,6 +461,12 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         },
                         trend = state.bodyFatTrend.map { it.level },
                         nextStep = nextStep,
+                        onOpenPro = if (isPro) null else {
+                            {
+                                navController.popBackStack(Destination.COMPOSITION.route, inclusive = false)
+                                openPro()
+                            }
+                        },
                         onNextStep = {
                             nextStep?.let { step ->
                                 navController.popBackStack(Destination.COMPOSITION.route, inclusive = false)
