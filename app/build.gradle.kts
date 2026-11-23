@@ -50,7 +50,7 @@ android {
 
         // Overridable from CI so a tagged release can stamp a build number without a commit.
         versionCode = secret("VERSION_CODE", "1").toInt()
-        versionName = secret("VERSION_NAME", "1.0.0")
+        versionName = secret("VERSION_NAME", "1.1.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -64,14 +64,14 @@ android {
         }
 
 
+        // Squeeze Pro is on sale: the squeeze_pro subscription (monthly and yearly, each with a
+        // 7-day free trial) is active in Play Console. false makes every feature free and hides
+        // the paywall and Pro card.
+        buildConfigField("boolean", "PRO_ON_SALE", "true")
+
         // Play Console licensing key, used by PurchaseVerifier. Blank disables local
         // verification and falls back to trusting the Play Store's own response, which is
         // the right behaviour for a debug build with no Play Console behind it.
-        // Launch switch for Squeeze Pro. false: every feature is free, the paywall and Pro card
-        // are hidden. Set to true (once the squeeze_pro subscription is active in Play Console)
-        // to start selling Pro with its free trial.
-        buildConfigField("boolean", "PRO_ON_SALE", "false")
-
         buildConfigField("String", "PLAY_PUBLIC_KEY", "\"${secret("PLAY_PUBLIC_KEY")}\"")
 
         // The *Web* OAuth client ID from the Google Cloud project, used by Sign in with
