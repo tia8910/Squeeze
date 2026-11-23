@@ -36,7 +36,7 @@ window.draw = t => {
   }
   O.drawProgress(T, t);
   if (scene.kind === 'exercise') { O.drawTitle(scene, local); O.drawReps(scene, local, ...(T.repsAt || [905, 560])); }
-  if (T.panel && scene.kind !== 'cta') O.drawBrand(...(T.brandAt || [70, 1430]));
+  if (T.panel && !T.studio && scene.kind !== 'cta') O.drawBrand(...(T.brandAt || [70, 1430]));
   if (scene.kind === 'hook') O.drawHook(scene, local);
   if (scene.kind === 'cta') O.drawCTA(scene, local);
   if (scene.kind !== 'cta' || local < .4) O.drawCaption(T.words, t, T.captionY || 1330);

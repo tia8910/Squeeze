@@ -66,12 +66,12 @@ def text(body, size, loc, rot, material, extrude=.0, spacing=1.0):
 
 # ── materials ─────────────────────────────────────────────────────────────────
 FLOOR = mat("floor", (.004, .009, .026), rough=.22, metal=.2, coat=.6, coat_rough=.04)
-WALL = mat("wall", (.006, .014, .04), rough=.55)
+WALL = mat("wall", (.0012, .0028, .009), rough=.85)
 PANEL = mat("panel", (.002, .004, .013), rough=.45, coat=.2)
 STAGE = mat("stage", (.003, .006, .018), rough=.3, coat=.7, coat_rough=.05)
-NEON = mat("neon", BLUE, emit=BLUE, strength=9)
-NEON_SOFT = mat("neon_soft", BLUE, emit=SKY, strength=2.5)
-LETTER = mat("letter", (.9, .93, 1), rough=.3, emit=(.82, .88, 1), strength=4.5)
+NEON = mat("neon", BLUE, emit=BLUE, strength=5)
+NEON_SOFT = mat("neon_soft", BLUE, emit=SKY, strength=1.1)
+LETTER = mat("letter", (.85, .88, .95), rough=.22, metal=.85, coat=.6, coat_rough=.05, emit=(.78, .85, 1), strength=1.6)
 LETTER_FLOOR = mat("letter_floor", (.1, .2, .5), rough=.5, emit=SKY, strength=1.2)
 
 # ── world: deep navy ───────────────────────────────────────────────────────────
@@ -82,14 +82,8 @@ w.node_tree.nodes["Background"].inputs["Color"].default_value = (.002, .005, .01
 # ── floor and the back wall ───────────────────────────────────────────────────
 bpy.ops.mesh.primitive_plane_add(size=40); obj().data.materials.append(FLOOR)
 bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 3.2, 3)); wall = obj()
-wall.scale = (14, 1, 6); wall.rotation_euler = (math.radians(90), 0, 0)
+wall.scale = (14, 6, 1); wall.rotation_euler = (math.radians(90), 0, 0)
 wall.data.materials.append(WALL)
-# two thin neon seams on the wall
-for x in (-.95, .95):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(x, 3.15, 2.2)); s_ = obj()
-    s_.scale = (.014, .02, 4.4); s_.data.materials.append(NEON_SOFT)
-
-
 def picture(path, size, loc, glow):
     """A flat image on the wall in its true colours: self-lit like a screen, so the studio
     lights do not wash it out."""
@@ -113,13 +107,13 @@ def picture(path, size, loc, glow):
 
 # logo lockup above head height, straight on the wall: full-colour app icon, the
 # wordmark, and the Google Play badge underneath
-LOCK_Z = 3.0
+LOCK_Z = 2.62
 if ICON.exists():
-    picture(ICON, .56, (-.93, 2.99, LOCK_Z + .02), .9)
-text("SQUEEZE FIT", .27, (.3, 2.985, LOCK_Z + .19), (math.radians(90), 0, 0), LETTER, extrude=.015, spacing=1.06)
+    picture(HERE / "brand/emblem.png", .5, (-.78, 2.99, LOCK_Z + .02), 1.7)
+text("SQUEEZE FIT", .27, (.32, 2.985, LOCK_Z + .12), (math.radians(90), 0, 0), LETTER, extrude=.015, spacing=1.06)
 BADGE = HERE / "brand/google-play-badge.png"
 if BADGE.exists():
-    picture(BADGE, .86, (.3, 2.99, LOCK_Z - .17), .9)
+    picture(BADGE, .58, (.32, 2.99, LOCK_Z - .17), .85)
 
 # tall neon light bars framing the stage
 for x in (-1.2, 1.2):
@@ -147,13 +141,12 @@ area("key", (-2.2, -3.0, 4.6), (0, 0, 1.0), 1.6, 380, (1, .97, .94))
 area("rimL", (-2.6, 2.2, 3.2), (0, 0, 1.1), 1.0, 1400, (.2, .42, 1))
 area("rimR", (2.6, 2.2, 3.0), (0, 0, 1.1), 1.0, 1300, (.3, .52, 1))
 area("top", (0, .5, 5.5), (0, .5, 0), 2.5, 160, (.55, .68, 1))
-area("wallwash", (0, 1.4, .2), (0, 3.2, 2.4), 3.0, 25, (.15, .35, 1))
 
 # ── camera: front, chest height, full body on the stage with room above ──────
 cd = bpy.data.cameras.new("cam"); cd.sensor_fit = "VERTICAL"; cd.angle_y = math.radians(34)
 cam = bpy.data.objects.new("cam", cd); sc.collection.objects.link(cam)
-cam.location = (0, -6.2, 1.3)
-cam.rotation_euler = (Vector((0, 0, 1.25)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+cam.location = (0, -6.88, 1.4)
+cam.rotation_euler = (Vector((0, 0, 1.46)) - cam.location).to_track_quat("-Z", "Y").to_euler()
 sc.camera = cam
 
 r = sc.render

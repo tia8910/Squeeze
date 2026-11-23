@@ -142,6 +142,13 @@ def main(script_path):
         clip = (pathlib.Path(script_path).parent / clip).resolve()
     out_dir = HERE / "out"; out_dir.mkdir(exist_ok=True)
     work = pathlib.Path(tempfile.mkdtemp(prefix="short-"))
+    studio = S.get("studio")
+    if studio:
+        # studio mode: work on the whole frame, then key the figure into the rendered set
+        probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                "stream=width,height", "-of", "csv=p=0", str(clip)], capture_output=True, text=True,
+                               check=True).stdout.strip().split(",")
+        S["crop"] = [0, 0, int(probe[0]), int(probe[1])]
     if S.get("highlight"):
         # paint the working muscles on the cropped clip first, then use it uncropped
         hl = work / "highlighted.mp4"
@@ -149,6 +156,11 @@ def main(script_path):
         run(sys.executable, HERE / "highlight.py", clip, hl, "--crop", f"{cx},{cy},{cw},{ch}",
             "--muscles", ",".join(S["highlight"]))
         clip, S["crop"] = hl, [0, 0, cw, ch]
+    if studio:
+        studio_png = (pathlib.Path(script_path).parent / studio).resolve()
+        keyed = work / "in-studio.mp4"
+        run(sys.executable, HERE / "in_studio.py", clip, studio_png, keyed)
+        clip = keyed
     clip_dur = probe_duration(clip)
     emph = {w.lower() for w in S.get("emphasis", [])}
 
@@ -177,7 +189,9 @@ def main(script_path):
 
     # 2) overlay layer
     tl = {"fps": FPS, "duration": total, "words": words, "scenes": scenes,
-          "panel": True, "captionY": S.get("captionY", 1655), "repsAt": S.get("repsAt", [905, 560]),
+          "panel": True, "studio": bool(studio),
+          "captionY": S.get("captionY", 1745 if studio else 1655),
+          "repsAt": S.get("repsAt", [930, 960] if studio else [905, 560]),
           "brandAt": S.get("brandAt", [70, 1440])}
     tl_path = work / "timeline.json"; tl_path.write_text(json.dumps(tl))
     overlay = work / "overlay.mov"
@@ -196,7 +210,21 @@ def main(script_path):
     with wave.open(str(wav), "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes(pcm)
 
-    # 4) composite: backdrop + feathered clip panel + overlay + audio
+    # 4) composite
+    out = out_dir / f"{S['id']}.mp4"
+    if studio:
+        # the keyed clip already is the full 1080x1920 frame
+        speed = S.get("speed", 1.0)
+        vf = (f"[0:v]scale={W}:{H},setpts={speed}*PTS,fps={FPS},tpad=stop_mode=clone:stop_duration={total},"
+              f"trim=duration={total},format=rgba[base];[base][1:v]overlay=0:0:format=auto,format=yuv420p[v]")
+        run("ffmpeg", "-v", "error", "-y", "-i", clip, "-i", overlay, "-i", wav,
+            "-filter_complex", vf, "-map", "[v]", "-map", "2:a",
+            "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-r", FPS,
+            "-c:a", "aac", "-b:a", "192k", "-t", total, "-movflags", "+faststart", out)
+        print(f"{out}  ({total:.1f} s)")
+        return
+
+    # backdrop + feathered clip panel + overlay + audio
     bg = work / "bg.png"; backdrop(bg)
     P = S.get("panel", {"y": 440, "size": 1080})
     size, py = P["size"], P["y"]
@@ -209,7 +237,6 @@ def main(script_path):
           f"[2:v]format=gray,scale={size}:{size}[m];[clip][m]alphamerge[panel];"
           f"[0:v][panel]overlay=x=(W-w)/2:y={py}:shortest=0[base];"
           f"[base][3:v]overlay=0:0:format=auto,format=yuv420p[v]")
-    out = out_dir / f"{S['id']}.mp4"
     run("ffmpeg", "-v", "error", "-y",
         "-loop", "1", "-framerate", FPS, "-t", total, "-i", bg,
         "-i", clip,
