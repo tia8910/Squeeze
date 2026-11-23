@@ -91,7 +91,7 @@ export function drawTitle(scene, local) {
   ctx.restore();
 }
 
-export function drawCaption(words, t) {
+export function drawCaption(words, t, y = 1330) {
   let cur = null;
   for (const w of words) if (w.start <= t && t < w.end + .25) cur = w;
   if (!cur) return;
@@ -100,7 +100,7 @@ export function drawCaption(words, t) {
   const text = cur.text.toUpperCase();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.save();
-  ctx.translate(540, 1330);
+  ctx.translate(540, y);
   ctx.scale(pop, pop);
   ctx.rotate(-.02);
   const px = font('150px Anton', text, 920, 2);
@@ -117,7 +117,7 @@ export function drawCaption(words, t) {
 
 export function drawProgress(T, t) {
   const ex = T.scenes.filter(s => s.kind === 'exercise');
-  if (!ex.length) return;
+  if (ex.length < 2) return;
   const n = ex.length, gap = 12, w = 560, segW = (w - gap * (n - 1)) / n, x0 = 540 - w / 2, y = 104;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ex.forEach((s, i) => {
@@ -224,4 +224,49 @@ export function drawFlash(a) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = `rgba(200,220,255,${a})`;
   ctx.fillRect(0, 0, W, H);
+}
+
+// Rep counter: a ring that fills through the set, the count popping at the bottom of each rep.
+export function drawReps(scene, local, cx = 905, cy = 560) {
+  const reps = scene.reps || [];
+  if (!reps.length) return;
+  const n = reps.filter(r => r <= local).length;
+  const last = n ? reps[n - 1] : -9;
+  const pop = local - last < .22 ? lerp(1.35, 1, easeOut((local - last) / .22)) : 1;
+  const a = easeOut(clamp((local - .3) / .4, 0, 1));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(cx, cy);
+  const r = 78;
+  ctx.fillStyle = 'rgba(4,12,34,.72)';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(141,179,255,.25)';
+  ctx.beginPath(); ctx.arc(0, 0, r - 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = C.blue; ctx.shadowColor = C.blue; ctx.shadowBlur = 20; ctx.lineCap = 'round';
+  const total = scene.repTarget || reps.length;
+  ctx.beginPath(); ctx.arc(0, 0, r - 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, n / total)); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.save(); ctx.scale(pop, pop);
+  ctx.font = '84px Anton'; ctx.fillStyle = C.white; ctx.fillText(String(n), 0, -6);
+  ctx.restore();
+  ctx.font = '600 22px Oswald'; ctx.letterSpacing = '4px'; ctx.fillStyle = C.sky;
+  ctx.fillText('REPS', 2, 44);
+  ctx.restore();
+  ctx.letterSpacing = '0px';
+}
+
+// Small brand mark, bottom-left of the video panel.
+export function drawBrand(x = 70, y = 1430) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.save();
+  const s = 54;
+  ctx.beginPath(); ctx.roundRect(x, y, s, s, 14); ctx.save(); ctx.clip(); ctx.drawImage(icon, x, y, s, s); ctx.restore();
+  ctx.font = '600 30px Oswald'; ctx.letterSpacing = '5px'; ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 12;
+  ctx.fillText('SQUEEZE FIT', x + s + 16, y + s / 2 + 2);
+  ctx.restore();
+  ctx.letterSpacing = '0px';
 }
