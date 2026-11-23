@@ -95,45 +95,68 @@ class BackupManager @Inject constructor(
 
     // ── Sign-in ──────────────────────────────────────────────────────────────────────────
 
-    /** Shows Google's account picker, then asks for Drive access. */
+    /**
+     * Connects Google Drive in one step: Google's own sheet picks the account and grants the
+     * hidden app folder together.
+     *
+     * This used to be two steps, a Credential Manager account picker and then authorization.
+     * The picker needs the Web client ID to match as well as the Android client, and when any
+     * part of that did not line up it reported "cancelled" without ever showing a screen, so a
+     * setup problem looked like the user backing out. Authorization alone needs only the
+     * Android client (package name and signing SHA-1), and its errors carry a code.
+     */
     suspend fun signIn(activity: Activity): DriveAccess {
         check(_status.value.configured) { NOT_CONFIGURED }
-        val option = GetSignInWithGoogleOption.Builder(BuildConfig.GOOGLE_WEB_CLIENT_ID).build()
-        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-        val credential = try {
-            CredentialManager.create(activity).getCredential(activity, request).credential
-        } catch (e: GetCredentialCancellationException) {
-            throw IllegalStateException("Sign-in cancelled")
-        }
-        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-            val google = GoogleIdTokenCredential.createFrom(credential.data)
-            prefs.edit().putString(KEY_EMAIL, google.id).putString(KEY_NAME, google.displayName).apply()
-            _status.value = _status.value.copy(email = google.id, name = google.displayName, message = null)
-        } else {
-            error("Google did not return an account")
-        }
         return authorize(activity)
     }
 
     /** Drive access: a token straight away if already granted, otherwise Google's consent screen. */
     suspend fun authorize(from: Context = context): DriveAccess {
-        val request = AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(DRIVE_APPDATA))).build()
-        val result = Identity.getAuthorizationClient(from).authorize(request).await()
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_APPDATA), Scope(EMAIL_SCOPE)))
+            .build()
+        val result = try {
+            Identity.getAuthorizationClient(from).authorize(request).await()
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            throw IllegalStateException(explain(e.statusCode))
+        }
         val pending = result.pendingIntent
         return if (result.hasResolution() && pending != null) {
             DriveAccess.NeedsConsent(pending)
         } else {
+            remember(result)
             setReconnect(false)
             DriveAccess.Granted(result.accessToken ?: error("Google returned no access token"))
         }
     }
 
+    /** Records which Google account holds the backup, for the backup card. */
+    private fun remember(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
+        val account = runCatching { result.toGoogleSignInAccount() }.getOrNull()
+        val email = account?.email ?: _status.value.email ?: "Google account"
+        val name = account?.displayName ?: _status.value.name
+        prefs.edit().putString(KEY_EMAIL, email).putString(KEY_NAME, name).apply()
+        _status.value = _status.value.copy(email = email, name = name, message = null)
+    }
+
+    /** Google's error codes, in words someone can act on. */
+    private fun explain(code: Int): String = when (code) {
+        com.google.android.gms.common.api.CommonStatusCodes.DEVELOPER_ERROR ->
+            "Google sign in is not set up for this version of Squeeze yet (code 10)."
+        com.google.android.gms.common.api.CommonStatusCodes.NETWORK_ERROR ->
+            "No connection to Google. Check your internet and try again."
+        com.google.android.gms.common.api.CommonStatusCodes.CANCELED, 12501 -> "Sign in cancelled"
+        else -> "Google sign in failed (code $code). Try again in a moment."
+    }
+
     /** The token from Google's consent screen, or null if the user declined. */
     fun onConsentResult(data: Intent?): String? {
         if (data == null) return null
-        val token = runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data).accessToken }
-            .getOrNull()
-        if (token != null) setReconnect(false)
+        val result = runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data) }
+            .getOrNull() ?: return null
+        val token = result.accessToken ?: return null
+        remember(result)
+        setReconnect(false)
         return token
     }
 
@@ -208,6 +231,7 @@ class BackupManager @Inject constructor(
     private companion object {
         const val PREFS = "google_backup"
         const val KEY_EMAIL = "email"
+        const val EMAIL_SCOPE = "email"
         const val KEY_NAME = "name"
         const val KEY_LAST = "last_backup_ms"
         const val KEY_RECONNECT = "needs_reconnect"

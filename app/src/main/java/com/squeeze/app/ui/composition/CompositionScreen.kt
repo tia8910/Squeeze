@@ -177,11 +177,6 @@ fun CompositionScreen(
         // beside it rather than behind a scroll.
         StatRow {
             StatTile(
-                value = "%.1f%%".format(latest.level),
-                label = "Body fat",
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
                 value = weightTrend.lastOrNull()?.let { "%.1f".format(it.level) }
                     ?: latestWeight(measurements)?.let { "%.1f".format(it) }
                     ?: "--",
@@ -191,6 +186,12 @@ fun CompositionScreen(
             StatTile(
                 value = leanMassTrend.lastOrNull()?.let { "%.1f".format(it.level) } ?: "--",
                 label = "Muscle (kg)",
+                modifier = Modifier.weight(1f),
+            )
+            // The hero already carries body fat; the third tile is how often you check in.
+            StatTile(
+                value = measurements.size.toString(),
+                label = "Check-ins",
                 modifier = Modifier.weight(1f),
             )
         }
@@ -209,16 +210,7 @@ fun CompositionScreen(
             muscle = leanMassTrend,
         )
 
-        // One action: the scan, which also takes the weight. Tape measurements stay
-        // available for people who use a tape, but as a quiet link rather than a second
-        // button of equal weight.
-        PrimaryButton(
-            text = "Scan check-in",
-            onClick = onStartScan,
-            leading = {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, Modifier.size(18.dp))
-            },
-        )
+        // Scanning lives in the centre of the tab bar; tape measurements stay a quiet link.
         androidx.compose.material3.TextButton(onClick = onAddMeasurement, modifier = Modifier.fillMaxWidth()) {
             androidx.compose.material3.Text(
                 "Enter tape measurements instead · ${measurements.size} " +

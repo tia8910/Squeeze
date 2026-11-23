@@ -105,6 +105,9 @@ fun SettingsScreen(
 
         if (pro.onSale) ProCard(pro, onOpenPro)
 
+        // Three groups, in the order people come here for them: what the plan is built on,
+        // what happens to their data, and how the app looks and sounds.
+        GroupLabel("YOUR PLAN")
         ProfileSection(
             heightCm = heightCm,
             birthYear = birthYear,
@@ -120,20 +123,10 @@ fun SettingsScreen(
             onGoalChange = onGoalChange,
         )
 
-        GroupLabel("GOOGLE DRIVE BACKUP")
-        BrandCard(Modifier.fillMaxWidth()) {
-            if (pro.pro) {
-                com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
-            } else {
-                Text("Automatic backup to your own Google Drive is part of Pro.", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.TextButton(onClick = onOpenPro) { Text("See Squeeze Pro") }
-            }
-        }
-
         // What happens to the data, as facts with a tick, then the one switch.
-        GroupLabel("PRIVACY CENTRE")
+        GroupLabel("PRIVACY AND DATA")
         GroupCard {
-            InfoRow(Icons.Rounded.PhoneAndroid, "Photos stay on this phone", "Analysed on-device and stored encrypted, never uploaded, not even to your backup.")
+            InfoRow(Icons.Rounded.PhoneAndroid, "Photos stay on this phone", "Analysed on this phone and stored encrypted, never uploaded, not even to your backup.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             InfoRow(Icons.Rounded.Lock, "Encrypted database", "Everything is encrypted with a key kept in your phone's secure hardware.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -148,7 +141,16 @@ fun SettingsScreen(
             )
         }
 
-        GroupLabel("APPEARANCE")
+        BrandCard(Modifier.fillMaxWidth()) {
+            if (pro.pro) {
+                com.squeeze.app.ui.backup.GoogleBackupCard(compact = false)
+            } else {
+                Text("Automatic backup to your own Google Drive is part of Pro.", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.TextButton(onClick = onOpenPro) { Text("See Squeeze Pro") }
+            }
+        }
+
+        GroupLabel("APP")
         SegmentedControl(
             options = listOf("Light", "Dark", "System"),
             selected = when (themeMode) {
@@ -159,7 +161,6 @@ fun SettingsScreen(
             onSelect = { onThemeModeChange(listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)[it]) },
         )
 
-        GroupLabel("SOUND")
         GroupCard {
             ToggleRow(
                 icon = Icons.Rounded.MusicNote,

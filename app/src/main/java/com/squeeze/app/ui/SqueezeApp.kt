@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Person
@@ -88,6 +89,7 @@ private const val ROUTE_LOG = "log"
 private const val ROUTE_MACHINE = "machine"
 private const val ROUTE_PROGRESS = "progress"
 private const val ROUTE_PRO = "pro"
+private const val ROUTE_PLAN_OFFER = "plan_offer"
 
 private enum class Destination(
     val route: String,
@@ -97,7 +99,7 @@ private enum class Destination(
     COMPOSITION("composition", "Body", Icons.Default.MonitorWeight),
     TRAINING("training", "Train", Icons.Default.FitnessCenter),
     NUTRITION("nutrition", "Fuel", Icons.Default.Restaurant),
-    SETTINGS("settings", "You", Icons.Default.Person),
+    SETTINGS("settings", "Profile", Icons.Default.Person),
 }
 
 /**
@@ -116,7 +118,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     // Onboarding and the landing page offer the theme before the app is set up; the choice is
-    // the same setting as You › Appearance.
+    // the same setting as Profile › Appearance.
     val renderingDark = LocalIsDarkTheme.current
     val toggleTheme = { viewModel.setThemeMode(if (renderingDark) ThemeMode.LIGHT else ThemeMode.DARK) }
 
@@ -176,13 +178,14 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         currentRoute == ROUTE_LOG ||
         currentRoute == ROUTE_MACHINE ||
         currentRoute == ROUTE_PROGRESS ||
-        currentRoute == ROUTE_PRO
+        currentRoute == ROUTE_PRO ||
+        currentRoute == ROUTE_PLAN_OFFER
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
-            if (currentRoute == ROUTE_SCAN || currentRoute == ROUTE_CELEBRATION) return@Scaffold
+            if (currentRoute == ROUTE_SCAN || currentRoute == ROUTE_CELEBRATION || currentRoute == ROUTE_PLAN_OFFER) return@Scaffold
 
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -202,7 +205,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
                         activeTab == Destination.TRAINING -> Text("Training")
                         activeTab == Destination.NUTRITION -> Text("Nutrition")
-                        else -> Text("You")
+                        else -> Text("Profile")
                     }
                 },
                 navigationIcon = {
@@ -222,6 +225,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
             BrandNavBar(
                 active = activeTab,
+                onScan = { navController.navigate(ROUTE_SCAN) },
                 onSelect = { destination ->
                     navController.navigate(destination.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
@@ -263,11 +267,12 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         // the true one.
         LaunchedEffect(currentRoute) { viewModel.refresh() }
 
-        // The Pro screen once, right after onboarding, with "Not now" one tap away.
+        // Once, right after onboarding: the plan built from their answers and the free week,
+        // with the free scan one tap away.
         LaunchedEffect(isPro, paywallSeen) {
             if (!isPro && !paywallSeen) {
                 viewModel.markPaywallSeen()
-                navController.navigate(ROUTE_PRO)
+                navController.navigate(ROUTE_PLAN_OFFER)
             }
         }
 
@@ -400,6 +405,15 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
 
                 composable(LABEL_ROUTE) { LabelScreen() }
 
+                composable(ROUTE_PLAN_OFFER) {
+                    com.squeeze.app.ui.pro.PlanOfferScreen(
+                        goal = state.profile?.goal ?: Goal.HYPERTROPHY,
+                        targetBodyFatPercent = state.profile?.targetBodyFatPercent,
+                        targetEpochDay = state.profile?.targetEpochDay,
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+
                 composable(ROUTE_PRO) {
                     com.squeeze.app.ui.pro.PaywallScreen(onClose = { navController.popBackStack() })
                 }
@@ -500,7 +514,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
  * the hairline rule above.
  */
 @Composable
-private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
+private fun BrandNavBar(active: Destination?, onScan: () -> Unit, onSelect: (Destination) -> Unit) {
     val dark = LocalIsDarkTheme.current
 
     // A floating bar: inset from the edges, rounded, on the card surface — the content
@@ -524,7 +538,10 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Destination.entries.forEach { destination ->
+            // Scan sits in the middle, filled: the one action the whole app starts from.
+            val tabs = Destination.entries
+            tabs.forEachIndexed { index, destination ->
+                if (index == tabs.size / 2) ScanButton(onScan)
                 val selected = destination == active
 
                 val tint by androidx.compose.animation.animateColorAsState(
@@ -586,6 +603,31 @@ private fun BrandNavBar(active: Destination?, onSelect: (Destination) -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+/** The Scan button in the centre of the tab bar: filled and blue, so it reads as the main action. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ScanButton(onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(52.dp)
+                .pressScale(interaction)
+                .shadow(14.dp, RoundedCornerShape(20.dp), ambientColor = Brand.Blue, spotColor = Brand.Blue)
+                .clip(RoundedCornerShape(20.dp))
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Brand.IconBlueLight, Brand.IconBlueDeep)))
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClickLabel = "Scan", onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                androidx.compose.material.icons.Icons.Default.CenterFocusStrong,
+                contentDescription = "Scan",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp),
+            )
         }
     }
 }
