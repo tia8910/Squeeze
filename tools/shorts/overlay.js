@@ -165,7 +165,7 @@ export function drawCTA(scene, local) {
   ctx.save();
   const v = easeOut(clamp(local / .5, 0, 1));
   const veil = ctx.createLinearGradient(0, 0, 0, H);
-  veil.addColorStop(0, `rgba(3,9,26,${.88 * v})`); veil.addColorStop(.62, `rgba(3,9,26,${.8 * v})`); veil.addColorStop(1, `rgba(3,9,26,${.35 * v})`);
+  veil.addColorStop(0, `rgba(3,9,26,${.97 * v})`); veil.addColorStop(.45, `rgba(3,9,26,${.95 * v})`); veil.addColorStop(.62, `rgba(3,9,26,${.82 * v})`); veil.addColorStop(1, `rgba(3,9,26,${.35 * v})`);
   ctx.fillStyle = veil; ctx.fillRect(0, 0, W, H);
   const a = easeOut(clamp((local - .15) / .5, 0, 1));
   ctx.globalAlpha = a;
