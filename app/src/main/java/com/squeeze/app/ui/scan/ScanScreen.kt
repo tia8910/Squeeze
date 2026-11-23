@@ -21,6 +21,12 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -641,45 +647,78 @@ private fun CaptureStep(
                     }
                 }
 
+                // Upload, a large round shutter, switch camera: the camera app layout people
+                // already know, with the shutter where the thumb rests.
+                val capture = {
+                    if (countdown == 0) {
+                        if (timerSeconds == 0) {
+                            shoot()
+                        } else {
+                            scope.launch {
+                                countdown = timerSeconds
+                                while (countdown > 0) {
+                                    delay(1000)
+                                    countdown--
+                                }
+                                shoot()
+                            }
+                        }
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        enabled = countdown == 0,
+                    FilledTonalIconButton(
                         onClick = {
-                            if (timerSeconds == 0) {
-                                shoot()
-                            } else {
-                                scope.launch {
-                                    countdown = timerSeconds
-                                    while (countdown > 0) {
-                                        delay(1000)
-                                        countdown--
-                                    }
-                                    shoot()
-                                }
-                            }
+                            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
+                        modifier = Modifier.size(52.dp),
                     ) {
-                        Text(
-                            if (countdown > 0) {
-                            "Get into position…"
-                        } else {
-                            when (step) {
-                                ScanStep.SIDE -> "Capture side"
-                                ScanStep.BACK -> "Capture back"
-                                else -> "Capture front"
-                            }
-                        },
-                        )
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = "Upload a photo")
                     }
-
-                    FilledTonalButton(onClick = { useFrontCamera = !useFrontCamera }) {
+                    Box(
+                        Modifier
+                            .size(84.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .border(4.dp, Color.White, androidx.compose.foundation.shape.CircleShape)
+                            .clickable(
+                                enabled = countdown == 0,
+                                onClickLabel = when (step) {
+                                    ScanStep.SIDE -> "Capture side"
+                                    ScanStep.BACK -> "Capture back"
+                                    else -> "Capture front"
+                                },
+                                onClick = capture,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(66.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (countdown > 0) MaterialTheme.colorScheme.primary else Color.White),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (countdown > 0) {
+                                Text("$countdown", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                            }
+                        }
+                    }
+                    FilledTonalIconButton(onClick = { useFrontCamera = !useFrontCamera }, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.Default.Cameraswitch, contentDescription = "Switch camera")
                     }
                 }
+                Text(
+                    "Analysed on this phone. The photo is never uploaded.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
             }
 
             // The permission prompt lives behind this column, in the space the camera preview
@@ -701,7 +740,7 @@ private fun CaptureStep(
                 }
             }
 
-            OutlinedButton(
+            if (!hasCameraPermission) OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     photoPicker.launch(
