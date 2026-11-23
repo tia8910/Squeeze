@@ -80,6 +80,8 @@ def music(seconds):
         for k in range(8):                                  # eighth-note bass pulse
             ps = s + int(k * beat / 2 * SR)
             pe = min(e, ps + int(beat / 2 * SR))
+            if ps >= pe:
+                break
             pt = t[ps:pe] - t[ps]
             out[ps:pe] += (np.sin(2 * np.pi * f0 / 2 * pt) * np.exp(-pt * 9) * .16).astype(np.float32)
     for k in range(int(seconds / beat) + 1):                # kick
@@ -164,10 +166,35 @@ def main(script_path):
     clip_dur = probe_duration(clip)
     emph = {w.lower() for w in S.get("emphasis", [])}
 
-    # 1) voice, per scene
+    # 1) voice: a recorded voiceover (e.g. ElevenLabs) aligned to its script, or neural TTS
     words, voices, t = [], [], 0.0
     scenes = []
-    for i, sc in enumerate(S["scenes"]):
+    vo = S.get("voiceover")
+    if vo:
+        from align import align
+        base = pathlib.Path(script_path).parent
+        audio = (base / vo["file"]).resolve()
+        text = vo["text"] if "text" in vo else (base / vo["textFile"]).read_text()
+        lead = .3
+        ws = align(audio, text)
+        vdur = probe_duration(audio)
+        # the call to action starts at the first word of vo["ctaFrom"]
+        first = re.findall(r"[\w'’]+", vo.get("ctaFrom", "Want"))[0].lower()
+        cta_i = next((i for i in range(len(ws) - 1, -1, -1) if ws[i]["text"].lower() == first), len(ws))
+        t_cta = lead + (ws[cta_i]["start"] if cta_i < len(ws) else vdur) - .2
+        for w in ws:
+            text_ = re.sub(r"[^\w'×-]", "", w["text"])
+            words.append({"text": text_, "start": lead + w["start"], "end": lead + w["end"],
+                          "emph": text_.lower() in emph or text_.isdigit()})
+        voices.append((lead, audio))
+        ex, cta = S["scenes"][0], S["scenes"][-1]
+        reps = ex.get("reps", [])
+        loops = int(t_cta / max(clip_dur, .1)) + 1
+        ex = {**ex, "reps": [r + k * clip_dur for k in range(loops) for r in reps if r + k * clip_dur < t_cta]}
+        scenes = [{**ex, "start": 0, "end": round(t_cta, 3)},
+                  {**cta, "start": round(t_cta, 3), "end": round(lead + vdur + 1.2, 3)}]
+        t = lead + vdur + 1.2
+    for i, sc in enumerate([] if vo else S["scenes"]):
         mp3 = work / f"vo{i}.mp3"
         ws = asyncio.run(tts(sc["narration"], S.get("voice", "en-US-AndrewNeural"), S.get("rate", "+6%"), mp3))
         vdur = probe_duration(mp3)
@@ -201,7 +228,8 @@ def main(script_path):
     voice = np.zeros(int(total * SR) + SR, np.float32)
     for at, mp3 in voices:
         a = decode(mp3); s = int(at * SR)
-        voice[s:s + len(a)] += a[:len(voice) - s]
+        n = max(0, min(len(a), len(voice) - s))
+        voice[s:s + n] += a[:n]
     voice = voice[:int(total * SR)]
     mix = mixdown(voice, music(total))
     wav = work / "mix.wav"
@@ -217,7 +245,7 @@ def main(script_path):
         speed = S.get("speed", 1.0)
         vf = (f"[0:v]scale={W}:{H},setpts={speed}*PTS,fps={FPS},tpad=stop_mode=clone:stop_duration={total},"
               f"trim=duration={total},format=rgba[base];[base][1:v]overlay=0:0:format=auto,format=yuv420p[v]")
-        run("ffmpeg", "-v", "error", "-y", "-i", clip, "-i", overlay, "-i", wav,
+        run("ffmpeg", "-v", "error", "-y", "-stream_loop", "-1", "-i", clip, "-i", overlay, "-i", wav,
             "-filter_complex", vf, "-map", "[v]", "-map", "2:a",
             "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-r", FPS,
             "-c:a", "aac", "-b:a", "192k", "-t", total, "-movflags", "+faststart", out)
@@ -239,7 +267,7 @@ def main(script_path):
           f"[base][3:v]overlay=0:0:format=auto,format=yuv420p[v]")
     run("ffmpeg", "-v", "error", "-y",
         "-loop", "1", "-framerate", FPS, "-t", total, "-i", bg,
-        "-i", clip,
+        "-stream_loop", "-1", "-i", clip,
         "-loop", "1", "-t", total, "-i", mask,
         "-i", overlay,
         "-i", wav,
