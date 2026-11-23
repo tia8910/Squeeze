@@ -48,6 +48,11 @@ DAILY COACHING
 • Tips for your goal and your training time, every day
 • Clear next steps after every scan
 
+FREE AND PRO
+• The body scan, body fat trend and history are free, always
+• Squeeze Pro adds training, nutrition, coaching and Drive backup
+• 7 days free, then monthly or yearly. Cancel anytime in Google Play
+
 Built for adults who want honest numbers without giving up their privacy.
 
 Squeeze Fit is a fitness and nutrition tool, not a medical device. Talk to a doctor before starting a new diet or training plan.

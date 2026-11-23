@@ -68,6 +68,7 @@ class WorkoutLogViewModel @Inject constructor(
     private val coach: CoachRepository,
     private val profileDao: ProfileDao,
     private val measurementDao: MeasurementDao,
+    private val appReview: com.squeeze.app.play.AppReview,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WorkoutLogUiState())
@@ -143,6 +144,7 @@ class WorkoutLogViewModel @Inject constructor(
                 summary = coach.workoutSummary(),
             )
             refresh()
+            appReview.goodMoment()
         }
     }
 
@@ -152,6 +154,7 @@ class WorkoutLogViewModel @Inject constructor(
             val kcal = coach.logSession(s.sport, s.title.ifBlank { s.sport.label }, s.minutes, s.intensity, s.distanceKm)
             _state.value = s.copy(message = "Saved ${s.sport.label.lowercase()}: ${s.minutes} min, about $kcal kcal above rest.")
             refresh()
+            appReview.goodMoment()
         }
     }
 

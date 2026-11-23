@@ -165,7 +165,7 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
 
             PlanCard(
                 title = "Yearly",
-                price = yearly?.price ?: "$50.00",
+                price = yearly?.price ?: "$49.99",
                 per = "a year",
                 note = yearly?.let { "about ${perMonth(it)} a month" } ?: "about $4.17 a month",
                 badge = saving?.let { "Save $it%" },
@@ -175,7 +175,7 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
             )
             PlanCard(
                 title = "Monthly",
-                price = monthly?.price ?: "$5.00",
+                price = monthly?.price ?: "$4.99",
                 per = "a month",
                 note = "cancel anytime",
                 badge = null,
@@ -195,7 +195,7 @@ fun PaywallScreen(onClose: () -> Unit, viewModel: ProViewModel = hiltViewModel()
             )
             Text(
                 if (trialDays > 0) {
-                    "Free for $trialDays days, then ${selected?.price ?: if (chosen == Products.YEARLY) "$50.00" else "$5.00"} " +
+                    "Free for $trialDays days, then ${selected?.price ?: if (chosen == Products.YEARLY) "$49.99" else "$4.99"} " +
                         "${if (chosen == Products.YEARLY) "a year" else "a month"}. Cancel anytime in Google Play before the " +
                         "trial ends and you won't be charged."
                 } else {
