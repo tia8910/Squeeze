@@ -33,6 +33,7 @@
 -keep class androidx.credentials.playservices.** { *; }
 
 # Annotation-only references from Tink and Guava-style libraries.
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn com.google.api.client.**
