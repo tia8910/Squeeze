@@ -180,6 +180,8 @@ dependencies {
 
     implementation(libs.mediapipe.tasks.vision)
     implementation(libs.onnxruntime.android)
+    implementation(libs.play.review.ktx)
+    implementation(libs.play.app.update.ktx)
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)

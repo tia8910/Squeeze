@@ -337,6 +337,7 @@ class ScanViewModel @Inject constructor(
     private val profileDao: ProfileDao,
     private val photoStore: ScanPhotoStore,
     private val coach: CoachRepository,
+    private val appReview: com.squeeze.app.play.AppReview,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScanUiState())
@@ -948,6 +949,8 @@ class ScanViewModel @Inject constructor(
                 ),
             )
 
+            // A saved scan is the moment the app delivered: Play's rating card may follow.
+            appReview.goodMoment()
             frontBitmap = null
             // The AI's physique read goes where training and nutrition can use it.
             _state.value.physique?.let { report ->

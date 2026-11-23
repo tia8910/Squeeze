@@ -61,6 +61,13 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var uiSettings: UiSettings
     @Inject lateinit var soundEngine: SoundEngine
     @Inject lateinit var backupManager: com.squeeze.app.data.backup.BackupManager
+    @Inject lateinit var appUpdates: com.squeeze.app.play.AppUpdates
+    @Inject lateinit var appReview: com.squeeze.app.play.AppReview
+
+    /** Play's update sheet. A cancelled flexible update is remembered so it is not re-asked. */
+    private val updateLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> if (result.resultCode != RESULT_OK) appUpdates.declined() }
 
     private var unlocked by mutableStateOf(false)
 
@@ -116,6 +123,27 @@ class MainActivity : FragmentActivity() {
                         // preserve yet, and building the dashboard behind the gate would
                         // read the database before the user has proven the phone is theirs.
                         if (everUnlocked) SqueezeApp()
+
+                        // Play's update and rating flows wait until the user is past the
+                        // lock, so neither ever appears over the biometric gate.
+                        val updateReady by appUpdates.readyToInstall.collectAsState()
+                        val reviewDue by appReview.due.collectAsState()
+                        androidx.compose.runtime.LaunchedEffect(unlocked) {
+                            if (unlocked) appUpdates.check(updateLauncher)
+                        }
+                        androidx.compose.runtime.LaunchedEffect(reviewDue, unlocked) {
+                            if (reviewDue && unlocked) {
+                                // Lets the saved confirmation land before Play's card slides up.
+                                kotlinx.coroutines.delay(REVIEW_DELAY_MS)
+                                appReview.ask(this@MainActivity)
+                            }
+                        }
+                        if (updateReady && unlocked) {
+                            com.squeeze.app.ui.components.UpdateReadyCard(
+                                onRestart = appUpdates::install,
+                                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                            )
+                        }
 
                         // LockScreen draws an opaque Surface over the full size, so nothing
                         // underneath is visible here or in the recents thumbnail.
@@ -272,5 +300,6 @@ class MainActivity : FragmentActivity() {
          * dialogs the app itself puts the user through.
          */
         const val GRACE_PERIOD_MS = 30_000L
+        const val REVIEW_DELAY_MS = 1_500L
     }
 }
