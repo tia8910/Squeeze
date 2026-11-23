@@ -108,7 +108,7 @@ fun TrainingScreen(
                     SetupSection(state, viewModel)
                     TrainingTimeSection(state, viewModel)
                     Text(
-                        "Goal: ${state.goal.label()}, change it in You.",
+                        "Goal: ${state.goal.label()}, change it in Profile.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

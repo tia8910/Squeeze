@@ -274,7 +274,7 @@ fun OnboardingScreen(
                     Spacer(Modifier.width(1.dp))
                 }
                 Text(
-                    "Change any of this later under You.",
+                    "Change any of this later in Profile.",
                     style = MaterialTheme.typography.bodySmall,
                     color = muted,
                     modifier = Modifier.align(Alignment.CenterVertically),
@@ -494,7 +494,7 @@ private fun GoalPrompt(
         Text(
             text = "A target with a date is what lets the app tell you whether what you are " +
                 "doing is working, rather than only showing you a number. Skip it if you do " +
-                "not know yet, you can set one any time under You.",
+                "not know yet, you can set one any time in Profile.",
             style = MaterialTheme.typography.bodySmall,
             color = muted,
             modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
