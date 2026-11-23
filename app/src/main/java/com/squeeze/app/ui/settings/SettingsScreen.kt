@@ -199,6 +199,7 @@ private fun ProCard(pro: com.squeeze.app.billing.EntitlementState, onOpenPro: ()
             Text("SQUEEZE PRO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Text(
                 when {
+                    paid && pro.trialDaysLeft != null -> trialLine(pro.trialDaysLeft)
                     paid -> "Pro is active"
                     pro.debugUnlocked -> "Unlocked in this test build"
                     else -> "Try 7 days free"
@@ -208,6 +209,7 @@ private fun ProCard(pro: com.squeeze.app.billing.EntitlementState, onOpenPro: ()
             )
             Text(
                 if (pro.plan == com.squeeze.app.billing.Products.REVIEW_ACCESS) "Unlocked with an access code"
+                else if (paid && pro.trialDaysLeft != null) "Then billed by Google Play. Cancel anytime before it ends."
                 else if (paid) "Manage or cancel in Google Play" else "Training, nutrition, coaching and backup",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
@@ -292,4 +294,11 @@ private fun AboutCard() {
             modifier = Modifier.padding(top = 8.dp),
         )
     }
+}
+
+/** "Free trial, 3 days left", or the last-day wording. */
+internal fun trialLine(daysLeft: Int): String = when (daysLeft) {
+    0 -> "Free trial ends today"
+    1 -> "Free trial, 1 day left"
+    else -> "Free trial, $daysLeft days left"
 }

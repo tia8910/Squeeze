@@ -126,9 +126,33 @@ fun ScanScreen(
         )
     }
 
+    // Android stops showing the permission dialog after a second "Don't allow", and the
+    // request then returns false instantly. Without this the camera button did nothing at all;
+    // with it, the button opens the app's settings page where the camera can be allowed.
+    var cameraBlocked by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> hasCameraPermission = granted }
+    ) { granted ->
+        hasCameraPermission = granted
+        val activity = context.findActivity()
+        cameraBlocked = !granted && activity != null &&
+            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+    }
+
+    // Coming back from the settings page with the camera allowed should just work.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                if (hasCameraPermission) cameraBlocked = false
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
 
     // Deliberately not requested on entry: uploading needs no camera, and a reflexive denial
     // would block the capture path permanently.
@@ -154,7 +178,19 @@ fun ScanScreen(
             failure = state.failure,
             profileMissing = state.profileMissing,
             hasCameraPermission = hasCameraPermission,
-            onRequestCamera = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onRequestCamera = {
+                if (cameraBlocked) {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        ),
+                    )
+                } else {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            cameraBlocked = cameraBlocked,
             onCapture = viewModel::onPhotoCaptured,
             onPhotoPicked = viewModel::onPhotoPicked,
             onCheckFraming = viewModel::checkFraming,
@@ -236,6 +272,7 @@ private fun CaptureStep(
     profileMissing: Boolean,
     hasCameraPermission: Boolean,
     onRequestCamera: () -> Unit,
+    cameraBlocked: Boolean,
     onCapture: (Bitmap) -> Unit,
     onPhotoPicked: (Uri) -> Unit,
     /**
@@ -254,6 +291,7 @@ private fun CaptureStep(
     val sound = LocalSoundEngine.current
 
     var useFrontCamera by remember { mutableStateOf(false) }
+    var captureFailed by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableIntStateOf(DEFAULT_TIMER_SECONDS) }
     var countdown by remember { mutableIntStateOf(0) }
 
@@ -279,22 +317,27 @@ private fun CaptureStep(
     ) { uri: Uri? -> uri?.let(onPhotoPicked) }
 
     fun shoot() {
+        captureFailed = false
         imageCapture.takePicture(
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     // Only on a frame that actually decoded. A shutter sound for a capture
                     // that produced nothing would tell the user the opposite of the truth.
-                    image.decodeToBitmap()?.let { bitmap ->
+                    val bitmap = image.decodeToBitmap()
+                    image.close()
+                    if (bitmap == null) {
+                        captureFailed = true
+                    } else {
                         sound?.play(Cue.CAPTURE)
                         onCapture(bitmap)
                     }
-                    image.close()
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    // The step is unchanged, so the user simply taps again.
-                    exception.printStackTrace()
+                    // The step is unchanged; the message says so, so the user taps again
+                    // instead of waiting for a photo that is not coming.
+                    captureFailed = true
                 }
             },
         )
@@ -535,6 +578,14 @@ private fun CaptureStep(
                     AiLiveBadge(framingHint)
                 }
 
+                if (captureFailed) {
+                    Text(
+                        "The photo did not take. Tap capture to try again.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -637,9 +688,16 @@ private fun CaptureStep(
             // the screen offered only an upload. The ask belongs in the same stack as the
             // actions it unlocks.
             if (!hasCameraPermission) {
+                if (cameraBlocked) {
+                    Text(
+                        "Camera access is off for Squeeze. Allow it in Settings, or upload a photo instead.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
                 Button(onClick = onRequestCamera, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.PhotoCamera, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Use the camera")
+                    Text(if (cameraBlocked) "  Open settings" else "  Use the camera")
                 }
             }
 
@@ -1910,4 +1968,10 @@ private fun AccuracyDisclaimer() {
             )
         }
     }
+}
+
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

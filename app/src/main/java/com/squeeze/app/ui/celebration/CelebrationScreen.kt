@@ -57,6 +57,8 @@ fun CelebrationScreen(
     /** The journey's next step; when there is one, it is the main button. */
     nextStep: com.squeeze.core.coach.JourneyStep? = null,
     onNextStep: () -> Unit = {},
+    /** Set for free users: Pro becomes the main next step after a saved scan. */
+    onOpenPro: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val sound = LocalSoundEngine.current
@@ -163,7 +165,15 @@ fun CelebrationScreen(
             modifier = Modifier.alpha(contentAlpha.value),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (nextStep != null) {
+            if (onOpenPro != null) {
+                // Free users: the scan is saved, and Pro is what turns it into a plan.
+                com.squeeze.app.ui.pro.ProTeaserCard(
+                    headline = "Your scan is saved",
+                    detail = "Squeeze Pro turns it into a training week and meals for your goal.",
+                    onOpenPro = onOpenPro,
+                )
+                androidx.compose.material3.TextButton(onClick = onViewProgress) { androidx.compose.material3.Text("View progress") }
+            } else if (nextStep != null) {
                 // The domino: finishing one step hands straight to the next.
                 PrimaryButton(text = "Next: ${nextStep.title}", onClick = onNextStep)
                 androidx.compose.material3.TextButton(onClick = onViewProgress) { androidx.compose.material3.Text("View progress") }
