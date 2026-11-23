@@ -1,112 +1,222 @@
-SQUEEZE FIT: GROK VIDEO PROMPTS
-One prompt per exercise. Use image-to-video with the white sculpture image, paste the
-whole prompt. Each prompt describes the full 50-second video; if Grok makes a shorter
-clip, extend it with the same prompt until you have about 50 seconds.
+SQUEEZE FIT: GROK VIDEO PROMPTS (DETAILED)
+One prompt per exercise. Use image-to-video with the full-body white sculpture image and
+paste the whole prompt. Choose the highest quality / resolution setting Grok offers.
+Each clip ends on a steady pose (no dropping, jumping off or walking away), because
+endings with big movements are where AI video tends to glitch.
+Send the clips in order and say the exercise number; I join them to about 50 seconds.
 
 
 ====================================================================================
 1. FALSE-GRIP HANG (BAR)
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. The camera slowly pushes in on his forearms as they glow red. He reaches up and sets the heels of his hands on top of a black pull-up bar, wrists bent sharply over it, then hangs with straight arms and a still body. The camera circles from the side to behind him, then moves to a close-up of his wrists curled over the bar, forearm muscles glowing red and tensing. In slow motion his grip tightens and the forearms glow brighter. He drops down, shakes out his arms and turns to face the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He hangs from a straight black steel pull-up bar using a FALSE GRIP: the heels of both palms rest ON TOP of the bar, wrists bent sharply forward over the bar so the knuckles point toward the camera, fingers curled down the front of the bar. Arms fully straight, shoulders pulled slightly down, legs straight together, toes pointed, body perfectly still with no swinging. Both forearms glow red, brightest on the inner forearm from the wrist to just below the elbow, the glow slowly pulsing.
+
+Camera: starts as a medium shot from the side at chest height, slowly arcs around to a 3/4 front view, then pushes in to a close-up of both wrists bent over the bar with the red forearm muscles tensing, then a slow-motion close-up as his wrists curl harder and the red glow brightens. End holding the hang, perfectly still.
+
+Do not show: a normal overhand grip, straight wrists, rings, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 2. WRIST ROLLER
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands holding a black wrist roller with both arms straight out in front at shoulder height. He rolls it one wrist at a time, the rope winding up and lifting a small black weight plate, then slowly unrolls it back down. His forearms glow red and pulse with each turn. The camera moves from a front view to a close-up of his hands and forearms, then to a side view showing his straight arms and still shoulders. He lowers the roller and turns to face the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall, feet hip-width apart, holding a black wooden wrist-roller handle with both hands, palms facing down, arms fully straight out in front at shoulder height. A thin black rope hangs from the middle of the handle to a small black weight plate near the floor. He turns the handle with alternating wrist rolls, one hand then the other, winding the rope so the plate rises slowly to the handle, then reverses to lower it under control. Shoulders stay down and still, only the wrists move. Both forearms glow red on the top and the inner side, pulsing with each turn.
+
+Camera: starts as a full-body front view, moves to a medium side view showing the straight arms and rising plate, then a close-up of his hands and forearms turning the handle with the red muscles flexing, then a slow-motion close-up of one wrist roll. End holding the arms out with the plate raised.
+
+Do not show: bent elbows, shrugging shoulders, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 3. RICE BUCKET TRAINING
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He kneels beside a bucket filled with white rice and pushes both hands deep into it. He squeezes into fists, spreads his fingers wide, and twists his wrists side to side, rice shifting around his forearms. His forearms glow red and pulse. The camera moves from a front 3/4 view to a close-up of his forearms entering the rice, then a slow-motion shot of his fingers spreading open under the grains. He pulls his hands out, rice falling away, and looks at the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He kneels upright in front of a tall black bucket filled to the top with dry white uncooked rice. Both hands are pushed deep into the rice up to the middle of his forearms. He repeatedly squeezes his hands into tight fists, then spreads his fingers wide open, then twists his wrists left and right, the rice grains shifting and rippling around his forearms. His forearms glow red from wrist to elbow, pulsing with each squeeze.
+
+Camera: starts as a medium front 3/4 shot of him kneeling at the bucket, moves closer to the surface of the rice showing the grains moving around his forearms, then a slow-motion close-up of the rice surface as his hands twist underneath, red forearm muscles visible above the rice. End with his hands still deep in the rice, steady.
+
+Do not show: rice spilling everywhere, sand or water, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 4. PLATE PINCH HOLD
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He picks up two black weight plates pinched together in one hand, smooth sides out, and stands tall with his arm straight at his side, holding them still. His forearm and thumb glow red and tremble with effort. The camera moves from a front view to a close-up of his thumb and fingers pinching the plates, then circles to a side view. In slow motion his fingers squeeze harder. He sets the plates down, switches hands, and lifts them again.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall with his right arm straight down at his side, pinching two flat black weight plates pressed together, smooth sides facing out: the thumb flat on one side, the four fingers flat on the other, no fingers hooked over the top. The plates hang just beside his thigh, held perfectly still. His shoulders are level, chest up. His right forearm and the muscle at the base of his thumb glow red, pulsing as his grip trembles slightly with effort.
+
+Camera: starts as a full-body front view, moves to a medium side view of the arm and plates, then a close-up of his thumb and fingers pinching the smooth plates with the red forearm muscles tense, then a slow-motion close-up as his fingers squeeze harder. End holding the plates still at his side.
+
+Do not show: fingers wrapped over the top of the plates, the plates slipping, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 5. TOWEL HANG
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. Two thick grey towels hang over a black pull-up bar. He grabs one towel in each hand and hangs with straight arms and active shoulders, body still. His forearms glow red and pulse. The camera moves from a front view to a close-up of his fists crushing the towels, then circles behind him. In slow motion his grip tightens and the towels twist. He drops down and shakes out his hands, facing the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+Two thick plain grey towels are draped over a straight black steel pull-up bar, shoulder-width apart, hanging down vertically. He grips one towel in each fist, hands wrapped tightly around the fabric at head height, and hangs with arms fully straight, legs straight together, body perfectly still with no swinging. Both forearms glow red from wrist to elbow, pulsing as his fists crush the towels.
+
+Camera: starts as a full-body front view, slowly arcs to a side view, then pushes in to a close-up of his fists squeezing the twisted towel fabric with the red forearm muscles tensing, then a slow-motion close-up as his grip tightens. End holding the hang, still.
+
+Do not show: hands on the bar itself, swinging, logos on the towels or shorts, text, extra fingers, other people.
 
 
 ====================================================================================
 6. SLEDGEHAMMER LEVERING
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He holds a sledgehammer near the end of the handle, elbow tucked at his side, forearm pointing forward. He slowly lowers the hammer head forward toward the floor using only his wrist, then raises it back to vertical. His forearm glows red, brightest on the thumb side. The camera moves from a side view to a close-up of his wrist and forearm, then shows the hammer tilting in slow motion. He rests the hammer down and turns to the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall holding a black sledgehammer in his right hand, gripping the very end of the wooden handle. His upper arm is tucked against his side and his elbow is bent at ninety degrees, forearm pointing straight forward, the hammer head pointing straight up. Keeping his elbow and upper arm completely still, he slowly tilts the hammer forward using only his wrist until the head points toward the floor in front of him, then slowly raises it back to vertical. His right forearm glows red, brightest along the thumb side of the forearm, pulsing with each lift.
+
+Camera: starts as a medium side view of his whole arm and the hammer, moves to a close-up of his wrist and forearm, then shows the hammer tilting forward and back in slow motion. End holding the hammer upright and still.
+
+Do not show: swinging or striking with the hammer, the elbow moving, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 7. THICK-BAR HOLD
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. Two heavy black dumbbells with extra-thick grips rest on the floor. He deadlifts them and stands tall, holding them at his sides, squeezing the thick handles hard. His forearms glow red and pulse. The camera moves from a front view to a close-up of his hands wrapped around the thick grips, then circles to a side view. In slow motion his knuckles tighten. He sets the dumbbells down and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall holding a heavy black hexagonal dumbbell in each hand at his sides, arms straight. Each dumbbell handle is wrapped in a thick black rubber grip, so his fingers can barely close around it. He squeezes the thick handles as hard as possible, knuckles tight, shoulders level and pulled back, standing perfectly still. Both forearms glow red from wrist to elbow, pulsing with the squeeze.
+
+Camera: starts as a full-body front view, moves to a medium side view, then a close-up of one hand wrapped around the thick grip with the red forearm muscles straining, then a slow-motion close-up as his knuckles tighten further. End holding still.
+
+Do not show: thin normal handles, the dumbbells being dropped, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 8. ZOTTMAN CURL
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands holding two black dumbbells. He curls them up with palms facing up while his biceps glow red, rotates his palms to face down at the top, then lowers slowly while his forearms glow red. He repeats for several smooth reps. The camera moves from a front view to a close-up of the wrist turn at the top, then a side view. The rotation at the top is shown in slow motion. He finishes, lowers the dumbbells and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall holding a black hexagonal dumbbell in each hand, arms straight at his sides. With elbows pinned to his sides, he curls both dumbbells up with palms facing up while the front of his upper arms (biceps) glow red. At the top, he rotates both wrists so the palms face down, then lowers the dumbbells slowly with palms down while the top of his forearms glow red. At the bottom, he rotates the palms back up. Three smooth controlled reps, no swinging of the body.
+
+Camera: starts as a full-body front view, moves to a medium 3/4 view, then a close-up of the wrist rotation at the top of the curl, shown in slow motion. End standing still with the dumbbells at his sides.
+
+Do not show: elbows moving forward, leaning back, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 9. RUBBER BAND FINGER EXTENSIONS
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He holds one hand up in front of his chest with a thick rubber band looped around all his fingertips. He spreads his fingers wide against the band, pauses, then closes them slowly, repeating steadily. The back of his forearm glows red. The camera starts on his full upper body, moves into a close-up of his hand and forearm, then shows the fingers spreading in slow motion. He switches the band to the other hand and continues.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall with his right forearm raised in front of his chest, hand open with the palm facing him. A thick black rubber band is looped around the tips of all five fingers. He spreads his fingers wide apart against the band, stretching it, pauses for a moment, then slowly brings the fingertips back together. He repeats steadily. The back of his right forearm, from the wrist to just below the elbow, glows red and pulses each time the fingers open.
+
+Camera: starts as a medium shot of his upper body, then pushes in to a close-up of the hand and forearm, then a slow-motion close-up of the fingers spreading against the band. End with the fingers spread wide and still.
+
+Do not show: a hair tie or tiny band, a fist, logos, text, extra or missing fingers, other people.
 
 
 ====================================================================================
 10. BEHIND-THE-BACK WRIST CURL
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands holding a black barbell behind his back, arms straight, palms facing backward. He lets the bar roll down to his fingertips, then curls it back up using only his wrists, repeating steadily. His forearms glow red. The camera moves from a back view to a close-up of his hands and the rolling bar, then to a side view. The curl up is shown in slow motion. He sets the bar down and turns to the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He stands tall with his back to the camera, holding a black barbell behind his body just below his glutes, arms fully straight, hands shoulder-width apart, palms facing backward toward the camera. He opens his hands so the bar rolls down to his fingertips, then curls his fingers and then his wrists to roll the bar back up as high as his wrists allow. His arms and shoulders stay completely still. Both forearms glow red on the inner side, pulsing with each curl.
+
+Camera: starts as a full-body back view, moves to a medium shot of his hands and the barbell, then a close-up of the bar rolling down the fingers and curling back up, shown in slow motion. End holding the bar curled up, still.
+
+Do not show: elbows bending, a bar in front of the body, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 11. SEATED SOLEUS RAISE
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He sits on a black bench with knees bent at ninety degrees and a black weight plate resting on his thighs. He rises high onto the balls of his feet, pauses, then lowers his heels slowly, repeating. His lower calves glow red. The camera moves from a side view at low angle to a close-up of his calves and heels, then shows the rise in slow motion. He lifts the plate off and stands up facing the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He sits upright on a black flat bench with his knees bent at ninety degrees, feet flat on the floor hip-width apart, a large black weight plate resting on top of his thighs just above the knees, held in place by his hands. He rises slowly onto the balls of his feet as high as possible, pauses for a moment at the top, then lowers his heels slowly to the floor over three seconds. He repeats steadily. The lower part of his calves, below the main calf bulge just above the Achilles tendon, glows red and pulses at the top of each rise.
+
+Camera: starts as a low side view of his whole body on the bench, moves to a close-up of his calves and heels, then a slow-motion close-up of the heels rising. End with the heels raised and still.
+
+Do not show: standing up, straight legs, logos, text, extra toes, other people.
 
 
 ====================================================================================
 12. POGO HOPS
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands tall with knees nearly straight and does quick, light bounces on the balls of his feet, heels barely touching the floor, arms relaxed. His calves glow red and pulse with each hop. The camera moves from a side view, full body, to a low close-up of his feet and calves, then shows several hops in slow motion with the calves flexing. He stops, stands still and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He stands tall with feet hip-width apart, knees almost straight, arms relaxed at his sides. He does quick, small, springy bounces straight up and down on the balls of his feet, only a few centimetres off the floor, heels never touching down, body upright and stiff like a spring, landing in the same spot each time. His calves glow red, pulsing with every landing.
+
+Camera: starts as a full-body side view, moves to a low close-up of his feet and calves at floor level, then a slow-motion close-up of one landing showing the calves and Achilles tendons absorbing the bounce. End standing still on the balls of his feet.
+
+Do not show: big jumps, bent knees, travelling forward, logos, text, extra toes, other people.
 
 
 ====================================================================================
 13. BACKWARD SLED DRAG
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He holds two straps attached to a black weight sled and walks backward with short, quick steps, leaning back slightly, dragging the sled across the floor. The fronts of his thighs glow red. The camera tracks him from the side, moves to a close-up of his thighs and knees driving, then shows a step in slow motion. He stops, drops the straps and turns to the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a smooth dark floor, a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He faces a low black weight sled loaded with plates, holding two black straps attached to the sled, arms straight out in front of him. He walks backward away from the sled with short quick steps, staying on the balls of his feet, knees slightly bent and pushing forward over his toes, leaning his body back slightly, dragging the sled steadily across the floor toward him. The fronts of his thighs, especially just above the knees, glow red and pulse with each step.
+
+Camera: tracks alongside him from a side view, full body, then moves to a close-up of his thighs and knees driving, then a slow-motion shot of one step. End with him standing still holding the straps taut.
+
+Do not show: walking forward, pulling with bent arms, logos, text, extra toes, other people.
 
 
 ====================================================================================
 14. POLIQUIN STEP-UP
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands on a low black step with one heel raised on a small wedge. He bends that knee forward over his toes, lowering until the other foot lightly taps the floor, then drives back up, repeating slowly. The inner thigh just above his knee glows red. The camera moves from a side view, full body, to a close-up of his knee travelling forward, then shows the drive up in slow motion. He steps down and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He stands on one leg on a low black step box about knee-height to his shin, the heel of the standing foot raised on a small black wedge. His other leg hangs off the front edge. Keeping his torso upright, he slowly bends the standing knee forward far over his toes, lowering until the heel of the free foot lightly taps the floor, then drives back up to a straight leg. He repeats slowly. The inner front of the standing thigh, the teardrop-shaped muscle just above and inside the knee, glows red and pulses at the bottom of each rep.
+
+Camera: starts as a full-body side view, moves to a close-up of the knee travelling forward over the toes, then a slow-motion shot of the drive back up. End standing tall on the step.
+
+Do not show: stepping fully down, leaning forward at the hips, logos, text, extra toes, other people.
 
 
 ====================================================================================
 15. SPANISH SQUAT
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. A thick black resistance band loops behind both his knees, anchored to a post in front of him. He sits back into a squat with vertical shins and chest up, then holds still, his legs trembling with effort. The fronts of his thighs glow red and pulse. The camera moves from a side view, full body, to a close-up of his thighs and the band behind his knees, then slowly circles him. He stands up, steps out of the band and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+A thick black resistance band is anchored to a black steel post in front of him and looped around the backs of both his knees, pulling them forward. He sits back into a squat, leaning into the band, until his thighs are close to parallel with the floor, with his shins perfectly vertical, chest up and arms held out in front for balance. He holds this position completely still, his legs trembling slightly with effort. The fronts of both thighs glow red and pulse.
+
+Camera: starts as a full-body side view showing the vertical shins and the taut band, moves to a close-up of the band behind his knees and the red thighs, then slowly circles around him to a front 3/4 view. End holding the squat still.
+
+Do not show: knees travelling forward past the toes, a band around the ankles, logos, text, extra toes, other people.
 
 
 ====================================================================================
 16. HIP AIRPLANE
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He stands on one leg and hinges forward, his other leg extended behind him, torso nearly level with the floor. He slowly rotates his hips open, turning his chest toward the side, then rotates back to face the floor, balanced and controlled. The side of his standing hip glows red. The camera moves from a front 3/4 view, full body, to a close-up of his hip, then shows the rotation in slow motion. He returns to standing and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He stands on his left leg with a slight knee bend and hinges forward at the hips until his torso is nearly parallel to the floor, his right leg extended straight behind him in line with his body, arms out to the sides like wings. Balanced and controlled, he slowly rotates his hips and torso open, turning his chest toward the side so his right hip points up, then slowly rotates back until his chest faces the floor again. He repeats slowly. The side of his left hip, the outer upper buttock of the standing leg, glows red and pulses.
+
+Camera: starts as a full-body front 3/4 view, moves to a close-up of the standing hip, then shows one rotation in slow motion. End balanced with the chest facing the floor, still.
+
+Do not show: losing balance, the free foot touching down, logos, text, extra toes, other people.
 
 
 ====================================================================================
 17. SUITCASE CARRY
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. He picks up one heavy black kettlebell in one hand and walks forward with steady steps, torso perfectly upright, not leaning toward the weight. The side of his waist and his gripping forearm glow red. The camera tracks him from the front, moves to a close-up of his straight torso and the kettlebell, then a side view. He sets the kettlebell down, switches hands and walks back toward the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a smooth dark floor, a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five fingers on each hand.
+
+He walks slowly forward toward the camera holding one heavy black kettlebell in his right hand at his side, arm straight. His torso stays perfectly upright and level, shoulders square, not leaning toward the weight at all, his free left arm relaxed. Steady, even steps. The left side of his waist (the obliques on the side opposite the weight) and his right forearm glow red and pulse.
+
+Camera: starts as a full-body front view with the camera slowly moving backward ahead of him, moves to a side view, then a close-up of his straight torso and the red obliques, then a slow-motion shot of one step. End standing still holding the kettlebell at his side.
+
+Do not show: leaning sideways, two weights, putting the weight down, logos, text, extra fingers, other people.
 
 
 ====================================================================================
 18. SISSY SQUAT
 ====================================================================================
-White anatomical sculpture man from the image, glossy white skin with every muscle visible, bald, black athletic shorts, barefoot, in a dark navy studio with soft top light and blue rim light. Vertical 9:16, realistic smooth motion, no text. Holding a black pole beside him for balance, he rises onto his toes and leans back as his knees travel forward, lowering slowly under control, then returns to standing, repeating. The fronts of his thighs glow red. The camera moves from a side view, full body, to a close-up of his thighs stretching, then shows the lowering in slow motion. He stands tall, lets go of the pole and faces the camera.
+Photorealistic 3D render. The same white anatomical sculpture man from the image: glossy white porcelain skin with every muscle and tendon sculpted and visible, bald, smooth faceless calm expression, plain black athletic shorts with no logo, no stripes and no text, barefoot. Dark navy studio with a soft spotlight from above, a thin blue rim light outlining his body, light haze. Vertical 9:16, highest resolution, sharp focus, smooth realistic motion, correct anatomy with five toes on each foot.
+
+He stands beside a vertical black steel pole, holding it with his left hand for balance. He rises onto the balls of his feet, then slowly leans his whole body back in one straight line from knees to head while his knees travel forward and down, lowering under control until his knees are far in front of his toes and his torso is leaning well back. He pauses, then rises back to standing the same way. He repeats slowly. The fronts of both thighs glow red and pulse at the bottom of each rep.
+
+Camera: starts as a full-body side view, moves to a close-up of his thighs stretching and the knees travelling forward, then shows the lowering in slow motion. End standing tall on the balls of his feet, holding the pole, still.
+
+Do not show: bending at the hips, sitting back like a normal squat, letting go of the pole, logos, text, extra toes, other people.
