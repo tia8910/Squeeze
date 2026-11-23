@@ -232,6 +232,77 @@ elif STYLE == "halo":
     area("rimL", (-2.4, 2.0, 3.0), (0, 0, 1.1), .9, 900, (.25, .45, 1))
     area("rimR", (2.4, 2.0, 3.0), (0, 0, 1.1), .9, 900, (.25, .45, 1))
 
+elif STYLE in ("stopwatch", "portal", "corridor"):
+    # Halo family: a ring frames the athlete; logo small, top-left; soft haze behind
+    if STYLE == "portal":
+        bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 8.0, 3)); wb = obj()
+        wb.scale = (16, 7, 1); wb.rotation_euler = (math.radians(90), 0, 0)
+        wb.data.materials.append(mat("deep_wall", (.0008, .0016, .005), rough=.9))
+    else:
+        wall(mat("navy_wall", (.0016, .003, .01), rough=.75))
+    lockup(SILVER, y=2.985 if STYLE != "portal" else 2.6, emblem_glow=1.5, scale=.6, left=-1.52, z=2.78)
+    ring_y = 3.1 if STYLE != "portal" else 2.7
+
+    def ring(r, y, z, strength, thick=.02, color=BLUE):
+        bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=thick, major_segments=256, minor_segments=12,
+                                         location=(0, y, z), rotation=(math.radians(90), 0, 0))
+        obj().data.materials.append(mat(f"ring{y:.1f}{r:.2f}", color, emit=color, strength=strength))
+
+    if STYLE == "stopwatch":
+        ring(1.12, ring_y, 1.12, 1.2, thick=.012, color=SKY)
+        # tick marks round the dial; every fifth one longer and brighter
+        tick = mat("tick", SKY, emit=SKY, strength=3)
+        tick_hi = mat("tick_hi", (1, 1, 1), emit=(.85, .9, 1), strength=6)
+        for i in range(60):
+            a = i / 60 * 2 * math.pi
+            big = i % 5 == 0
+            L = .14 if big else .07
+            rr = 1.24 + L / 2
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(rr * math.sin(a), ring_y, 1.12 + rr * math.cos(a)),
+                                            rotation=(0, a, 0))
+            t_ = obj(); t_.scale = (.012 if big else .007, .01, L); t_.data.materials.append(tick_hi if big else tick)
+        # the progress arc: three quarters of the dial, bright
+        cu = bpy.data.curves.new("arc", "CURVE"); cu.dimensions = "3D"
+        sp_ = cu.splines.new("POLY"); n = 180
+        sp_.points.add(n - 1)
+        for i in range(n):
+            a = i / (n - 1) * 2 * math.pi * .75
+            sp_.points[i].co = (1.12 * math.sin(a), 0, 1.12 + 1.12 * math.cos(a), 1)
+        cu.bevel_depth = .026; cu.bevel_resolution = 6
+        arc = bpy.data.objects.new("arc", cu); sc.collection.objects.link(arc); arc.location = (0, ring_y - .02, 0)
+        cu.materials.append(mat("arc", BLUE, emit=BLUE, strength=11))
+        # glowing tip at the end of the arc
+        a = 2 * math.pi * .75
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=.05, location=(1.12 * math.sin(a), ring_y - .03, 1.12 + 1.12 * math.cos(a)))
+        obj().data.materials.append(mat("tip", (1, 1, 1), emit=(.9, .95, 1), strength=14))
+    elif STYLE == "portal":
+        for k, y_ in enumerate((2.7, 3.7, 4.7, 5.7, 6.7, 7.7)):
+            ring(1.12, y_, 1.12, 9 * (.62 ** k), thick=.02)
+    else:  # corridor
+        ring(1.12, ring_y, 1.12, 9)
+        ring(1.19, ring_y + .02, 1.12, 2.5, thick=.006, color=SKY)
+        blade = lambda k: mat(f"blade{k}", SKY, emit=SKY, strength=7 * (.7 ** k))
+        for k, y_ in enumerate((.2, .9, 1.6, 2.3, 3.0)):
+            for x_ in (-1.22, 1.22):
+                bpy.ops.mesh.primitive_cube_add(size=1, location=(x_, y_, 1.9)); b_ = obj()
+                b_.scale = (.025, .02, 3.6); b_.data.materials.append(blade(k))
+        # thin floor lines leading back to the wall
+        for x_ in (-.75, .75):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(x_, 2.2, .003)); l_ = obj()
+            l_.scale = (.012, 2.0, .004); l_.data.materials.append(mat("floorline", BLUE, emit=BLUE, strength=4))
+
+    stage(STAGE, words=True)
+    area("key", (-2.0, -3.0, 4.6), (0, 0, 1.0), 1.4, 340, (1, .97, .94))
+    area("rimL", (-2.4, 2.0, 3.0), (0, 0, 1.1), .9, 900, (.25, .45, 1))
+    area("rimR", (2.4, 2.0, 3.0), (0, 0, 1.1), .9, 900, (.25, .45, 1))
+    # soft haze between the athlete and the ring, so the lights bloom
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 1.8, 1.8)); hz = obj(); hz.scale = (4.5, 2.6, 3.6)
+    vm = bpy.data.materials.new("haze"); vm.use_nodes = True; vn = vm.node_tree.nodes
+    vn.remove(vn["Principled BSDF"]); pv = vn.new("ShaderNodeVolumePrincipled")
+    pv.inputs["Density"].default_value = .012
+    vm.node_tree.links.new(pv.outputs[0], vn["Material Output"].inputs["Volume"])
+    hz.data.materials.append(vm); hz.visible_shadow = False
+
 elif STYLE == "fluted":
     # Fluted wall: vertical ribs lit from above, halo-lit metal letters, black marble stage
     wall(mat("rib_back", (.002, .003, .008), rough=.6))
