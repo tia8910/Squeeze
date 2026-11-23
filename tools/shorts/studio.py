@@ -126,17 +126,24 @@ BADGE = HERE / "brand/google-play-badge.png"
 LOCK_Z = 2.62
 
 
-def lockup(letters, y=2.985, emblem_glow=1.7, halo=False, badge=True):
-    """Emblem + SQUEEZE FIT + the Google Play badge, above head height."""
-    picture(EMBLEM, .5, (-.78, y + .005, LOCK_Z + .02), emblem_glow)
-    text("SQUEEZE FIT", .27, (.32, y, LOCK_Z + .12), (math.radians(90), 0, 0), letters, extrude=.015, spacing=1.06)
+def lockup(letters, y=2.985, emblem_glow=1.7, halo=False, badge=True, scale=1.0, left=None, z=None):
+    """Emblem + SQUEEZE FIT + the Google Play badge. Centred above head height by default;
+    with `left` it is anchored at that x on the wall (scaled by `scale`), at height `z`."""
+    zc = LOCK_Z if z is None else z
+    if left is None:
+        X = lambda x: x
+    else:
+        X = lambda x: left + (x + 1.03) * scale
+    Z = lambda dz: zc + dz * scale
+    picture(EMBLEM, .5 * scale, (X(-.78), y + .005, Z(.02)), emblem_glow)
+    text("SQUEEZE FIT", .27 * scale, (X(.32), y, Z(.12)), (math.radians(90), 0, 0), letters, extrude=.015, spacing=1.06)
     if halo:
         # halo-lit signage: glowing copies just behind the letters wash the wall in blue
         glow = mat("halo", BLUE, emit=BLUE, strength=5)
-        t = text("SQUEEZE FIT", .27, (.32, y + .022, LOCK_Z + .12), (math.radians(90), 0, 0), glow, spacing=1.06)
+        t = text("SQUEEZE FIT", .27 * scale, (X(.32), y + .022, Z(.12)), (math.radians(90), 0, 0), glow, spacing=1.06)
         t.visible_camera = False; t.visible_glossy = False
     if badge and BADGE.exists():
-        picture(BADGE, .52, (.32, y + .005, LOCK_Z - .17), .85)
+        picture(BADGE, .52 * scale, (X(.32), y + .005, Z(-.17)), .85)
 
 
 def wall(material):
@@ -213,7 +220,7 @@ elif STYLE == "gallery":
 elif STYLE == "halo":
     # Halo: a large glowing ring on the wall frames the athlete, launch-stage style
     wall(mat("navy_wall", (.0018, .0035, .011), rough=.7))
-    lockup(SILVER, emblem_glow=1.5)
+    lockup(SILVER, emblem_glow=1.5, scale=.6, left=-1.52, z=2.78)
     bpy.ops.mesh.primitive_torus_add(major_radius=1.12, minor_radius=.022, major_segments=256, minor_segments=12,
                                      location=(0, 3.1, 1.12), rotation=(math.radians(90), 0, 0))
     obj().data.materials.append(mat("halo_ring", BLUE, emit=BLUE, strength=9))
