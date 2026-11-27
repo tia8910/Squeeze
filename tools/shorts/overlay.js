@@ -160,102 +160,111 @@ export function drawHook(scene, local) {
   ctx.restore();
 }
 
-// End card: the brand, then the app's three standout features, then the Play badge.
+// End card: the app itself. A phone shows three real screens in turn (scan, track,
+// privacy) with a caption for each, then the Google Play badge.
 const FEATURES = [
-  { icon: 'scan', title: 'SCAN', text: 'Body fat from one photo' },
-  { icon: 'track', title: 'TRACK', text: 'Real change, not daily noise' },
-  { icon: 'lock', title: 'PRIVATE', text: 'Photos never leave your phone' },
+  { title: 'SCAN', text: 'Every muscle read from one photo', screen: 'physique' },
+  { title: 'TRACK', text: 'Real change, not daily noise', screen: 'scan' },
+  { title: 'PRIVATE', text: 'Your photos never leave your phone', screen: 'privacy' },
 ];
+// where the phone screen sits inside each 1080x1920 store graphic
+const SCREEN_SRC = { x: 128, y: 640, w: 824, h: 1280 };
+let screens = {};
+export function bindScreens(map) { screens = map; }
 
-function lineIcon(kind, x, y, s) {
-  // thin line icons drawn on the card, brand blue with a soft glow
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = C.sky; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 16;
-  const h = s / 2, k = s * .28;
-  if (kind === 'scan') {
-    // viewfinder corners and a scan line
-    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      ctx.beginPath(); ctx.moveTo(sx * h, sy * (h - k)); ctx.lineTo(sx * h, sy * h); ctx.lineTo(sx * (h - k), sy * h); ctx.stroke();
-    }
-    ctx.beginPath(); ctx.moveTo(-h * .62, 0); ctx.lineTo(h * .62, 0); ctx.stroke();
-  } else if (kind === 'track') {
-    // a trend line rising through noisy points
-    ctx.beginPath(); ctx.moveTo(-h, h * .55); ctx.lineTo(-h * .35, h * .1); ctx.lineTo(h * .1, h * .3); ctx.lineTo(h, -h * .55); ctx.stroke();
-    ctx.fillStyle = C.sky;
-    for (const [px, py] of [[-h * .75, h * .2], [-h * .1, h * .55], [h * .45, -h * .05], [h * .7, -h * .7]]) {
-      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
-    }
-  } else {
-    // padlock
-    ctx.beginPath(); ctx.roundRect(-h * .72, -h * .05, h * 1.44, h * 1.05, 8); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, -h * .05, h * .45, Math.PI, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, h * .3); ctx.lineTo(0, h * .58); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-export function drawCTA(scene, local) {
+function drawPhone(scene, local) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.save();
-  // a clean, almost solid ground with one soft pool of brand light
-  const v = easeOut(clamp(local / .35, 0, 1));
-  ctx.fillStyle = `rgba(3,7,20,${.96 * v})`; ctx.fillRect(0, 0, W, H);
-  const pool = ctx.createRadialGradient(540, 760, 40, 540, 760, 900);
-  pool.addColorStop(0, `rgba(23,104,255,${.22 * v})`); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  const v = easeOut(clamp(local / .3, 0, 1));
+  ctx.fillStyle = `rgba(3,7,20,${.97 * v})`; ctx.fillRect(0, 0, W, H);
+  const pool = ctx.createRadialGradient(540, 1000, 60, 540, 1000, 820);
+  pool.addColorStop(0, `rgba(23,104,255,${.32 * v})`); pool.addColorStop(1, 'rgba(23,104,255,0)');
   ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
-  const appear = (delay, dur = .45) => easeOut(clamp((local - delay) / dur, 0, 1));
+  const appear = (delay, dur = .4) => easeOut(clamp((local - delay) / dur, 0, 1));
 
-  // brand: emblem and wordmark
-  let a = appear(.15);
+  // brand lockup, small, at the top
+  let a = appear(.1);
   ctx.globalAlpha = a;
-  ctx.save(); ctx.translate(0, (1 - a) * 30);
-  const es = 150, ey = 330;
+  const ly = 190;
   if (emblem && emblem.naturalWidth) {
-    ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 36;
-    ctx.drawImage(emblem, 540 - es / 2, ey, es, es);
+    ctx.shadowColor = 'rgba(141,179,255,.7)'; ctx.shadowBlur = 24;
+    ctx.drawImage(emblem, 300, ly - 52, 104, 104);
     ctx.shadowBlur = 0;
   }
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.font = '112px Anton'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.white;
-  ctx.fillText('SQUEEZE FIT', 544, ey + es + 135);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.font = '84px Anton'; ctx.letterSpacing = '6px'; ctx.fillStyle = C.white;
+  ctx.fillText('SQUEEZE FIT', 428, ly + 4);
   ctx.letterSpacing = '0px';
-  ctx.font = '500 34px J'; ctx.fillStyle = 'rgba(221,232,255,.7)';
-  ctx.fillText('Your body coach, fully on your phone.', 540, ey + es + 200);
-  ctx.restore();
 
-  // features: three rows, revealed one after another
+  // which feature is showing: equal slots across the card, before the badge
   const rows = scene.features || FEATURES;
-  const top = 860, gap = 150, x0 = 210;
-  rows.forEach((f, i) => {
-    const r = appear(.55 + i * .22);
-    if (r <= 0) return;
-    ctx.globalAlpha = r;
-    ctx.save(); ctx.translate((1 - r) * 40, 0);
-    const y = top + i * gap;
-    // divider above each row
-    ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x0 - 40, y - 62); ctx.lineTo(W - x0 + 40, y - 62); ctx.stroke();
-    lineIcon(f.icon, x0 + 20, y, 64);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.font = '600 30px Oswald'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.sky;
-    ctx.fillText(f.title, x0 + 100, y - 22);
-    ctx.letterSpacing = '0px';
-    ctx.font = '600 40px J'; ctx.fillStyle = C.white;
-    ctx.fillText(f.text, x0 + 100, y + 24);
-    ctx.restore();
-  });
-  ctx.globalAlpha = appear(.55 + rows.length * .22);
-  ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(x0 - 40, top + rows.length * gap - 62); ctx.lineTo(W - x0 + 40, top + rows.length * gap - 62); ctx.stroke();
+  const span = Math.max(1, (scene.end - scene.start) - 1.1);
+  const slot = span / rows.length;
+  const t = Math.max(0, local - .35);
+  const idx = Math.min(rows.length - 1, Math.floor(t / slot));
+  const into = t - idx * slot;
+  const fadeIn = clamp(into / .25, 0, 1), fadeOut = idx < rows.length - 1 ? clamp((slot - into) / .25, 0, 1) : 1;
+  const fa = Math.min(fadeIn, fadeOut) * appear(.35);
 
-  // the official badge, last
-  const b = appear(.55 + rows.length * .22 + .15);
+  // caption
+  const f = rows[idx];
+  ctx.globalAlpha = fa;
+  ctx.textAlign = 'center';
+  ctx.font = '600 32px Oswald'; ctx.letterSpacing = '12px'; ctx.fillStyle = C.sky;
+  ctx.fillText(f.title, 546, 340);
+  ctx.letterSpacing = '0px';
+  ctx.font = '700 54px J'; ctx.fillStyle = C.white;
+  ctx.fillText(f.text, 540, 410);
+
+  // the phone, floating gently; drawn on its own layer so its bottom can fade to clear
+  const pa = appear(.25, .5);
+  const pw = 560, ph = pw * SCREEN_SRC.h / SCREEN_SRC.w, px = 540 - pw / 2;
+  const py = 500 + (1 - pa) * 60 + Math.sin(local * 1.6) * 6;
+  const r = 64, bez = 14, pad = 120;
+  const layer = document.createElement('canvas');
+  layer.width = pw + bez * 2 + pad * 2; layer.height = ph + bez * 2 + pad * 2;
+  const lc = layer.getContext('2d');
+  const ox = pad + bez, oy = pad + bez;
+  lc.save();
+  lc.shadowColor = 'rgba(23,104,255,.65)'; lc.shadowBlur = 90;
+  lc.fillStyle = '#0a0f1c';
+  lc.beginPath(); lc.roundRect(ox - bez, oy - bez, pw + bez * 2, ph + bez * 2, r + bez); lc.fill();
+  lc.restore();
+  lc.strokeStyle = 'rgba(141,179,255,.35)'; lc.lineWidth = 2;
+  lc.beginPath(); lc.roundRect(ox - bez, oy - bez, pw + bez * 2, ph + bez * 2, r + bez); lc.stroke();
+  lc.save();
+  lc.beginPath(); lc.roundRect(ox, oy, pw, ph, r); lc.clip();
+  const draw = (key, alpha) => {
+    const im = screens[key];
+    if (!im || !im.naturalWidth || alpha <= 0) return;
+    lc.globalAlpha = alpha;
+    lc.drawImage(im, SCREEN_SRC.x, SCREEN_SRC.y, SCREEN_SRC.w, SCREEN_SRC.h, ox, oy, pw, ph);
+  };
+  draw(f.screen, 1);
+  if (idx < rows.length - 1 && into > slot - .25) draw(rows[idx + 1].screen, 1 - fadeOut);
+  lc.restore();
+  // fade the whole phone layer out towards its bottom edge
+  lc.globalCompositeOperation = 'destination-in';
+  const mask = lc.createLinearGradient(0, oy + ph - 460, 0, oy + ph + bez);
+  mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(1, 'rgba(0,0,0,0)');
+  lc.fillStyle = mask; lc.fillRect(0, 0, layer.width, layer.height);   // one fill: destination-in clears outside it
+  ctx.globalAlpha = pa;
+  ctx.drawImage(layer, px - ox, py - oy);
+  ctx.globalAlpha = 1;
+
+  // progress dots
+  ctx.globalAlpha = appear(.35);
+  rows.forEach((_, i) => {
+    ctx.fillStyle = i === idx ? C.white : 'rgba(141,179,255,.35)';
+    ctx.beginPath(); ctx.roundRect(540 - 60 + i * 44, 1440, i === idx ? 36 : 14, 14, 7); ctx.fill();
+  });
+
+  // the official badge
+  const b = appear(.35 + span - .2, .4);
   ctx.globalAlpha = b;
   if (badge && badge.naturalWidth) {
     const bw = 400, bh = bw * badge.naturalHeight / badge.naturalWidth;
-    ctx.drawImage(badge, 540 - bw / 2, 1440 + (1 - b) * 20, bw, bh);
+    ctx.drawImage(badge, 540 - bw / 2, 1530 + (1 - b) * 20, bw, bh);
   }
   ctx.restore();
   ctx.letterSpacing = '0px';
@@ -332,4 +341,216 @@ export function drawBrand(x = 70, y = 1430) {
   ctx.fillText('SQUEEZE FIT', x + s + 16, y + s / 2 + 2);
   ctx.restore();
   ctx.letterSpacing = '0px';
+}
+
+// End card: the brand, then the app's three standout features, then the Play badge.
+const LIST_FEATURES = [
+  { icon: 'scan', title: 'SCAN', text: 'Body fat from one photo' },
+  { icon: 'track', title: 'TRACK', text: 'Real change, not daily noise' },
+  { icon: 'lock', title: 'PRIVATE', text: 'Photos never leave your phone' },
+];
+
+function lineIcon(kind, x, y, s) {
+  // thin line icons drawn on the card, brand blue with a soft glow
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = C.sky; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 16;
+  const h = s / 2, k = s * .28;
+  if (kind === 'scan') {
+    // viewfinder corners and a scan line
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      ctx.beginPath(); ctx.moveTo(sx * h, sy * (h - k)); ctx.lineTo(sx * h, sy * h); ctx.lineTo(sx * (h - k), sy * h); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(-h * .62, 0); ctx.lineTo(h * .62, 0); ctx.stroke();
+  } else if (kind === 'track') {
+    // a trend line rising through noisy points
+    ctx.beginPath(); ctx.moveTo(-h, h * .55); ctx.lineTo(-h * .35, h * .1); ctx.lineTo(h * .1, h * .3); ctx.lineTo(h, -h * .55); ctx.stroke();
+    ctx.fillStyle = C.sky;
+    for (const [px, py] of [[-h * .75, h * .2], [-h * .1, h * .55], [h * .45, -h * .05], [h * .7, -h * .7]]) {
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    // padlock
+    ctx.beginPath(); ctx.roundRect(-h * .72, -h * .05, h * 1.44, h * 1.05, 8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -h * .05, h * .45, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, h * .3); ctx.lineTo(0, h * .58); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawList(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.save();
+  // a clean, almost solid ground with one soft pool of brand light
+  const v = easeOut(clamp(local / .35, 0, 1));
+  ctx.fillStyle = `rgba(3,7,20,${.96 * v})`; ctx.fillRect(0, 0, W, H);
+  const pool = ctx.createRadialGradient(540, 760, 40, 540, 760, 900);
+  pool.addColorStop(0, `rgba(23,104,255,${.22 * v})`); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  const appear = (delay, dur = .45) => easeOut(clamp((local - delay) / dur, 0, 1));
+
+  // brand: emblem and wordmark
+  let a = appear(.15);
+  ctx.globalAlpha = a;
+  ctx.save(); ctx.translate(0, (1 - a) * 30);
+  const es = 150, ey = 330;
+  if (emblem && emblem.naturalWidth) {
+    ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 36;
+    ctx.drawImage(emblem, 540 - es / 2, ey, es, es);
+    ctx.shadowBlur = 0;
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '112px Anton'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.white;
+  ctx.fillText('SQUEEZE FIT', 544, ey + es + 135);
+  ctx.letterSpacing = '0px';
+  ctx.font = '500 34px J'; ctx.fillStyle = 'rgba(221,232,255,.7)';
+  ctx.fillText('Your body coach, fully on your phone.', 540, ey + es + 200);
+  ctx.restore();
+
+  // features: three rows, revealed one after another
+  const rows = LIST_FEATURES;
+  const top = 860, gap = 150, x0 = 210;
+  rows.forEach((f, i) => {
+    const r = appear(.55 + i * .22);
+    if (r <= 0) return;
+    ctx.globalAlpha = r;
+    ctx.save(); ctx.translate((1 - r) * 40, 0);
+    const y = top + i * gap;
+    // divider above each row
+    ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0 - 40, y - 62); ctx.lineTo(W - x0 + 40, y - 62); ctx.stroke();
+    lineIcon(f.icon, x0 + 20, y, 64);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '600 30px Oswald'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.sky;
+    ctx.fillText(f.title, x0 + 100, y - 22);
+    ctx.letterSpacing = '0px';
+    ctx.font = '600 40px J'; ctx.fillStyle = C.white;
+    ctx.fillText(f.text, x0 + 100, y + 24);
+    ctx.restore();
+  });
+  ctx.globalAlpha = appear(.55 + rows.length * .22);
+  ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0 - 40, top + rows.length * gap - 62); ctx.lineTo(W - x0 + 40, top + rows.length * gap - 62); ctx.stroke();
+
+  // the official badge, last
+  const b = appear(.55 + rows.length * .22 + .15);
+  ctx.globalAlpha = b;
+  if (badge && badge.naturalWidth) {
+    const bw = 400, bh = bw * badge.naturalHeight / badge.naturalWidth;
+    ctx.drawImage(badge, 540 - bw / 2, 1440 + (1 - b) * 20, bw, bh);
+  }
+  ctx.restore();
+  ctx.letterSpacing = '0px';
+  ctx.globalAlpha = 1;
+}
+
+
+function endGround(local) {
+  const v = easeOut(clamp(local / .3, 0, 1));
+  ctx.fillStyle = `rgba(3,7,20,${.97 * v})`; ctx.fillRect(0, 0, W, H);
+  return v;
+}
+
+function brandTop(y, size, alpha) {
+  ctx.globalAlpha = alpha;
+  ctx.textBaseline = 'middle';
+  ctx.font = `${size}px Anton`; ctx.letterSpacing = `${size * .07}px`;
+  const tw = ctx.measureText('SQUEEZE FIT').width, es = size * 1.25;
+  const x0 = 540 - (es + 24 + tw) / 2;
+  if (emblem && emblem.naturalWidth) {
+    ctx.shadowColor = 'rgba(141,179,255,.7)'; ctx.shadowBlur = 22;
+    ctx.drawImage(emblem, x0, y - es / 2, es, es); ctx.shadowBlur = 0;
+  }
+  ctx.textAlign = 'left'; ctx.fillStyle = C.white;
+  ctx.fillText('SQUEEZE FIT', x0 + es + 24, y + 3);
+  ctx.letterSpacing = '0px';
+}
+
+function badgeAt(y, alpha, w = 400) {
+  if (!badge || !badge.naturalWidth) return;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(badge, 540 - w / 2, y + (1 - alpha) * 20, w, w * badge.naturalHeight / badge.naturalWidth);
+}
+
+// 3 · Glass cards: stacked cards, each with a slice of the real screen beside its feature.
+function drawCards(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
+  const pool = ctx.createRadialGradient(540, 900, 60, 540, 900, 900);
+  pool.addColorStop(0, 'rgba(23,104,255,.25)'); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.globalAlpha = appear(0); ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  brandTop(220, 92, appear(.1));
+  ctx.globalAlpha = appear(.2);
+  ctx.textAlign = 'center'; ctx.font = '500 36px J'; ctx.fillStyle = 'rgba(221,232,255,.72)';
+  ctx.fillText('Your body coach, fully on your phone.', 540, 320);
+  const cards = [
+    { t: 'SCAN', d: 'Body fat from one photo', key: 'scan', sy: 250 },
+    { t: 'TRACK', d: 'Real change, not daily noise', key: 'scan', sy: 0 },
+    { t: 'PRIVATE', d: 'Photos never leave your phone', key: 'privacy', sy: 0 },
+  ];
+  cards.forEach((c, i) => {
+    const a = appear(.45 + i * .22);
+    if (a <= 0) return;
+    const y = 430 + i * 300, x = 90, w = 900, h = 260;
+    ctx.globalAlpha = a; ctx.save(); ctx.translate((1 - a) * 50, 0);
+    ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.strokeStyle = 'rgba(141,179,255,.28)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 36); ctx.fill(); ctx.stroke();
+    // screen slice on the right
+    const im = screens[c.key];
+    if (im && im.naturalWidth) {
+      ctx.save(); ctx.beginPath(); ctx.roundRect(x + w - 300, y + 20, 280, h - 40, 22); ctx.clip();
+      ctx.drawImage(im, SCREEN_SRC.x, SCREEN_SRC.y + 150 + c.sy, SCREEN_SRC.w, SCREEN_SRC.w * (h - 40) / 280, x + w - 300, y + 20, 280, h - 40);
+      ctx.restore();
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '600 30px Oswald'; ctx.letterSpacing = '9px'; ctx.fillStyle = C.sky;
+    ctx.fillText(c.t, x + 50, y + 90); ctx.letterSpacing = '0px';
+    ctx.font = '700 44px J'; ctx.fillStyle = C.white;
+    const words = c.d.split(' '), half = Math.ceil(words.length / 2);
+    ctx.fillText(words.slice(0, half).join(' '), x + 50, y + 150);
+    ctx.fillText(words.slice(half).join(' '), x + 50, y + 202);
+    ctx.restore();
+  });
+  badgeAt(1390, appear(1.3));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+// 4 · Bold type: three huge words, one line each, outlined until they light up.
+function drawType(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .35) => easeOut(clamp((local - d) / dur, 0, 1));
+  brandTop(230, 76, appear(.1));
+  const words = [['SCAN.', 'Body fat from one photo'], ['TRACK.', 'Real change, not daily noise'], ['PRIVATE.', 'Photos never leave your phone']];
+  words.forEach(([w, d], i) => {
+    const a = appear(.4 + i * .3);
+    const y = 560 + i * 310;
+    ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '230px Anton'; ctx.letterSpacing = '6px';
+    // the outline is always there; the fill lights up in turn
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(141,179,255,.35)'; ctx.strokeText(w, 543, y);
+    if (a > 0) {
+      ctx.globalAlpha = a;
+      const g = ctx.createLinearGradient(0, y - 200, 0, y);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#8DB3FF');
+      ctx.shadowColor = 'rgba(23,104,255,.8)'; ctx.shadowBlur = 40;
+      ctx.fillStyle = g; ctx.fillText(w, 543, y); ctx.shadowBlur = 0;
+      ctx.letterSpacing = '0px';
+      ctx.font = '600 36px J'; ctx.fillStyle = 'rgba(221,232,255,.85)';
+      ctx.fillText(d, 540, y + 62);
+    }
+    ctx.letterSpacing = '0px';
+  });
+  badgeAt(1500, appear(1.5));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+export function drawCTA(scene, local) {
+  const style = scene.endStyle || 'phone';
+  if (style === 'list') return drawList(scene, local);
+  if (style === 'cards') return drawCards(scene, local);
+  if (style === 'type') return drawType(scene, local);
+  return drawPhone(scene, local);
 }

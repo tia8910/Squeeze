@@ -17,6 +17,11 @@ window.setup = async tl => {
   icon.src = '/icon.png'; await icon.decode();
   badge.src = '/badge.png'; await badge.decode().catch(() => {});
   emblem.src = '/emblem.png'; await emblem.decode().catch(() => {});
+  const screens = {};
+  for (const [k, f] of [['scan', 1], ['physique', 2], ['privacy', 3]]) {
+    const im = new Image(); im.src = `/screen${f}.png`; await im.decode().catch(() => {}); screens[k] = im;
+  }
+  O.bindScreens(screens);
   for (const w of [600, 700, 800]) await document.fonts.load(`${w} 40px J`);
   await document.fonts.load('40px Anton');
   for (const w of [500, 600, 700]) await document.fonts.load(`${w} 40px Oswald`);

@@ -14,6 +14,8 @@ function serve() {
   const map = url => {
     if (url.startsWith('/font/')) return path.join(ROOT, 'app/src/main/res/font', path.basename(url));
     if (url === '/icon.png') return path.join(ROOT, 'store/icon-512.png');
+    const scr = url.match(/^\/screen(\d)\.png$/);
+    if (scr) return path.join(ROOT, 'store', ['', 'screenshot-1-scan.png', 'screenshot-2-physique.png', 'screenshot-3-privacy.png'][+scr[1]]);
     if (url === '/emblem.png') return path.join(__dirname, 'brand/emblem.png');
     if (url === '/badge.png') return path.join(__dirname, 'brand/google-play-badge.png');
     if (url === '/') return path.join(__dirname, 'index.html');
