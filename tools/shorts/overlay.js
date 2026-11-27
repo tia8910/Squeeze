@@ -606,11 +606,226 @@ function drawBento(scene, local) {
   ctx.restore(); ctx.globalAlpha = 1;
 }
 
+// ── drawn illustrations (no screenshots) ─────────────────────────────────────
+const FEAT5 = [
+  { key: 'scan', title: 'SCAN', text: 'Body fat from one photo' },
+  { key: 'track', title: 'TRACK', text: 'Real change, not daily noise' },
+  { key: 'train', title: 'TRAIN', text: 'Full training, built for you' },
+  { key: 'eat', title: 'EAT', text: 'Nutrition customized for you' },
+  { key: 'private', title: 'PRIVATE', text: 'Photos never leave your phone' },
+];
+
+function illus(kind, x, y, s, t = 0) {
+  // s = size of the illustration's square; t = seconds, for small motions
+  ctx.save(); ctx.translate(x, y);
+  const h = s / 2;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const glow = (c = 'rgba(23,104,255,.9)', b = 18) => { ctx.shadowColor = c; ctx.shadowBlur = b; };
+  if (kind === 'scan') {
+    ctx.strokeStyle = C.sky; ctx.lineWidth = s * .035; glow();
+    const k = s * .26;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      ctx.beginPath(); ctx.moveTo(sx * h, sy * (h - k)); ctx.lineTo(sx * h, sy * h); ctx.lineTo(sx * (h - k), sy * h); ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    if (emblem && emblem.naturalWidth) { ctx.globalAlpha *= .92; ctx.drawImage(emblem, -h * .7, -h * .7, s * .7, s * .7); }
+    // sweeping scan line
+    const ly = -h * .8 + ((t * .9) % 1) * s * .8 * 2;
+    const g = ctx.createLinearGradient(0, ly - s * .12, 0, ly);
+    g.addColorStop(0, 'rgba(23,104,255,0)'); g.addColorStop(1, 'rgba(141,179,255,.55)');
+    ctx.fillStyle = g; ctx.fillRect(-h * .85, ly - s * .12, h * .85 * 2, s * .12);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = s * .018; glow('rgba(141,179,255,1)', 20);
+    ctx.beginPath(); ctx.moveTo(-h * .85, ly); ctx.lineTo(h * .85, ly); ctx.stroke();
+  } else if (kind === 'track') {
+    // area chart drawing itself, a dashed noisy line behind
+    const pts = [[-1, .45], [-.6, .3], [-.25, .38], [.1, .05], [.45, .0], [.8, -.38], [1, -.5]].map(([a, b]) => [a * h * .9, b * h]);
+    ctx.strokeStyle = 'rgba(141,179,255,.35)'; ctx.lineWidth = s * .012; ctx.setLineDash([s * .03, s * .03]);
+    ctx.beginPath(); pts.forEach(([a, b], i) => { const n = b + Math.sin(i * 2.3) * h * .22; i ? ctx.lineTo(a, n) : ctx.moveTo(a, n); }); ctx.stroke();
+    ctx.setLineDash([]);
+    const prog = clamp(t / 1.2, 0, 1), last = Math.max(1, Math.floor(prog * (pts.length - 1)));
+    const area = ctx.createLinearGradient(0, -h, 0, h);
+    area.addColorStop(0, 'rgba(23,104,255,.5)'); area.addColorStop(1, 'rgba(23,104,255,0)');
+    ctx.fillStyle = area; ctx.beginPath(); ctx.moveTo(pts[0][0], h * .9);
+    for (let i = 0; i <= last; i++) ctx.lineTo(...pts[i]);
+    ctx.lineTo(pts[last][0], h * .9); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C.sky; ctx.lineWidth = s * .035; glow();
+    ctx.beginPath(); for (let i = 0; i <= last; i++) i ? ctx.lineTo(...pts[i]) : ctx.moveTo(...pts[i]); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(...pts[last], s * .045, 0, Math.PI * 2); ctx.fill();
+  } else if (kind === 'train') {
+    // dumbbell over a week strip
+    ctx.fillStyle = C.sky; glow();
+    ctx.fillRect(-h * .55, -h * .28, h * 1.1, s * .05);
+    for (const sx of [-1, 1]) {
+      ctx.beginPath(); ctx.roundRect(sx * h * .55 - (sx > 0 ? 0 : s * .1), -h * .52, s * .1, h * .5, 8); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(sx * h * .76 - (sx > 0 ? 0 : s * .07), -h * .42, s * .07, h * .3, 6); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    const days = 7, dw = s * .1, gx = s * .028, x0 = -(days * dw + (days - 1) * gx) / 2;
+    for (let i = 0; i < days; i++) {
+      const on = [0, 1, 3, 4, 5].includes(i), lit = on && t * 4 > i;
+      ctx.fillStyle = lit ? C.blue : 'rgba(141,179,255,.18)';
+      ctx.beginPath(); ctx.roundRect(x0 + i * (dw + gx), h * .3, dw, dw * 1.3, 8); ctx.fill();
+    }
+  } else if (kind === 'eat') {
+    // macro ring: three arcs filling in
+    const r = h * .72, lw = s * .085, prog = clamp(t / 1.1, 0, 1);
+    ctx.lineWidth = lw; ctx.strokeStyle = 'rgba(141,179,255,.15)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    const parts = [[.38, '#1768FF'], [.4, '#8DB3FF'], [.18, '#DDE8FF']];
+    let a0 = -Math.PI / 2;
+    for (const [f, c] of parts) {
+      const a1 = a0 + Math.PI * 2 * f * prog;
+      ctx.strokeStyle = c; glow(c, 14);
+      ctx.beginPath(); ctx.arc(0, 0, r, a0 + .06, Math.max(a0 + .06, a1 - .06)); ctx.stroke();
+      a0 += Math.PI * 2 * f;
+    }
+    ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(s * .2)}px Anton`; ctx.fillText('P·C·F', 0, s * .01);
+  } else {
+    // shield with a check
+    ctx.strokeStyle = C.sky; ctx.lineWidth = s * .04; glow();
+    ctx.beginPath();
+    ctx.moveTo(0, -h * .85); ctx.lineTo(h * .7, -h * .55); ctx.lineTo(h * .7, 0);
+    ctx.quadraticCurveTo(h * .65, h * .6, 0, h * .9); ctx.quadraticCurveTo(-h * .65, h * .6, -h * .7, 0);
+    ctx.lineTo(-h * .7, -h * .55); ctx.closePath(); ctx.stroke();
+    const sh = ctx.createLinearGradient(0, -h, 0, h); sh.addColorStop(0, 'rgba(23,104,255,.35)'); sh.addColorStop(1, 'rgba(23,104,255,.05)');
+    ctx.fillStyle = sh; ctx.fill();
+    const p = clamp(t / .6, 0, 1);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = s * .05;
+    ctx.beginPath(); ctx.moveTo(-h * .3, h * .02); ctx.lineTo(-h * .05, h * .28 * Math.min(1, p * 2));
+    if (p > .5) ctx.lineTo(-h * .05 + h * .4 * (p - .5) * 2, h * .28 - h * .55 * (p - .5) * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function headline(y, a) {
+  ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '700 50px J'; ctx.fillStyle = C.white; ctx.fillText('Training & nutrition,', 540, y);
+  ctx.fillStyle = C.sky; ctx.fillText('customized for you.', 540, y + 60);
+}
+
+// 1 · Orbit: emblem in a glowing ring, five features orbiting around it
+function drawOrbit(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
+  brandTop(170, 76, appear(.1));
+  headline(290, appear(.2));
+  const cx = 540, cy = 880, R = 330;
+  ctx.globalAlpha = appear(.3);
+  const halo = ctx.createRadialGradient(cx, cy, 40, cx, cy, R * 1.3);
+  halo.addColorStop(0, 'rgba(23,104,255,.35)'); halo.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, cy - R * 1.4, W, R * 2.8);
+  ctx.strokeStyle = 'rgba(141,179,255,.55)'; ctx.lineWidth = 3; ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 24;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0;
+  if (emblem && emblem.naturalWidth) { ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 40; ctx.drawImage(emblem, cx - 120, cy - 120, 240, 240); ctx.shadowBlur = 0; }
+  const spin = local * .12;
+  FEAT5.forEach((f, i) => {
+    const a = appear(.5 + i * .18); if (a <= 0) return;
+    const ang = -Math.PI / 2 + i * Math.PI * 2 / 5 + spin;
+    const x = cx + Math.cos(ang) * R, y = cy + Math.sin(ang) * R;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(6,14,36,.92)'; ctx.strokeStyle = 'rgba(141,179,255,.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 78, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    illus(f.key, x, y, 88, local - (.5 + i * .18));
+  });
+  // legend under the ring: one centred column
+  FEAT5.forEach((f, i) => {
+    const a = appear(1.4 + i * .1); if (a <= 0) return;
+    ctx.globalAlpha = a;
+    const y = 1330 + i * 52;
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 24px Oswald'; ctx.letterSpacing = '5px'; ctx.fillStyle = C.sky;
+    ctx.textAlign = 'right'; ctx.fillText(f.title, 400, y);
+    ctx.letterSpacing = '0px'; ctx.font = '600 30px J'; ctx.fillStyle = C.white;
+    ctx.textAlign = 'left'; ctx.fillText(f.text, 430, y);
+  });
+  badgeAt(1630, appear(2.1));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+// 2 · Bento with illustrations
+function drawBentoArt(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
+  const pool = ctx.createRadialGradient(540, 960, 80, 540, 960, 1000);
+  pool.addColorStop(0, 'rgba(23,104,255,.24)'); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.globalAlpha = appear(0); ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  brandTop(190, 80, appear(.1));
+  headline(312, appear(.2));
+  const G = 22, X = 70, Wd = W - X * 2, half = (Wd - G) / 2;
+  const tiles = [
+    { x: X, y: 420, w: half, h: 330, f: FEAT5[0] },
+    { x: X + half + G, y: 420, w: half, h: 330, f: FEAT5[1] },
+    { x: X, y: 772, w: Wd, h: 300, f: { key: 'train', title: 'FULL TRAINING', text: 'A week built for your body' }, wide: true },
+    { x: X, y: 1094, w: half, h: 330, f: { key: 'eat', title: 'NUTRITION', text: 'Customized for you' } },
+    { x: X + half + G, y: 1094, w: half, h: 330, f: FEAT5[4] },
+  ];
+  tiles.forEach((tl, i) => {
+    const d = .4 + i * .16, a = appear(d); if (a <= 0) return;
+    ctx.globalAlpha = a; ctx.save(); ctx.translate(0, (1 - a) * 40);
+    const g = ctx.createLinearGradient(tl.x, tl.y, tl.x + tl.w, tl.y + tl.h);
+    g.addColorStop(0, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(255,255,255,.025)');
+    ctx.fillStyle = g; ctx.strokeStyle = 'rgba(141,179,255,.26)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(tl.x, tl.y, tl.w, tl.h, 34); ctx.fill(); ctx.stroke();
+    if (tl.wide) illus(tl.f.key, tl.x + tl.w - 190, tl.y + tl.h / 2, 200, local - d);
+    else illus(tl.f.key, tl.x + tl.w / 2, tl.y + tl.h - 105, 150, local - d);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '600 26px Oswald'; ctx.letterSpacing = '7px'; ctx.fillStyle = C.sky;
+    ctx.fillText(tl.f.title, tl.x + 34, tl.y + 58); ctx.letterSpacing = '0px';
+    ctx.font = '700 32px J'; ctx.fillStyle = C.white;
+    const words = tl.f.text.split(' ');
+    const lines = tl.wide ? [words.slice(0, 3).join(' '), words.slice(3).join(' ')] : [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')];
+    lines.forEach((ln, k) => ctx.fillText(ln, tl.x + 34, tl.y + 104 + k * 40));
+    ctx.restore();
+  });
+  badgeAt(1470, appear(1.4));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+// 3 · Journey: Scan → Track → Train → Eat → Private on a glowing path
+function drawJourney(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
+  brandTop(170, 76, appear(.1));
+  headline(290, appear(.2));
+  const x = 230, y0 = 470, step = 205;
+  // the path fills downward
+  const prog = clamp((local - .4) / 1.6, 0, 1);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + step * 4); ctx.stroke();
+  ctx.strokeStyle = C.blue; ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + step * 4 * prog); ctx.stroke(); ctx.shadowBlur = 0;
+  FEAT5.forEach((f, i) => {
+    const d = .4 + i * .32, a = appear(d); if (a <= 0) return;
+    const y = y0 + i * step;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(6,14,36,.95)'; ctx.strokeStyle = 'rgba(141,179,255,.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 80, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    illus(f.key, x, y, 92, local - d);
+    ctx.save(); ctx.translate((1 - a) * 30, 0);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '600 28px Oswald'; ctx.letterSpacing = '7px'; ctx.fillStyle = C.sky;
+    ctx.fillText(`0${i + 1}  ${f.title}`, x + 120, y - 24); ctx.letterSpacing = '0px';
+    ctx.font = '700 38px J'; ctx.fillStyle = C.white; ctx.fillText(f.text, x + 120, y + 22);
+    ctx.restore();
+  });
+  badgeAt(1520, appear(2.2));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
 export function drawCTA(scene, local) {
   const style = scene.endStyle || 'phone';
   if (style === 'list') return drawList(scene, local);
   if (style === 'cards') return drawCards(scene, local);
   if (style === 'type') return drawType(scene, local);
   if (style === 'bento') return drawBento(scene, local);
+  if (style === 'orbit') return drawOrbit(scene, local);
+  if (style === 'bentoart') return drawBentoArt(scene, local);
+  if (style === 'journey') return drawJourney(scene, local);
   return drawPhone(scene, local);
 }
