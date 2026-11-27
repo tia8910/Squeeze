@@ -138,10 +138,12 @@ class WorkoutLogViewModel @Inject constructor(
         viewModelScope.launch {
             val s = _state.value
             val kcal = coach.logSession(Sport.STRENGTH, s.title, s.minutes, Intensity.MODERATE, null)
+            val summary = coach.workoutSummary()
+            coach.celebrateRecords(summary.records)
             _state.value = s.copy(
                 message = "Saved: ${s.todaysSets.size} sets, about $kcal kcal. Your nutrition plan and " +
                     "this week's volume now include it.",
-                summary = coach.workoutSummary(),
+                summary = summary,
             )
             refresh()
             appReview.goodMoment()

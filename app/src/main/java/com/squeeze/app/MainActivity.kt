@@ -183,6 +183,8 @@ class MainActivity : FragmentActivity() {
      */
     override fun onStart() {
         super.onStart()
+        // Resets the comeback countdown; a date only, nothing about what was done.
+        com.squeeze.app.notify.Reminders.noteOpen(this)
 
         if (unlocked || !biometricsAvailable()) return
 
