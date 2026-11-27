@@ -1,0 +1,332 @@
+SQUEEZE FIT: ELEVENLABS VOICEOVER SCRIPTS
+One script per exercise, about 50 seconds each at a confident, upbeat pace.
+
+------------------------------------------------------------------------------------
+HOW TO GET THE "COOL COACH" SOUND
+------------------------------------------------------------------------------------
+Voice:     In the Voice Library, filter by "Narrative / Social media", male, American or
+           British, and pick a deep, warm, confident voice (search terms that work well:
+           "deep", "confident", "trailer", "coach", "motivational"). Preview with the
+           first script and keep the one that sounds calm but powerful, not shouty.
+Model:     Eleven v3 if you have it (it understands the [tags] in brackets below).
+           On Multilingual v2, delete everything in [brackets] before generating.
+Settings:  Stability 35–45%  (lower = more expressive)
+           Similarity 75–80%
+           Style 35–50%      (higher = more attitude; too high gets theatrical)
+           Speaker boost ON, Speed 1.0–1.05
+Tips:      - Generate each script 2–3 times and keep the best take.
+           - "..." gives a short pause, a new line gives a beat.
+           - Export as MP3 or WAV, one file per exercise, named by number (01.mp3 …).
+           - Send me the file with its clip; I time the captions to your voice.
+
+Every script ends with the same call to action, so the brand line sounds identical
+in every video.
+
+
+====================================================================================
+00. BODYWEIGHT SQUAT
+====================================================================================
+[confident] Everyone squats. Almost nobody squats right.
+Here's the fix.
+Arms straight out in front... feet just wider than your hips.
+Sit your hips BACK, like you're reaching for a chair... and keep your chest proud.
+Knees push out, over your toes. Never caving in.
+Go as deep as you can while your heels stay glued to the floor.
+Then drive up... through your whole foot.
+Your quads straighten the knee. Your glutes lock out the hips.
+Three sets of fifteen. Slow down... fast up.
+Master this, and every lift you do gets stronger.
+[warm] Want the full plan, built around your body?
+Get Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+01. FALSE-GRIP HANG
+====================================================================================
+[confident] Gymnasts have the biggest forearms in sport.
+This is their secret... and you've probably never tried it.
+It's called the false grip.
+Put the heels of your hands ON TOP of the bar... wrists bent over it, knuckles forward.
+Now hang. Arms straight. Body still.
+[slower] Feel that? Your whole forearm is fighting to hold the wrist in place.
+That's your flexors working... from the wrist, all the way to the elbow.
+Start with three hangs of twenty seconds.
+Work up to thirty... then forty-five.
+It burns. That's the point.
+[warm] Bigger forearms, stronger grip, better pull-ups.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+02. WRIST ROLLER
+====================================================================================
+[energetic] Want forearms that look like ropes?
+Meet the most underrated tool in the gym... the wrist roller.
+Arms straight out at shoulder height. Don't let them drop.
+Roll the handle... one wrist at a time... and wind that weight all the way up.
+Then reverse it. Lower it slowly. Don't let it fall.
+[slower] Up works the top of your forearm. Down works the bottom.
+Both sides. Every rep.
+Keep your shoulders down. Only the wrists move.
+Three rounds, up and down. Your forearms will be on fire.
+[warm] Grip strength carries over to everything... deadlifts, pull-ups, carries.
+Train it right with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+03. RICE BUCKET TRAINING
+====================================================================================
+[intrigued] Martial artists have trained their grip this way for centuries.
+All you need... is a bucket of rice.
+Push your hands deep in... all the way to your forearms.
+Now squeeze into tight fists.
+Spread your fingers wide... against the resistance.
+Twist your wrists... left... right.
+[slower] Every direction your hand can move, the rice pushes back.
+That's every muscle in your forearm... including the ones you never train.
+Forty-five seconds on. Rest. Three rounds.
+It's cheap, it's simple, and it works.
+[warm] Stronger hands, healthier elbows.
+Get the full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+04. PLATE PINCH HOLD
+====================================================================================
+[confident] Real grip strength starts with one finger... your thumb.
+Grab two weight plates, smooth sides out, and pinch them together.
+Thumb flat on one side. Fingers flat on the other.
+No hooking over the top. That's cheating.
+Stand tall, arm by your side... and hold.
+[slower] Twenty seconds. Feel your thumb and forearm shaking.
+That's the muscle that makes every bar feel lighter in your hands.
+Switch hands. Three rounds each side.
+When twenty seconds feels easy... add a heavier plate.
+[warm] Small exercise. Huge difference.
+Build your full routine with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+05. TOWEL HANG
+====================================================================================
+[energetic] Want a climber's grip?
+Throw two towels over a pull-up bar.
+Grab one in each hand... and squeeze like your life depends on it.
+Now hang. Arms straight. No swinging.
+[slower] A towel is thick and it slips.
+So your fingers have to crush it... every single second.
+That's raw crushing grip. The kind that never lets go.
+Hang as long as you can. Rest. Three rounds.
+Once you can hold thirty seconds... try pull-ups on the towels.
+[warm] Your hands will thank you on every heavy lift.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+06. SLEDGEHAMMER LEVERING
+====================================================================================
+[confident] This one looks strange. It works incredibly well.
+Hold a sledgehammer at the very end of the handle.
+Elbow tucked at your side, forearm pointing forward, hammer straight up.
+Now... using only your wrist... lower the head forward.
+Slowly. Control it all the way.
+Then bring it back up.
+[slower] Your elbow doesn't move. Your shoulder doesn't move. Just the wrist.
+That builds the muscle on the thumb side of your forearm... and armors your wrist.
+Too hard? Choke up on the handle.
+Ten reps each way. Three sets.
+[warm] Strong wrists. Fewer injuries. Bigger lifts.
+Train smarter with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+07. THICK-BAR HOLD
+====================================================================================
+[confident] Ever wonder why strongmen have giant forearms?
+They train with thick handles.
+Wrap fat grips around your dumbbells... or use a thick bar.
+Pick them up... and squeeze. Hard.
+Your fingers can barely close around the handle.
+[slower] So your forearms have to work twice as hard... just to hold on.
+Stand tall. Shoulders back. Thirty seconds.
+Rest... and go again. Three rounds.
+Fat grips cost almost nothing... and they turn every exercise into forearm training.
+[warm] Bigger forearms. Iron grip.
+Get the full program with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+08. ZOTTMAN CURL
+====================================================================================
+[energetic] Two curls... in one rep.
+This is the Zottman curl.
+Palms up. Curl the dumbbells... biceps working.
+At the top... turn your palms down.
+And lower... slowly... with your palms facing the floor.
+[slower] Now your forearms are doing the work.
+Biceps on the way up. Forearms on the way down.
+Keep your elbows pinned to your sides. No swinging.
+Three sets of ten. Go lighter than you think... the lowering is the hard part.
+[warm] Bigger arms, top to bottom.
+Build your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+09. RUBBER BAND FINGER EXTENSIONS
+====================================================================================
+[calm, knowing] If your elbows hurt when you lift... listen up.
+You train your grip every day. You close your hand a thousand times.
+But you never train the muscles that OPEN it.
+Put a thick rubber band around your fingertips.
+Spread your fingers wide... against the band.
+Pause.
+And close... slowly.
+[slower] That's your finger extensors... on the back of the forearm.
+Balance them out, and a lot of elbow pain simply... goes away.
+Twenty-five reps. Both hands. Two minutes a day.
+[warm] Healthy joints keep you training for years.
+Get the full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+10. BEHIND-THE-BACK WRIST CURL
+====================================================================================
+[confident] You've done wrist curls. But probably not like this.
+Hold a barbell behind your back. Arms straight. Palms facing back.
+Open your hands... let the bar roll down to your fingertips.
+Now curl it back up... fingers first, then the wrists.
+[slower] Behind your back, your forearms work in a stronger position...
+and you can handle more weight with less strain on the wrist.
+Arms stay straight. Only the hands move.
+Three sets of fifteen. Smooth and controlled.
+[warm] Bigger forearms, built the smart way.
+Get your full program with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+11. SEATED SOLEUS RAISE
+====================================================================================
+[intrigued] Runners... this is the calf muscle you forget.
+It's called the soleus. It sits under your main calf...
+and it takes more load than any other muscle when you run.
+Sit down. Knees bent to ninety degrees. Weight on your thighs.
+Rise up on your toes... as high as you can.
+Pause.
+Lower for three slow seconds.
+[slower] Bent knees switch off the big calf... so the soleus does all the work.
+Three sets of fifteen. Feel the burn low, near the Achilles.
+[warm] Stronger calves, fewer injuries, longer runs.
+Get your hybrid plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+12. POGO HOPS
+====================================================================================
+[energetic] Want to run faster... without running more?
+Train your springs.
+Stand tall. Knees almost straight.
+Now bounce. Small, quick hops on the balls of your feet.
+Heels never touch the floor.
+[slower] Your Achilles tendon is a spring.
+Every hop teaches it to store energy... and fire it back.
+That's free speed on every single stride.
+Twenty fast hops. Rest. Three rounds.
+Stay light. Stay quiet. Stay stiff.
+[warm] Run lighter, run faster.
+Get your hybrid plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+13. BACKWARD SLED DRAG
+====================================================================================
+[confident] Knees hurt? Try walking... backwards.
+Grab a sled. Hold the straps. Lean back just a little.
+Now walk backward. Short steps. Stay on your toes.
+Drive your knees forward over your feet.
+[slower] Feel the front of your thighs, right above the knee? That's the point.
+Backward sled drags build the quads that protect your knees...
+with almost zero stress on the joint.
+Twenty meters. Rest. Four rounds.
+It's the favorite rehab trick of strength coaches everywhere.
+[warm] Strong knees. Pain-free training.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+14. POLIQUIN STEP-UP
+====================================================================================
+[confident] This step-up has bulletproofed more knees than any machine.
+Stand on a low step. Put your heel up on a small wedge.
+Now bend that knee forward... way out over your toes.
+Lower until your other heel taps the floor.
+Then drive back up.
+[slower] That teardrop muscle above your knee? That's what we're building.
+It keeps the kneecap on track... every step, every jump, every landing.
+Torso tall. Slow down. Strong up.
+Three sets of twelve, each leg.
+[warm] Knees built to last.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+15. SPANISH SQUAT
+====================================================================================
+[intrigued] Physical therapists love this one. Most lifters have never heard of it.
+The Spanish squat.
+Loop a heavy band behind your knees, anchored in front of you.
+Now sit back into the band... shins vertical, chest up.
+And hold.
+[slower] The band pulls your knees forward... your quads fight back.
+That loads the patellar tendon... safely.
+Your legs will shake. Stay there.
+Thirty seconds. Rest. Three rounds.
+[warm] It's a go-to fix for knee pain from jumping and running.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+16. HIP AIRPLANE
+====================================================================================
+[calm, confident] Balance... is a strength. And this builds it.
+Stand on one leg. Hinge forward until you're almost flat.
+Other leg straight behind you. Arms out like wings.
+Now open your hips... turn your chest to the side.
+Then close it back... facing the floor.
+Slow. Controlled. Don't fall.
+[slower] Your side glute works overtime to keep your hip and knee stable.
+That's what keeps your knees safe when you run, cut and land.
+Five each side. Use a wall at first.
+[warm] Stable hips. Healthy knees.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+17. SUITCASE CARRY
+====================================================================================
+[confident] The best core exercise... is just walking.
+Pick up ONE heavy weight. Hold it at your side.
+Now walk. Stand perfectly tall.
+Don't lean toward the weight. Not even a little.
+[slower] Your body wants to tip over. Your core says no.
+That's your obliques working... every single step.
+And your grip is getting stronger at the same time.
+Thirty meters. Switch hands. Four rounds.
+It's simple... and it's brutal.
+[warm] Real-world strength.
+Get your full plan with Squeeze Fit. Free on Google Play.
+
+
+====================================================================================
+18. SISSY SQUAT
+====================================================================================
+[confident] Old-school bodybuilders built massive quads with this.
+The sissy squat.
+Hold something for balance. Rise up onto your toes.
+Now lean back... as your knees travel forward.
+Lower as far as you can control.
+And come back up.
+[slower] Your hips stay straight. All the bend comes from the knees.
+That puts your quads under a stretch no other squat can match.
+Start with your own bodyweight. Three sets of ten.
+[warm] Big quads. No barbell needed.
+Get your full plan with Squeeze Fit. Free on Google Play.

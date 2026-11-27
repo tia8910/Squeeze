@@ -1,0 +1,77 @@
+SQUEEZE FIT: 60-SECOND SHORT: "5 UNDERRATED PUSH-UP VARIATIONS"
+Model 2: photorealistic athletic man. Vertical 9:16, 1080x1920.
+If Grok makes shorter clips, generate each scene on its own: paste the CHARACTER and STYLE
+blocks first, then the scene. Captions, numbers and the end card are added in the edit.
+
+--- CHARACTER (paste at the start of every scene) --------------------------------------------
+A photorealistic athletic adult man, late 20s, clearly male with a masculine jaw and short stubble,
+lean muscular hybrid-athlete build (defined chest, shoulders, triceps, abs), light tan skin,
+shirtless. Navy blue baseball cap worn forward with a small white "Squeeze Fit" logo on the front,
+navy athletic shorts, black training shoes. The same man, same cap, and same outfit in every shot.
+
+--- STYLE (paste after the character) --------------------------------------------------------
+Outdoor calisthenics park at golden hour, warm low sun behind him, dark rubber floor, black
+steel bars softly out of focus. Cinematic lighting, shallow depth of field, professional sports
+commercial look, smooth realistic motion with correct human anatomy and full range of motion.
+The working muscles glow with a soft translucent red light under the skin, getting brighter at
+the hardest point of each rep. No text, no subtitles, no watermark.
+Avoid: cap changing shape, logo melting or flickering, face changing, body becoming female,
+extra fingers, bent wrists, limbs merging with the floor, sudden cuts inside a clip.
+
+--- SCENE 1 (0-10s): HOOK -------------------------------------------------------------------
+Low camera at floor level, side-on. He does two fast, strict standard push-ups, then pauses
+at the top in a perfect plank and looks into the lens. The camera pushes in slowly and rises to
+eye level. Chest and triceps glow faintly red on each rep.
+(Caption in edit: "You're doing push-ups wrong… or just the boring ones.")
+
+--- SCENE 2 (10-20s): FORM: PUSH-UP PLUS (serratus anterior) --------------------------------
+Close-up from a high three-quarter angle behind his shoulder. Plank on straight arms, hands
+under shoulders. Arms stay locked: he lets the shoulder blades sink together, then pushes the
+floor away so the upper back rounds slightly and the shoulder blades wrap forward around the
+ribs. Three slow reps. The serratus anterior on the side of the ribs and the lower traps glow
+red as he pushes away. The camera slides slowly along his side.
+(Caption: "1 · PUSH-UP PLUS · arms locked, push the floor away")
+
+--- SCENE 3 (20-32s): MUSCLE ACTIVATION: ARCHER PUSH-UP -------------------------------------
+Front three-quarter view at chest height. Wide hand position. He lowers toward his right hand
+while the left arm straightens out to the side, chest stops just above the right hand, then
+presses back up and repeats to the left side. The middle reps slow down to cinematic slow
+motion; the right chest, front shoulder and triceps glow brighter red as he lowers, then the glow
+moves to the left side. Golden rim light on the shoulders, dust in the sun beams.
+(Caption: "2 · ARCHER PUSH-UP · one arm does the work, the other only guides")
+
+--- SCENE 4 (32-45s): FULL MOVEMENT: SPIDERMAN + DEFICIT PUSH-UP ----------------------------
+Part A, side view, camera orbiting slowly: Spiderman push-up: as he lowers, his right knee
+drives outside toward his right elbow, then he presses up and returns the leg; next rep, left
+side. Obliques, hip flexors and chest glow red.
+Part B, low front angle, then overhead: deficit push-up with each hand on a black weight plate,
+chest dropping below hand level into a deep stretch, then pressing up powerfully. The lower
+chest and front shoulders glow red at the bottom of each rep.
+(Captions: "3 · SPIDERMAN · knee to elbow, hips stay level"
+           "4 · DEFICIT · chest below your hands for the deep stretch")
+
+--- SCENE 5 (45-55s): PEAK: PSEUDO-PLANCHE PUSH-UP -------------------------------------------
+Side-on, low camera, slow motion. Hands turned out by his hips, fingers pointing to the side,
+arms straight. He leans his shoulders far forward past his hands, body in a straight line, and
+does slow, controlled push-ups, then holds the bottom position for two seconds. Front
+shoulders, biceps and core glow intense red and pulse with each breath. The background sun
+flares behind him.
+(Caption: "5 · PSEUDO-PLANCHE · lean past your hands, keep the body straight")
+
+--- SCENE 6 (55-60s): FINISH / BRANDING -----------------------------------------------------
+He finishes the last rep, stands up, takes a breath, and adjusts his navy Squeeze Fit cap while
+looking toward the camera. The glow fades. The camera pulls back and the background goes
+softly dark navy with a slight blue light, leaving space in the upper part of the frame for the
+logo. Calm and clean, no fast movement.
+(End card in edit: Squeeze Fit logo + "Save this for push day" + Google Play badge)
+
+
+--- OPTIONAL VOICEOVER (ElevenLabs v3, single paragraph, about 55 s) ------------------------
+[confident] Five push-ups nobody does... and they're the ones that grow you. One: push-up plus.
+Arms locked, push the floor away... this wakes up your serratus and saves your shoulders. Two:
+archer push-up. One arm works, the other just guides... it's your road to the one-arm push-up.
+Three: Spiderman. Knee to elbow, hips level... chest and core in one rep. Four: deficit push-up.
+Hands on plates, chest below your hands... that deep stretch is where the growth is. Five:
+pseudo-planche. Lean past your hands and keep your body straight... your shoulders will feel it
+for days. [warm] Save this for push day. Squeeze Fit builds your training around you... free
+on Google Play.

@@ -1,0 +1,46 @@
+{
+  "id": "hybrid-legs",
+  "voice": "en-US-AndrewNeural",
+  "rate": "+6%",
+  "clips": "clips/hybrid-legs",
+  "emphasis": ["stronger", "faster", "hamstrings", "glutes", "quads", "calves", "speed", "snap", "squeeze"],
+  "scenes": [
+    {
+      "kind": "hook", "clip": "01-hook.mp4",
+      "tag": "Squeeze Fit · Hybrid training",
+      "headline": [{"text": "Hybrid", "size": 200}, {"text": "Legs", "size": 200, "color": "hot"}, {"text": "lift heavy · run fast", "style": "label"}],
+      "narration": "Running a lot, but your legs keep getting weaker? Do these five moves twice a week and get stronger without slowing down."
+    },
+    {
+      "kind": "exercise", "clip": "02-split-squat.mp4",
+      "title": "Bulgarian split squat", "dose": "3 × 8 each leg", "muscles": ["Quads", "Glutes"],
+      "narration": "Bulgarian split squats. Drop the back knee straight down, keep the front heel planted, and drive up. One leg at a time, just like running."
+    },
+    {
+      "kind": "exercise", "clip": "03-rdl.mp4",
+      "title": "Romanian deadlift", "dose": "3 × 8", "muscles": ["Hamstrings", "Glutes"],
+      "narration": "Romanian deadlifts. Push your hips back, keep the dumbbells close, and stop when your hamstrings stretch. This protects you from pulls when you sprint."
+    },
+    {
+      "kind": "exercise", "clip": "04-kb-swing.mp4",
+      "title": "Kettlebell swing", "dose": "3 × 15", "muscles": ["Glutes", "Core"],
+      "narration": "Kettlebell swings. Hinge, then snap your hips forward. The bell floats up from your glutes, not your arms."
+    },
+    {
+      "kind": "exercise", "clip": "05-box-jump.mp4",
+      "title": "Box jump", "dose": "4 × 5", "muscles": ["Quads", "Calves"],
+      "narration": "Box jumps. Jump up, land soft and quiet, step down. Low reps, full rest. This is where your speed comes from."
+    },
+    {
+      "kind": "exercise", "clip": "06-calf-raise.mp4",
+      "title": "Single-leg calf raise", "dose": "3 × 15", "muscles": ["Calves"],
+      "narration": "Single leg calf raises. All the way up, three seconds down. Strong calves take the beating of every stride."
+    },
+    {
+      "kind": "cta", "clip": "07-cta.mp4",
+      "lines": ["Your lifting + running week,", "planned from one photo."],
+      "button": "Free on Google Play",
+      "narration": "Want your full week, lifting and running, built around your body? Get Squeeze Fit. Link in bio."
+    }
+  ]
+}

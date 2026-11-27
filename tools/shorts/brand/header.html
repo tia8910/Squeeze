@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Squeeze Fit channel header</title>
+<style>
+  /* YouTube channel art: 2560x1440. Phones show only the centre 1546x423 band, desktop the
+     full width x 423, TV everything: the brand sits in the safe band, the figures outside it. */
+  @font-face { font-family: Anton; src: url(../node_modules/@fontsource/anton/files/anton-latin-400-normal.woff2); }
+  @font-face { font-family: Oswald; src: url(../node_modules/@fontsource/oswald/files/oswald-latin-600-normal.woff2); font-weight: 600; }
+  @font-face { font-family: J; src: url(../../../app/src/main/res/font/jakarta_semibold.ttf); font-weight: 600; }
+  :root { --navy: #040b1f; --blue: #1768FF; --sky: #8DB3FF; --ice: #DDE8FF; }
+  html, body { margin: 0; }
+  .art { position: relative; width: 2560px; height: 1440px; overflow: hidden;
+    background:
+      radial-gradient(1100px 520px at 50% 50%, rgba(23,104,255,.38), transparent 70%),
+      radial-gradient(700px 700px at 12% 50%, rgba(23,104,255,.22), transparent 70%),
+      radial-gradient(700px 700px at 88% 50%, rgba(23,104,255,.22), transparent 70%),
+      linear-gradient(180deg, #02060f 0%, #071a4a 50%, #02060f 100%); }
+  /* thin light lines across the band, like a stage */
+  .line { position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(141,179,255,.55) 25%, rgba(141,179,255,.55) 75%, transparent); }
+  .ring { position: absolute; border-radius: 50%; border: 6px solid rgba(110,160,255,.9);
+    box-shadow: 0 0 40px 6px rgba(23,104,255,.8), inset 0 0 40px 6px rgba(23,104,255,.55); }
+  .fig { position: absolute; filter: drop-shadow(0 0 30px rgba(23,104,255,.55)); }
+  .band { position: absolute; left: 527px; width: 1506px; top: 509px; height: 423px;
+    display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 40px; }
+  .emblem { width: 200px; height: 200px; filter: drop-shadow(0 0 28px rgba(141,179,255,.75)); }
+  .words { display: flex; flex-direction: column; gap: 10px; }
+  .name { font: 168px/0.92 Anton, Impact, sans-serif; letter-spacing: 6px; color: #fff;
+    text-shadow: 0 0 40px rgba(23,104,255,.8), 0 6px 0 #020713; }
+  .tag { font: 600 34px Oswald, sans-serif; letter-spacing: 6px; white-space: nowrap; color: var(--sky); }
+  .side {
+    display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .side .k { font: 600 26px Oswald, sans-serif; letter-spacing: 6px; white-space: nowrap; color: var(--ice); }
+  .side img { width: 300px; }
+</style>
+</head>
+<body>
+<div class="art">
+  <div class="line" style="top:512px"></div>
+  <div class="line" style="top:926px"></div>
+  <div class="ring" style="width:980px;height:980px;left:-520px;top:230px"></div>
+  <div class="ring" style="width:980px;height:980px;right:-520px;top:230px"></div>
+  <img class="fig" src="FIG_LEFT" style="height:1180px;left:-40px;top:200px">
+  <img class="fig" src="FIG_RIGHT" style="height:1180px;right:-30px;top:190px">
+  <div class="band">
+    <div class="brand">
+      <img class="emblem" src="emblem.png">
+      <div class="words">
+        <div class="name">SQUEEZE FIT</div>
+        <div class="tag">HYBRID TRAINING · FORM · ANATOMY</div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="k">NEW SHORTS EVERY WEEK</div>
+      <img src="google-play-badge.png">
+    </div>
+  </div>
+</div>
+</body>
+</html>

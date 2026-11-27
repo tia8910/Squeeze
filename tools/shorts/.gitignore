@@ -1,0 +1,5 @@
+node_modules/
+out/
+# Downloaded MakeHuman assets and the generated human.json (see build_human.py)
+assets/
+clips/
