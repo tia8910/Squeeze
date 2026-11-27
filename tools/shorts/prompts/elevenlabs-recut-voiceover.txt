@@ -32,3 +32,18 @@ SHORTER ALTERNATIVE (about 13 seconds)
 
 [warm] Scan your body. Track real change. Train and eat for you... and your photos never leave your phone.
 Squeeze Fit. Free on Google Play.
+
+
+CREATIVE VERSIONS (single paragraph each: paste as is, no empty lines)
+
+A  "The trend doesn't lie"
+[confident] The mirror lies. The scale lies. Your trend doesn't. Squeeze Fit scans your body from one photo, tracks real change, and builds your training and meals around you... and that photo never leaves your phone. Run. Pull. Push. Jump. Carry. Squeeze Fit. Free on Google Play.
+
+B  "Runners lift. Lifters run."
+[confident] Runners lift. Lifters run. You do both... so your plan should too. One photo scans your body, your progress shows what's really changing, and your training and nutrition are built for you, privately, on your phone. Squeeze Fit. Free on Google Play.
+
+C  "Your body keeps the score"
+[confident] Every sprint. Every pull. Every push, jump and carry... your body keeps the score. Squeeze Fit reads it from one photo, tracks what's really changing, and builds your training and meals around you. Your photos never leave your phone. Squeeze Fit. Free on Google Play.
+
+Note: ElevenLabs only reads the first block if there is an empty line, so keep each
+script on one paragraph. Type extra tags such as [warm] by hand so they turn into tags.
