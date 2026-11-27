@@ -18,6 +18,8 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Screenshot
@@ -27,6 +29,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -179,6 +183,8 @@ fun SettingsScreen(
             )
         }
 
+        ReminderCard()
+
         AboutCard()
     }
 }
@@ -271,6 +277,87 @@ private fun ToggleRow(
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/**
+ * Training reminders and the weekly check-in. Reads and writes [com.squeeze.app.notify.Reminders]
+ * directly, since the alarms live outside the app's view models anyway.
+ */
+@Composable
+private fun ReminderCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val reminders = com.squeeze.app.notify.Reminders
+    var on by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(reminders.enabled(context)) }
+    var time by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(reminders.time(context)) }
+    var allowed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(reminders.canPost(context)) }
+
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        allowed = granted && reminders.canPost(context)
+        if (!allowed) openNotificationSettings(context)
+    }
+
+    GroupCard {
+        ToggleRow(
+            icon = Icons.Rounded.Notifications,
+            title = "Reminders",
+            detail = when {
+                on && !allowed -> "Notifications are off for Squeeze. Tap the switch to allow them."
+                on -> "Daily at %d:%02d, plus a scan check-in on Sundays.".format(time.hour, time.minute)
+                else -> "A daily nudge to train and a weekly scan check-in."
+            },
+            checked = on && allowed,
+            onCheckedChange = { want ->
+                on = want
+                reminders.setEnabled(context, want)
+                if (want && !reminders.canPost(context)) {
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        reminders.markPermissionAsked(context)
+                        ask.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        openNotificationSettings(context)
+                    }
+                }
+            },
+        )
+        if (on && allowed) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        android.app.TimePickerDialog(
+                            context,
+                            { _, hour, minute ->
+                                time = java.time.LocalTime.of(hour, minute)
+                                reminders.setTime(context, time)
+                            },
+                            time.hour,
+                            time.minute,
+                            android.text.format.DateFormat.is24HourFormat(context),
+                        ).show()
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Text("Reminder time", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                Text("%d:%02d".format(time.hour, time.minute), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+/** The system page for this app's notifications, for when the permission was refused before. */
+private fun openNotificationSettings(context: android.content.Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 

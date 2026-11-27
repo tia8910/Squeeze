@@ -69,6 +69,11 @@ class MainActivity : FragmentActivity() {
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
     ) { result -> if (result.resultCode != RESULT_OK) appUpdates.declined() }
 
+    /** Android 13+ notification permission, asked once; reminders are rebooked either way. */
+    private val notificationLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { com.squeeze.app.notify.Reminders.schedule(this) }
+
     private var unlocked by mutableStateOf(false)
 
     /**
@@ -130,6 +135,21 @@ class MainActivity : FragmentActivity() {
                         val reviewDue by appReview.due.collectAsState()
                         androidx.compose.runtime.LaunchedEffect(unlocked) {
                             if (unlocked) appUpdates.check(updateLauncher)
+                        }
+                        // Asked once, after the welcome screen, so it never covers the intro.
+                        val landingSeen by uiSettings.landingSeen.collectAsState()
+                        androidx.compose.runtime.LaunchedEffect(unlocked, landingSeen) {
+                            val reminders = com.squeeze.app.notify.Reminders
+                            if (unlocked && landingSeen &&
+                                android.os.Build.VERSION.SDK_INT >= 33 &&
+                                reminders.enabled(this@MainActivity) &&
+                                !reminders.permissionAsked(this@MainActivity) &&
+                                !reminders.canPost(this@MainActivity)
+                            ) {
+                                kotlinx.coroutines.delay(NOTIFICATION_ASK_DELAY_MS)
+                                reminders.markPermissionAsked(this@MainActivity)
+                                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
                         }
                         androidx.compose.runtime.LaunchedEffect(reviewDue, unlocked) {
                             if (reviewDue && unlocked) {
@@ -301,5 +321,6 @@ class MainActivity : FragmentActivity() {
          */
         const val GRACE_PERIOD_MS = 30_000L
         const val REVIEW_DELAY_MS = 1_500L
+        const val NOTIFICATION_ASK_DELAY_MS = 1_200L
     }
 }
