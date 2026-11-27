@@ -76,6 +76,9 @@ class MainActivity : FragmentActivity() {
 
     private var unlocked by mutableStateOf(false)
 
+    /** Drives the lock screen's fingerprint button: idle, reading, then a check. */
+    private var lockStage by mutableStateOf(com.squeeze.app.ui.lock.LockStage.IDLE)
+
     /**
      * True once the user has got in at least once during this activity's life.
      *
@@ -167,7 +170,7 @@ class MainActivity : FragmentActivity() {
 
                         // LockScreen draws an opaque Surface over the full size, so nothing
                         // underneath is visible here or in the recents thumbnail.
-                        if (!unlocked) LockScreen(onAuthenticate = ::promptForBiometric)
+                        if (!unlocked) LockScreen(onAuthenticate = ::promptForBiometric, stage = lockStage)
                     }
                 }
             }
@@ -259,6 +262,7 @@ class MainActivity : FragmentActivity() {
     private fun promptForBiometric() {
         if (promptShowing) return
         promptShowing = true
+        lockStage = com.squeeze.app.ui.lock.LockStage.SCANNING
 
         val prompt = BiometricPrompt(
             this,
@@ -266,8 +270,18 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     promptShowing = false
-                    unlocked = true
+                    // The app is composed behind the lock now, so it is ready the moment the
+                    // check has shown; the short pause lets the green tick land first.
                     everUnlocked = true
+                    lockStage = com.squeeze.app.ui.lock.LockStage.DONE
+                    lifecycleScope.launch {
+                        kotlinx.coroutines.delay(UNLOCK_CHECK_MS)
+                        // Not if the app was left during the pause: onStop has locked it again.
+                        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                            unlocked = true
+                        }
+                        lockStage = com.squeeze.app.ui.lock.LockStage.IDLE
+                    }
                     // The ambient collector already ran while locked and chose silence, and
                     // it will not re-emit for a change it cannot see. Start it here instead.
                     if (uiSettings.ambientEnabled.value) soundEngine.startAmbient()
@@ -278,6 +292,7 @@ class MainActivity : FragmentActivity() {
                 // next onStart would both be dead.
                 override fun onAuthenticationError(code: Int, message: CharSequence) {
                     promptShowing = false
+                    lockStage = com.squeeze.app.ui.lock.LockStage.IDLE
                 }
             },
         )
@@ -324,5 +339,6 @@ class MainActivity : FragmentActivity() {
         const val GRACE_PERIOD_MS = 30_000L
         const val REVIEW_DELAY_MS = 1_500L
         const val NOTIFICATION_ASK_DELAY_MS = 1_200L
+        const val UNLOCK_CHECK_MS = 450L
     }
 }
