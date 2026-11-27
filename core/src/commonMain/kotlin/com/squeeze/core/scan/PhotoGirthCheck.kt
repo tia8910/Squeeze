@@ -5,7 +5,7 @@ import kotlin.math.abs
 
 /** Something about the photograph that makes some of its measurements unreliable. */
 enum class PhotoIssue(val label: String) {
-    ARM_RAISED("Arm raised"),
+    ARM_RAISED("Arm raised or flexed"),
     ARM_ACROSS_BODY("Arm in front of the body"),
     LEGS_COVERED("Legs covered by clothing"),
 }
@@ -35,8 +35,11 @@ data class GirthCheck(
  * real scan. A missing number is honest; a wrong one becomes a strength or a weak point.
  *
  * Three checks, each conservative:
- * 1. Pose. An elbow above shoulder height is a raised arm: chest and arm are withheld, and
- *    arms, chest and back width are not judged. An elbow inside the shoulder line is an arm in
+ * 1. Pose. An arm is raised or flexed when its elbow is above the shoulder, its fist is above
+ *    the shoulder, or the upper arm points more sideways than down. A double-biceps or
+ *    single-arm flex in a mirror does all three, and only the first was checked at first, so a
+ *    flex with the elbow just under shoulder height got through. Chest and arm are withheld,
+ *    and arms, chest and back width are not judged: a flexed arm is not the arm at rest. An elbow inside the shoulder line is an arm in
  *    front of the body: chest is withheld.
  * 2. Clothing. Legs that show less skin than the physique read needs: thigh and calf are
  *    withheld, since the outline there is the fabric.
@@ -51,10 +54,27 @@ object PhotoGirthCheck {
     /** An elbow closer to the midline than this share of half the shoulder width is across the body. */
     private const val ACROSS_SHARE = 0.6
 
-    fun armRaised(pose: FrontPoseGeometry): Boolean {
+    /** A typical phone photo held upright, for callers that do not know the real shape. */
+    const val PORTRAIT_ASPECT = 0.6
+
+    /**
+     * @param aspect the photo's width over its height, so sideways and downward distances on the
+     *   upper arm compare in pixels rather than in the two different normalised units
+     */
+    fun armRaised(pose: FrontPoseGeometry, aspect: Double = PORTRAIT_ASPECT): Boolean {
         val span = torsoSpan(pose) ?: return false
-        return listOf(pose.shoulderLeft to pose.elbowLeft, pose.shoulderRight to pose.elbowRight)
-            .any { (shoulder, elbow) -> elbow != null && elbow.y < shoulder.y - RAISED_MARGIN * span }
+        val sides = listOf(
+            Triple(pose.shoulderLeft, pose.elbowLeft, pose.wristLeft),
+            Triple(pose.shoulderRight, pose.elbowRight, pose.wristRight),
+        )
+        return sides.any { (shoulder, elbow, wrist) ->
+            val elbowUp = elbow != null && elbow.y < shoulder.y - RAISED_MARGIN * span
+            val fistUp = wrist != null && wrist.y < shoulder.y
+            // Upper arm out to the side: more horizontal travel than vertical, in pixels.
+            val outward = elbow != null &&
+                abs(elbow.x - shoulder.x) * aspect > (elbow.y - shoulder.y).coerceAtLeast(0.0)
+            elbowUp || fistUp || outward
+        }
     }
 
     fun armAcrossBody(pose: FrontPoseGeometry): Boolean {
@@ -79,6 +99,7 @@ object PhotoGirthCheck {
         visibility: Map<MuscleGroup, Double>,
         heightCm: Double,
         female: Boolean,
+        aspect: Double = PORTRAIT_ASPECT,
     ): GirthCheck {
         val issues = linkedSetOf<PhotoIssue>()
         val untrusted = linkedSetOf<MuscleGroup>()
@@ -86,11 +107,11 @@ object PhotoGirthCheck {
         var out = c
 
         if (pose != null) {
-            if (armRaised(pose)) {
+            if (armRaised(pose, aspect)) {
                 issues += PhotoIssue.ARM_RAISED
                 untrusted += setOf(MuscleGroup.ARMS, MuscleGroup.CHEST, MuscleGroup.V_TAPER)
                 if (out.chestCm != null) withheld["Chest"] = "Arm in the way"
-                if (out.armCm != null) withheld["Arm"] = "Arm raised"
+                if (out.armCm != null) withheld["Arm"] = "Arm flexed or raised"
                 out = out.copy(chestCm = null, armCm = null)
             }
             if (armAcrossBody(pose)) {
