@@ -302,11 +302,11 @@ private fun ReminderCard() {
     GroupCard {
         ToggleRow(
             icon = Icons.Rounded.Notifications,
-            title = "Reminders",
+            title = "Notifications",
             detail = when {
                 on && !allowed -> "Notifications are off for Squeeze. Tap the switch to allow them."
-                on -> "Daily at %d:%02d, plus a scan check-in on Sundays.".format(time.hour, time.minute)
-                else -> "A daily nudge to train and a weekly scan check-in."
+                on -> "Choose which ones below. Never your body data on the lock screen."
+                else -> "Training, meals, progress and comeback nudges."
             },
             checked = on && allowed,
             onCheckedChange = { want ->
@@ -323,6 +323,21 @@ private fun ReminderCard() {
             },
         )
         if (on && allowed) {
+            com.squeeze.app.notify.ReminderKind.entries.forEach { kind ->
+                var kindOn by androidx.compose.runtime.remember(kind) {
+                    androidx.compose.runtime.mutableStateOf(reminders.enabled(context, kind))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                KindRow(
+                    title = kind.title,
+                    detail = kind.detail,
+                    checked = kindOn,
+                    onCheckedChange = {
+                        kindOn = it
+                        reminders.setEnabled(context, kind, it)
+                    },
+                )
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Row(
                 Modifier
@@ -343,10 +358,25 @@ private fun ReminderCard() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Rounded.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-                Text("Reminder time", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                Text("Training reminder time", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                 Text("%d:%02d".format(time.hour, time.minute), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
+    }
+}
+
+/** One kind of notification, indented under the main switch. */
+@Composable
+private fun KindRow(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 50.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

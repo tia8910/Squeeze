@@ -68,6 +68,7 @@ class CoachRepository @Inject constructor(
     private val composition: BodyCompositionRepository,
     private val workoutDao: WorkoutDao,
     private val activityDao: ActivityDao,
+    private val context: android.content.Context,
 ) {
 
     /**
@@ -186,6 +187,7 @@ class CoachRepository @Inject constructor(
     suspend fun saveFavouriteFoods(foods: Set<String>) {
         val existing = profileDao.get() ?: return
         profileDao.upsert(existing.copy(favouriteFoods = foods.joinToString("|")))
+        if (foods.isNotEmpty()) com.squeeze.app.notify.Reminders.noteFuelUsed(context)
     }
 
     /** When the user usually trains, or null before they have said. */
@@ -267,8 +269,13 @@ class CoachRepository @Inject constructor(
                 netKcal = kcal,
             ),
         )
+        com.squeeze.app.notify.Reminders.noteSession(context)
         return kcal
     }
+
+    /** Celebrates new personal records from the session just saved. */
+    fun celebrateRecords(exercises: List<String>) =
+        com.squeeze.app.notify.Reminders.postRecords(context, exercises)
 
     suspend fun recentSessions(days: Long = 14): List<ActivitySessionEntity> =
         activityDao.since(LocalDate.now().toEpochDay() - days)

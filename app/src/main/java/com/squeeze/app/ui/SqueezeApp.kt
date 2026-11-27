@@ -167,6 +167,12 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
         return
     }
 
+    // The goal date, for the countdown notification. A date only.
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    androidx.compose.runtime.LaunchedEffect(state.profile?.targetEpochDay) {
+        com.squeeze.app.notify.Reminders.noteGoalDay(appContext, state.profile?.targetEpochDay)
+    }
+
     val navController = rememberNavController()
     val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
     val paywallSeen by viewModel.paywallSeen.collectAsStateWithLifecycle()
