@@ -1,0 +1,34 @@
+SQUEEZE FIT: VOICEOVER FOR THE HYBRID RECUT (Journey end card)
+About 17 seconds. Paste the script exactly as it is into ElevenLabs.
+
+Voice:     deep, warm, confident male ("deep", "confident", "coach").
+Model:     Eleven v3 (keeps the [tags]); on Multilingual v2 delete the [tags] first.
+Settings:  Stability 40%   Similarity 78%   Style 45%   Speaker boost ON   Speed 1.0
+Export:    MP3, named recut.mp3. Generate 2–3 takes and send the best.
+
+How it lines up with the video:
+  "Run."    sprint            "Jump."   box jump
+  "Pull."   pull-up           "Carry."  farmer carry
+  "Push."   sled push
+  Paragraph 2 plays over the end card: each feature word appears on screen
+  as you say it (Scan, Track, Train, Eat, Private), and the Google Play
+  badge comes in on "Free on Google Play".
+
+
+--- SCRIPT (copy from here) -------------------------------------------------
+
+[confident] Run. Pull. Push. Jump. Carry.
+Hybrid training builds an athlete who can do it all... when the plan fits your body.
+
+[warm] Squeeze Fit scans your body fat from one photo... tracks real change... builds your training... and your nutrition. And your photos never leave your phone.
+Squeeze Fit. Free on Google Play.
+
+--- END ---------------------------------------------------------------------
+
+
+SHORTER ALTERNATIVE (about 13 seconds)
+
+[confident] Run. Pull. Push. Jump. Carry.
+
+[warm] Scan your body. Track real change. Train and eat for you... and your photos never leave your phone.
+Squeeze Fit. Free on Google Play.
