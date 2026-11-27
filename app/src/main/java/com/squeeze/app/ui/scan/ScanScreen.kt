@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -55,7 +58,6 @@ import androidx.compose.material3.FilledTonalButton
 import com.squeeze.app.ui.components.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -764,31 +766,36 @@ private fun CaptureStep(
 
 @Composable
 private fun StepCard(step: ScanStep) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Only the front photo is required, so the bar shows the required step as
-            // complete rather than implying two more are owed.
-            LinearProgressIndicator(
-                progress = { if (step == ScanStep.FRONT) 0.34f else 1f },
-                modifier = Modifier.fillMaxWidth(),
-            )
+    val (number, title, detail) = when (step) {
+        ScanStep.SIDE -> Triple(2, "Turn side-on", "Arms forward so your stomach outline is clear.")
+        ScanStep.BACK -> Triple(3, "Turn around", "Same pose as the front, back to the camera.")
+        else -> Triple(1, "Face the camera", "Head to feet in shot, plain background, even light.")
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = when (step) {
-                    ScanStep.SIDE -> "Side view, turn side-on"
-                    ScanStep.BACK -> "Back view, turn around"
-                    else -> "Front view, face the camera"
-                },
-                style = MaterialTheme.typography.titleSmall,
+                if (step == ScanStep.FRONT) "PHOTO 1 · REQUIRED" else "PHOTO $number · OPTIONAL",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
             )
-            Text(
-                text = "Shoulders and waist in shot at the least, arms held clear of your " +
-                    "sides, plain background, even light, close-fitting clothing. Loose " +
-                    "fabric is measured as body. Getting your hips in too gives the more " +
-                    "accurate reading; head to feet on top of that adds tape measurements " +
-                    "in centimetres.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                repeat(3) { i ->
+                    Box(
+                        Modifier
+                            .size(width = if (i + 1 == number) 22.dp else 8.dp, height = 8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (i + 1 <= number) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline,
+                            ),
+                    )
+                }
+            }
         }
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+        Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -958,8 +965,6 @@ private fun ResultStep(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Scan results", style = MaterialTheme.typography.headlineSmall)
-
         // Four things, and nothing else.
         //
         // The screen used to show the circumference route in full — seven editable girths, a
@@ -1032,7 +1037,28 @@ private fun ResultStep(
         val headline = visual.takeIf { bounded } ?: ai ?: state.tape ?: shape
         val fromAi = ai != null && headline === ai
 
+        // The answer first and large; how it was reached is one tap away.
+        headline?.let { h ->
+            val category = state.profile?.let { p ->
+                runCatching {
+                    com.squeeze.core.bodycomp.ReferenceBands.bodyFat(
+                        h.percent,
+                        p.sex,
+                        java.time.LocalDate.now().year - p.birthYear,
+                    ).label
+                }.getOrNull()
+            }
+            ResultHero(
+                estimate = h,
+                category = category,
+                source = if (state.abdominalBodyFatPercent != null) "Front and side photos" else "Front photo only",
+            )
+        }
+
+        PhotoIssueBanner(state.photoIssues)
+
         headline?.let {
+            ExpandableSection("How this was worked out") {
             ShapeHeadline(
                 estimate = it,
                 indices = state.shapeIndices,
@@ -1174,6 +1200,7 @@ private fun ResultStep(
                         ).takeIf { state.tape == null },
                 ),
             )
+            }
         }
 
         // What the AI made of each muscle group, read against the user's goal. Straight after
@@ -1181,6 +1208,8 @@ private fun ResultStep(
         state.physique?.let { PhysiqueCard(it, previous = state.previousPhysique) }
 
         if (state.withheld.isNotEmpty()) WithheldCard(state.withheld, state.photoIssues)
+
+        if (state.photoIssues.isNotEmpty()) RetakeCard(onRetake)
 
         // **Directly under the headline, and only when the outline could not answer.**
         //
@@ -1417,83 +1446,146 @@ private fun OptionalExtrasStep(
     onAddSide: () -> Unit,
     onAddBack: () -> Unit,
 ) {
+    // Four segments: the front photo earns two, a back photo one more, a side photo two.
+    val level = (2 + (if (hasBack) 1 else 0) + (if (hasSide) 2 else 0)).coerceAtMost(4)
+    val (label, color) = when (level) {
+        4 -> "Best" to Color(0xFF16A34A)
+        3 -> "Better" to Color(0xFF36A0FF)
+        else -> "Good" to Color(0xFFF59E0B)
+    }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Front photo captured", style = MaterialTheme.typography.headlineSmall)
-
-        Text(
-            text = "Enough to measure, but the side photo is the one worth taking. Fat on " +
-                "the abdomen accumulates far more in depth than in width, and a front view " +
-                "cannot see depth at all. It is the difference between guessing at your " +
-                "midsection and measuring it.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Button(onClick = onMeasureNow, modifier = Modifier.fillMaxWidth()) {
-            Text("Measure now")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF16A34A).copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("✓", color = Color(0xFF16A34A), fontWeight = FontWeight.Bold)
+            }
+            Column(Modifier.padding(start = 12.dp)) {
+                Text(
+                    if (hasSide || hasBack) "Photos added" else "Front photo done",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    if (hasSide) "Ready to measure." else "Enough to measure. One more photo makes it sharper.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = muted,
+                )
+            }
         }
 
-        ExtraOption(
-            title = "Add a side photo, recommended",
-            captured = hasSide,
-            detail = "The one measurement a front photo cannot make. Your abdomen is " +
-                "measured against your own ribcage, in the same picture, so nothing about " +
-                "your height or the framing can affect it, and unlike the front view, an " +
-                "arm at your side cannot get in the way of it.",
-            onClick = onAddSide,
-        )
+        BrandCard(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "SCAN ACCURACY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = muted,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = color)
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(4) { i ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (i < level) color else MaterialTheme.colorScheme.outline),
+                    )
+                }
+            }
+            if (!hasSide) {
+                Text(
+                    "A side photo takes it to Best: it measures your belly depth, which a front photo cannot see.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        }
+
+        Text("ADD A PHOTO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = muted)
 
         ExtraOption(
-            title = "Add a back photo",
-            captured = hasBack,
-            detail = "Measures the same width as the front from the other side, and the two " +
-                "are averaged. A small precision gain, worth it if you are chasing a " +
-                "reliable trend, skippable otherwise.",
+            title = "Side photo",
+            detail = "Turn 90 degrees, arms forward",
+            badge = if (hasSide) "Added" else "Recommended",
+            highlighted = !hasSide,
+            onClick = onAddSide,
+        )
+        ExtraOption(
+            title = "Back photo",
+            detail = "Scores back width, and steadies the trend",
+            badge = if (hasBack) "Added" else "Optional",
+            highlighted = false,
             onClick = onAddBack,
         )
+
+        Spacer(Modifier.height(8.dp))
+        if (!hasSide) {
+            PrimaryButton(text = "Add side photo", onClick = onAddSide, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = onMeasureNow, modifier = Modifier.fillMaxWidth()) {
+                Text("Measure now", fontWeight = FontWeight.Bold)
+            }
+        } else {
+            PrimaryButton(text = "Measure now", onClick = onMeasureNow, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
 @Composable
 private fun ExtraOption(
     title: String,
-    captured: Boolean,
     detail: String,
+    badge: String,
+    highlighted: Boolean,
     onClick: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                if (captured) {
-                    Text(
-                        text = "Captured",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-                Text(if (captured) "Retake" else "Add photo")
-            }
+    val primary = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(20.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 72.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(if (highlighted) 2.dp else 1.dp, if (highlighted) primary else MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(width = 44.dp, height = 56.dp).clip(RoundedCornerShape(12.dp))
+                .background(primary.copy(alpha = if (highlighted) 0.12f else 0.06f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.PhotoCamera, contentDescription = null, tint = primary, modifier = Modifier.size(20.dp))
         }
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            badge,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (highlighted) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (highlighted) primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

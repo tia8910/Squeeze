@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -102,13 +104,6 @@ fun PoseReference(step: ScanStep, modifier: Modifier = Modifier) {
             ) { PoseRules() }
         }
 
-        Text(
-            text = "Shoulders and waist in shot at the least, plain background, even " +
-                "light, close-fitting clothing or none. Your hips in shot as well gives " +
-                "the more accurate reading; head to feet on top of that adds centimetres.",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (dark) Brand.DarkMuted else Brand.Muted,
-        )
     }
 }
 
@@ -227,30 +222,27 @@ private const val ROWS = 2
  */
 @Composable
 private fun PoseRules() {
-    PoseRule(
-        "Arms clear of your sides",
-        "The one that matters most. An arm touching your waist is measured as part of you, " +
-            "and the reading comes back far too lean.",
-    )
-    PoseRule(
-        "Stand relaxed, not braced",
-        "Bracing narrows the waist and flattens the stomach. Breathe out and let it go.",
-    )
-    PoseRule(
-        "Phone at chest height, level",
-        "Shooting up or down foreshortens the trunk and moves every band.",
-    )
-    PoseRule(
-        "Waistband below your hip bones",
-        "Shorts sitting on the hip are measured instead of the hip.",
-    )
+    PoseRule("1", "Arms a hand's width out", "Not touching your waist, not flexed.")
+    PoseRule("2", "Relaxed, not braced", "Breathe out and let your stomach go.")
+    PoseRule("3", "Phone at chest height", "Level, on a shelf with the timer.")
+    PoseRule("4", "Shorts or fitted clothes", "Loose fabric is measured as body.")
 }
 
 @Composable
-private fun PoseRule(title: String, detail: String) {
+private fun PoseRule(number: String, title: String, detail: String) {
     val dark = LocalIsDarkTheme.current
 
-    Column {
+    Row(verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background((if (dark) Brand.DarkBlue else Brand.Blue).copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(number, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = if (dark) Brand.DarkBlue else Brand.Blue)
+        }
+        Column(Modifier.padding(start = 8.dp)) {
         Text(
             text = title,
             style = MaterialTheme.typography.bodySmall,
@@ -262,6 +254,7 @@ private fun PoseRule(title: String, detail: String) {
             style = MaterialTheme.typography.labelSmall,
             color = if (dark) Brand.DarkMuted else Brand.Muted,
         )
+        }
     }
 }
 
