@@ -15,7 +15,7 @@ import javax.inject.Singleton
 data class RemoteBackup(val id: String, val modifiedMs: Long?)
 
 /** HTTP 401: the access token expired or was revoked. */
-class DriveUnauthorized : IOException("Google sign-in expired")
+class DriveUnauthorized(message: String = "Google sign-in expired. Tap Reconnect.") : IOException(message)
 
 /**
  * The three Drive calls backup needs — find, write, read — against the app-data folder.
@@ -96,7 +96,13 @@ class DriveClient @Inject constructor() {
             if (code == HttpURLConnection.HTTP_UNAUTHORIZED) throw DriveUnauthorized()
             if (code !in 200..299) {
                 val error = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                throw IOException("Google Drive returned $code ${error.take(200)}")
+                // A token without the Drive scope is a permission to fix by reconnecting, not a
+                // fault: mark it so the card offers Reconnect instead of printing Google's JSON.
+                if (code == HttpURLConnection.HTTP_FORBIDDEN && ("insufficient" in error.lowercase() || "scope" in error.lowercase())) {
+                    throw DriveUnauthorized("Google Drive access was not allowed. Tap Reconnect and allow Google Drive.")
+                }
+                val reason = runCatching { org.json.JSONObject(error).getJSONObject("error").getString("message") }.getOrNull()
+                throw IOException("Google Drive could not save the backup (code $code)" + (reason?.let { ": $it" } ?: "."))
             }
             return conn.inputStream.bufferedReader().use { it.readText() }
         } finally {

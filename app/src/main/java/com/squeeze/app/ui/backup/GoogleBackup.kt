@@ -183,7 +183,7 @@ fun GoogleBackupCard(compact: Boolean, modifier: Modifier = Modifier, viewModel:
             Text("Signed in as ${status.email}", style = MaterialTheme.typography.titleSmall)
             Text(
                 when {
-                    status.needsReconnect -> "Google Drive access expired, reconnect to keep backing up."
+                    status.needsReconnect -> "Google Drive needs your permission again. Tap Reconnect and allow Google Drive."
                     status.lastBackupMs != null -> "Backs up automatically · last backup " +
                         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(status.lastBackupMs!!))
                     else -> "Backs up automatically once you have data."

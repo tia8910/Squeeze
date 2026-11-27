@@ -113,7 +113,9 @@ class BackupManager @Inject constructor(
     /** Drive access: a token straight away if already granted, otherwise Google's consent screen. */
     suspend fun authorize(from: Context = context): DriveAccess {
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(DRIVE_APPDATA), Scope(EMAIL_SCOPE)))
+            // Drive alone. Asking for a second scope (email) made Google show a checkbox per
+            // scope, and an unticked Drive box returned a token Drive then refused with 403.
+            .setRequestedScopes(listOf(Scope(DRIVE_APPDATA)))
             .build()
         val result = try {
             Identity.getAuthorizationClient(from).authorize(request).await()
@@ -124,10 +126,17 @@ class BackupManager @Inject constructor(
         return if (result.hasResolution() && pending != null) {
             DriveAccess.NeedsConsent(pending)
         } else {
+            if (!grantsDrive(result)) throw IllegalStateException(DRIVE_NOT_ALLOWED)
             remember(result)
             setReconnect(false)
             DriveAccess.Granted(result.accessToken ?: error("Google returned no access token"))
         }
+    }
+
+    /** Whether the token covers Drive. An empty list means Google did not report scopes at all. */
+    private fun grantsDrive(result: com.google.android.gms.auth.api.identity.AuthorizationResult): Boolean {
+        val granted = result.grantedScopes
+        return granted.isEmpty() || DRIVE_APPDATA in granted
     }
 
     /** Records which Google account holds the backup, for the backup card. */
@@ -155,6 +164,7 @@ class BackupManager @Inject constructor(
         val result = runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data) }
             .getOrNull() ?: return null
         val token = result.accessToken ?: return null
+        if (!grantsDrive(result)) return null
         remember(result)
         setReconnect(false)
         return token
@@ -169,7 +179,12 @@ class BackupManager @Inject constructor(
     // ── Backup and restore ───────────────────────────────────────────────────────────────
 
     /** The backup in Drive, if there is one. */
-    suspend fun findBackup(token: String): RemoteBackup? = drive.find(token)
+    suspend fun findBackup(token: String): RemoteBackup? = try {
+        drive.find(token)
+    } catch (e: DriveUnauthorized) {
+        setReconnect(true)
+        throw e
+    }
 
     suspend fun backupNow(token: String): Boolean = lock.withLock { upload(token) }
 
@@ -231,7 +246,7 @@ class BackupManager @Inject constructor(
     private companion object {
         const val PREFS = "google_backup"
         const val KEY_EMAIL = "email"
-        const val EMAIL_SCOPE = "email"
+        const val DRIVE_NOT_ALLOWED = "Google Drive access was not allowed. Tap Continue with Google and allow Google Drive."
         const val KEY_NAME = "name"
         const val KEY_LAST = "last_backup_ms"
         const val KEY_RECONNECT = "needs_reconnect"
