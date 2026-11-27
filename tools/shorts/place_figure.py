@@ -17,17 +17,18 @@ from scipy import ndimage as ndi
 
 
 def cutout(img):
+    """Background is the blue/navy backdrop (blue clearly above red); everything else that
+    connects into one body is the figure, black shorts included."""
     a = np.asarray(img.convert("RGB")).astype(np.float32)
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    lum = (r + g + b) / 3
-    m = ((b - r) < 12) & (lum > 16)
+    r, b = a[..., 0], a[..., 2]
+    background = (b - r) >= 10
+    m = ~background
     lab, n = ndi.label(m)
     sizes = ndi.sum(m, lab, range(1, n + 1))
     m = lab == (1 + int(np.argmax(sizes)))
     m = ndi.binary_closing(m, iterations=3)
     m = ndi.binary_fill_holes(m)
-    # the blue rim light sits on the silhouette edge: grow back over it a little
-    m = ndi.binary_dilation(m, iterations=2)
+    m = ndi.binary_opening(m, iterations=1)
     alpha = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))
     out = img.convert("RGBA"); out.putalpha(alpha)
     return out.crop(alpha.getbbox())
