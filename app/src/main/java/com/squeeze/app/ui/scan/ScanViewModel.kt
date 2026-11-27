@@ -33,6 +33,8 @@ import com.squeeze.core.scan.CropRegion
 import com.squeeze.core.scan.FrontPoseGeometry
 import com.squeeze.core.scan.MuscleGroup
 import com.squeeze.core.scan.PhysiqueAnalysis
+import com.squeeze.core.scan.PhotoGirthCheck
+import com.squeeze.core.scan.PhotoIssue
 import com.squeeze.core.bodycomp.MeasuredParts
 import com.squeeze.core.scan.PhysiqueRegions
 import com.squeeze.core.scan.PhysiqueReport
@@ -113,6 +115,10 @@ data class AiScanner(
 
 data class ScanUiState(
     val step: ScanStep = ScanStep.WEIGHT,
+    /** Sites this photo measured but could not stand behind, with the short reason. */
+    val withheld: Map<String, String> = emptyMap(),
+    /** What about the pose or clothing caused [withheld]. */
+    val photoIssues: Set<PhotoIssue> = emptySet(),
     val result: ScanResult? = null,
     val failure: DetectionFailure? = null,
     val saved: Boolean = false,
@@ -589,7 +595,7 @@ class ScanViewModel @Inject constructor(
         // no stature in it, and the one thing this codebase has learned the hard way is that
         // a fabricated stature does not produce a slightly wrong scan, it produces a
         // confidently wrong one — every girth is multiplied by the same bad number.
-        val result = front.scale?.let { scale ->
+        val measured = front.scale?.let { scale ->
             // **The trunk-scaled path degrades instead of dying, and only that path.**
             //
             // Enabling it turned a scan that produced no centimetres into one that produces
@@ -635,6 +641,18 @@ class ScanViewModel @Inject constructor(
             // figure below does not go through them and is unaffected.
             usableForBodyFat = false,
         )
+
+        // A raised arm, an arm across the chest, or loose clothing over the legs puts something
+        // that is not the body into the width a girth is read from. Those sites are dropped here,
+        // before anything downstream can turn them into a strength or a weak point.
+        val girthCheck = PhotoGirthCheck.check(
+            measured.circumferences,
+            front.geometry,
+            front.visibility,
+            profile.heightCm,
+            female = !isMale,
+        )
+        val result = measured.copy(circumferences = girthCheck.circumferences)
 
         // Computed from the pixel profile before it is discarded. Nothing here converts to
         // centimetres, so a mask that misjudged the body's height cannot reach it.
@@ -751,7 +769,11 @@ class ScanViewModel @Inject constructor(
         // model's reading, is skipped rather than judged — thighs in shorts are the shorts.
         val aspect = frontBitmap?.let { it.width.toDouble() / it.height } ?: 1.0
         val allRegions = front.geometry?.let { PhysiqueRegions.regions(it, aspect) }.orEmpty()
-        val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys)
+        // Back width is a back photo's call. From the front, the widest row of the outline is
+        // as likely to be a raised arm or a loose shirt as a lat.
+        val hidden = PhysiqueAnalysis.hiddenGroups(front.visibility, allRegions.keys) +
+            girthCheck.untrusted.filter { it in allRegions.keys } +
+            listOfNotNull(MuscleGroup.V_TAPER.takeIf { back == null && it in allRegions.keys })
         val muscleRegions = allRegions - hidden
         var live = scanner?.copy(
             stage = ScannerStage.MUSCLES,
@@ -779,6 +801,7 @@ class ScanViewModel @Inject constructor(
                 val goal = runCatching { Goal.valueOf(profile.goal) }.getOrDefault(Goal.HYPERTROPHY)
                 val (measuredStrong, measuredWeak) =
                     MeasuredParts.from(result.circumferences, Sex.valueOf(profile.sex))
+                        .let { (strong, weak) -> (strong - hidden) to (weak - hidden) }
                 // Every body-fat reading this scan has, for the one physical limit on the read:
                 // abs do not show above roughly 12%, whatever the crop looks like.
                 val bodyFat = listOfNotNull(
@@ -807,6 +830,8 @@ class ScanViewModel @Inject constructor(
             step = ScanStep.RESULT,
             scanner = null,
             physique = physique,
+            withheld = girthCheck.withheld,
+            photoIssues = girthCheck.issues,
             previousPhysique = physique?.let { coach.physiqueBefore(LocalDate.now().toEpochDay()) },
             appearance = appearance,
             profile = profile.toScanProfile(),

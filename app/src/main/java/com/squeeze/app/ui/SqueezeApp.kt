@@ -123,7 +123,13 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
     val toggleTheme = { viewModel.setThemeMode(if (renderingDark) ThemeMode.LIGHT else ThemeMode.DARK) }
 
     if (!landingSeen) {
-        LandingScreen(onGetStarted = viewModel::markLandingSeen, onToggleTheme = toggleTheme)
+        val introSound by viewModel.introSound.collectAsStateWithLifecycle()
+        LandingScreen(
+            onGetStarted = viewModel::markLandingSeen,
+            onToggleTheme = toggleTheme,
+            soundOn = introSound,
+            onSoundChange = viewModel::setIntroSound,
+        )
         return
     }
 

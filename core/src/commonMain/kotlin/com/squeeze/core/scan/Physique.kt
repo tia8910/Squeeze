@@ -403,7 +403,7 @@ object PhysiqueAnalysis {
             weaknessEvidence = (weakMeasured + listOfNotNull(
                 bodyFatPercent?.takeIf { absCap != null && absCap < 1.0 }?.let {
                     MuscleGroup.ABS to "At ${(it * 10).toInt() / 10.0}% body fat abs don't show yet, whatever is " +
-                        "underneath, they appear around ${if (female) "18–20" else "10–12"}%."
+                        "underneath, they appear around ${if (female) "18 to 20" else "10 to 12"}%."
                 },
             )).filterKeys { it in weaknesses },
         )
@@ -480,22 +480,22 @@ object PhysiqueAnalysis {
     }
 
     private fun how(goal: Goal, group: MuscleGroup): String = when (group) {
-        MuscleGroup.SHOULDERS -> "Overhead press and lateral raises, 10–20 hard sets a week. " +
+        MuscleGroup.SHOULDERS -> "Overhead press and lateral raises, 10 to 20 hard sets a week. " +
             "The side delts are what widen the frame."
         MuscleGroup.CHEST -> "Bench or dumbbell press plus an incline press, with dips or " +
-            "flyes, 10–20 sets a week."
-        MuscleGroup.ARMS -> "Curls and triceps extensions or close-grip press, 8–14 sets " +
+            "flyes, 10 to 20 sets a week."
+        MuscleGroup.ARMS -> "Curls and triceps extensions or close-grip press, 8 to 14 sets " +
             "each a week on top of your pressing and pulling."
         MuscleGroup.ABS -> if (goal == Goal.CUT || goal == Goal.MAKE_WEIGHT) {
             "Keep the deficit going, abs show when body fat drops. Add hanging leg raises " +
                 "and cable crunches to thicken them."
         } else {
-            "Hanging leg raises and weighted cable crunches, 6–10 sets a week. They show as " +
+            "Hanging leg raises and weighted cable crunches, 6 to 10 sets a week. They show as " +
                 "body fat comes down."
         }
-        MuscleGroup.V_TAPER -> "Pull-ups, lat pulldowns and rows, 10–20 sets a week. Wider " +
+        MuscleGroup.V_TAPER -> "Pull-ups, lat pulldowns and rows, 10 to 20 sets a week. Wider " +
             "lats make the waist look narrower."
-        MuscleGroup.LEGS -> "Squats or leg press, Romanian deadlifts and lunges, 10–20 sets " +
+        MuscleGroup.LEGS -> "Squats or leg press, Romanian deadlifts and lunges, 10 to 20 sets " +
             "a week."
     }
 }

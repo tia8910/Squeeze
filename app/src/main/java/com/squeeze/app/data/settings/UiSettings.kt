@@ -68,6 +68,21 @@ class UiSettings @Inject constructor(context: Context) {
      */
     val ambientEnabled: StateFlow<Boolean> = _ambientEnabled.asStateFlow()
 
+    private val _introSound = MutableStateFlow(prefs.getBoolean(KEY_INTRO_SOUND, false))
+
+    /**
+     * Whether the welcome video plays with its music.
+     *
+     * Off until the user taps for sound, and remembered after that, so the first launch never
+     * starts music on its own.
+     */
+    val introSound: StateFlow<Boolean> = _introSound.asStateFlow()
+
+    fun setIntroSound(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_INTRO_SOUND, enabled).apply()
+        _introSound.value = enabled
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME, mode.name).apply()
         _themeMode.value = mode
@@ -105,5 +120,6 @@ class UiSettings @Inject constructor(context: Context) {
         const val KEY_PAYWALL_SEEN = "paywall_seen"
         const val KEY_SOUND = "sound_enabled"
         const val KEY_AMBIENT = "ambient_enabled"
+        const val KEY_INTRO_SOUND = "intro_sound"
     }
 }

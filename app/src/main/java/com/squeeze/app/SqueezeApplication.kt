@@ -15,5 +15,8 @@ class SqueezeApplication : Application() {
 
         // Restores Pro from the Play Store's cache (works offline) and loads the plans.
         billingManager.start()
+
+        // Reminders are booked with the alarm clock, so they arrive while the app is closed.
+        com.squeeze.app.notify.Reminders.schedule(this)
     }
 }
