@@ -790,18 +790,20 @@ function drawJourney(scene, local) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
   endGround(local);
   const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
-  brandTop(170, 76, appear(.1));
-  headline(290, appear(.2));
+  // step times can come from the voiceover (scene.steps, seconds into the scene)
+  const steps = scene.steps || FEAT5.map((_, i) => .4 + i * .32);
+  brandTop(170, 76, appear(scene.headAt ?? .1));
+  headline(290, appear((scene.headAt ?? .1) + .1));
   const x = 230, y0 = 470, step = 205;
-  // the path fills downward
-  const prog = clamp((local - .4) / 1.6, 0, 1);
+  // the path fills downward, reaching each step as it lights up
+  const prog = clamp((local - steps[0]) / Math.max(.1, steps[steps.length - 1] - steps[0]), 0, 1);
   ctx.globalAlpha = 1;
   ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + step * 4); ctx.stroke();
   ctx.strokeStyle = C.blue; ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 18;
   ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + step * 4 * prog); ctx.stroke(); ctx.shadowBlur = 0;
   FEAT5.forEach((f, i) => {
-    const d = .4 + i * .32, a = appear(d); if (a <= 0) return;
+    const d = steps[i], a = appear(d); if (a <= 0) return;
     const y = y0 + i * step;
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(6,14,36,.95)'; ctx.strokeStyle = 'rgba(141,179,255,.55)'; ctx.lineWidth = 2;
@@ -814,7 +816,7 @@ function drawJourney(scene, local) {
     ctx.font = '700 38px J'; ctx.fillStyle = C.white; ctx.fillText(f.text, x + 120, y + 22);
     ctx.restore();
   });
-  badgeAt(1520, appear(2.2));
+  badgeAt(1520, appear(scene.badge ?? 2.2));
   ctx.restore(); ctx.globalAlpha = 1;
 }
 
