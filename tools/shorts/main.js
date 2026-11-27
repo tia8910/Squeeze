@@ -18,7 +18,7 @@ window.setup = async tl => {
   badge.src = '/badge.png'; await badge.decode().catch(() => {});
   emblem.src = '/emblem.png'; await emblem.decode().catch(() => {});
   const screens = {};
-  for (const [k, f] of [['scan', 1], ['physique', 2], ['privacy', 3]]) {
+  for (const [k, f] of [['scan', 1], ['physique', 2], ['privacy', 3], ['training', 4], ['nutrition', 5]]) {
     const im = new Image(); im.src = `/screen${f}.png`; await im.decode().catch(() => {}); screens[k] = im;
   }
   O.bindScreens(screens);

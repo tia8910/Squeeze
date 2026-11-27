@@ -163,9 +163,11 @@ export function drawHook(scene, local) {
 // End card: the app itself. A phone shows three real screens in turn (scan, track,
 // privacy) with a caption for each, then the Google Play badge.
 const FEATURES = [
-  { title: 'SCAN', text: 'Every muscle read from one photo', screen: 'physique' },
-  { title: 'TRACK', text: 'Real change, not daily noise', screen: 'scan' },
-  { title: 'PRIVATE', text: 'Your photos never leave your phone', screen: 'privacy' },
+  { title: 'SCAN', text: 'Body fat from one photo', screen: 'scan' },
+  { title: 'TRACK', text: 'Every muscle, read from your scan', screen: 'physique' },
+  { title: 'TRAIN', text: 'A full week built for your body', screen: 'training' },
+  { title: 'EAT', text: 'Meals and macros made for you', screen: 'nutrition' },
+  { title: 'PRIVATE', text: 'Photos never leave your phone', screen: 'privacy' },
 ];
 // where the phone screen sits inside each 1080x1920 store graphic
 const SCREEN_SRC = { x: 128, y: 640, w: 824, h: 1280 };
@@ -256,7 +258,8 @@ function drawPhone(scene, local) {
   ctx.globalAlpha = appear(.35);
   rows.forEach((_, i) => {
     ctx.fillStyle = i === idx ? C.white : 'rgba(141,179,255,.35)';
-    ctx.beginPath(); ctx.roundRect(540 - 60 + i * 44, 1440, i === idx ? 36 : 14, 14, 7); ctx.fill();
+    const dx = 540 - ((rows.length - 1) * 30 + 36) / 2 + i * 30 + (i > idx ? 22 : 0);
+    ctx.beginPath(); ctx.roundRect(dx, 1440, i === idx ? 36 : 14, 14, 7); ctx.fill();
   });
 
   // the official badge
@@ -547,10 +550,67 @@ function drawType(scene, local) {
   ctx.restore(); ctx.globalAlpha = 1;
 }
 
+// B · Bento grid: all five features at once, each tile with a slice of its real screen.
+function drawBento(scene, local) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.save();
+  endGround(local);
+  const appear = (d, dur = .4) => easeOut(clamp((local - d) / dur, 0, 1));
+  const pool = ctx.createRadialGradient(540, 960, 80, 540, 960, 1000);
+  pool.addColorStop(0, 'rgba(23,104,255,.24)'); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.globalAlpha = appear(0); ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  brandTop(190, 80, appear(.1));
+  ctx.globalAlpha = appear(.2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '700 50px J'; ctx.fillStyle = C.white;
+  ctx.fillText('Training & nutrition,', 540, 312);
+  ctx.fillStyle = C.sky; ctx.fillText('customized for you.', 540, 372);
+
+  const G = 22, X = 70, Wd = W - X * 2, half = (Wd - G) / 2;
+  const tiles = [
+    { x: X, y: 420, w: half, h: 330, t: 'SCAN', d: ['Body fat from', 'one photo'], key: 'scan', sy: 110 },
+    { x: X + half + G, y: 420, w: half, h: 330, t: 'TRACK', d: ['Every muscle,', 'read from a scan'], key: 'physique', sy: 120 },
+    { x: X, y: 772, w: Wd, h: 300, t: 'FULL TRAINING', d: ['A week built for', 'your body, set by set'], key: 'training', sy: 120, wide: true },
+    { x: X, y: 1094, w: half, h: 330, t: 'NUTRITION', d: ['Meals and macros', 'made for you'], key: 'nutrition', sy: 110 },
+    { x: X + half + G, y: 1094, w: half, h: 330, t: 'PRIVATE', d: ['Photos never', 'leave your phone'], key: 'privacy', sy: 0 },
+  ];
+  tiles.forEach((tl, i) => {
+    const a = appear(.4 + i * .16);
+    if (a <= 0) return;
+    ctx.globalAlpha = a; ctx.save(); ctx.translate(0, (1 - a) * 40);
+    // glass tile
+    const g = ctx.createLinearGradient(tl.x, tl.y, tl.x + tl.w, tl.y + tl.h);
+    g.addColorStop(0, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(255,255,255,.025)');
+    ctx.fillStyle = g; ctx.strokeStyle = 'rgba(141,179,255,.26)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(tl.x, tl.y, tl.w, tl.h, 34); ctx.fill(); ctx.stroke();
+    // screen slice: right half of the wide tile, lower part of the small tiles
+    const im = screens[tl.key];
+    ctx.save();
+    let sx, sy, sw, sh;
+    if (tl.wide) { sw = 400; sh = tl.h - 36; sx = tl.x + tl.w - sw - 18; sy = tl.y + 18; }
+    else { sw = tl.w - 36; sh = 150; sx = tl.x + 18; sy = tl.y + tl.h - sh - 18; }
+    ctx.beginPath(); ctx.roundRect(sx, sy, sw, sh, 20); ctx.clip();
+    if (im && im.naturalWidth) {
+      const srcW = SCREEN_SRC.w, srcH = srcW * sh / sw;
+      ctx.drawImage(im, SCREEN_SRC.x, SCREEN_SRC.y + tl.sy, srcW, srcH, sx, sy, sw, sh);
+    }
+    ctx.restore();
+    // words
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '600 26px Oswald'; ctx.letterSpacing = '7px'; ctx.fillStyle = C.sky;
+    ctx.fillText(tl.t, tl.x + 34, tl.y + 58); ctx.letterSpacing = '0px';
+    ctx.font = '700 36px J'; ctx.fillStyle = C.white;
+    tl.d.forEach((ln, k) => ctx.fillText(ln, tl.x + 34, tl.y + 108 + k * 44));
+    ctx.restore();
+  });
+  badgeAt(1470, appear(.4 + tiles.length * .16 + .2));
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
 export function drawCTA(scene, local) {
   const style = scene.endStyle || 'phone';
   if (style === 'list') return drawList(scene, local);
   if (style === 'cards') return drawCards(scene, local);
   if (style === 'type') return drawType(scene, local);
+  if (style === 'bento') return drawBento(scene, local);
   return drawPhone(scene, local);
 }
