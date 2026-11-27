@@ -93,6 +93,11 @@ class SqueezeViewModel @Inject constructor(
 
     fun markLandingSeen() = uiSettings.markLandingSeen()
 
+    /** Whether the welcome video plays with its music. */
+    val introSound: StateFlow<Boolean> = uiSettings.introSound
+
+    fun setIntroSound(enabled: Boolean) = uiSettings.setIntroSound(enabled)
+
     /** Whether FLAG_SECURE is applied; see [SecuritySettings.blockScreenshots]. */
     val blockScreenshots: StateFlow<Boolean> = securitySettings.blockScreenshots
 

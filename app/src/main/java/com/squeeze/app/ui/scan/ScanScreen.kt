@@ -1180,6 +1180,8 @@ private fun ResultStep(
         // the figure because it is the other half of the same look at the photograph.
         state.physique?.let { PhysiqueCard(it, previous = state.previousPhysique) }
 
+        if (state.withheld.isNotEmpty()) WithheldCard(state.withheld, state.photoIssues)
+
         // **Directly under the headline, and only when the outline could not answer.**
         //
         // This section spent its life at the foot of the screen, after the weight field,
@@ -1507,6 +1509,51 @@ private fun String.toCm(): Double? = trim().replace(',', '.').toDoubleOrNull()
  * least between people of the same size, which is what makes inferring it defensible at all.
  */
 /**
+ * The sites this photo measured but could not stand behind, and how to get them next time.
+ *
+ * Shown rather than silently dropped, so a missing chest reads as "your arm was in the way"
+ * instead of as the scan failing.
+ */
+@Composable
+private fun WithheldCard(withheld: Map<String, String>, issues: Set<com.squeeze.core.scan.PhotoIssue>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Not judged from this photo", style = MaterialTheme.typography.titleSmall)
+            withheld.forEach { (site, reason) ->
+                Row(Modifier.fillMaxWidth()) {
+                    Text(site, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        reason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            val tip = when {
+                com.squeeze.core.scan.PhotoIssue.ARM_RAISED in issues ||
+                    com.squeeze.core.scan.PhotoIssue.ARM_ACROSS_BODY in issues ->
+                    "Next time, let your arms hang a hand's width from your sides. A raised or " +
+                        "flexed arm adds itself to your chest width."
+                com.squeeze.core.scan.PhotoIssue.LEGS_COVERED in issues ->
+                    "Shorts or fitted clothing let the scan read your legs. Loose trousers " +
+                        "measure the fabric, not you."
+                else -> "These readings fell outside what a body measures, so they were left out " +
+                    "rather than guessed."
+            }
+            Text(
+                tip,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+/**
  * One editable measurement.
  *
  * A site the scan could not measure is shown empty and labelled, rather than hidden. Hiding
@@ -1579,9 +1626,9 @@ private fun VisualMatchSection(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = if (resolving) {
-                    "Which describes you?, this is what settles it"
+                    "Which describes you? This settles it"
                 } else {
-                    "Which describes you?, optional"
+                    "Which describes you? Optional"
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
@@ -1780,7 +1827,7 @@ private fun ShapeHeadline(
             // Shown for every reading, not only the uncertain ones. Every figure in this app
             // has an interval; hiding it is the core dishonesty of this app category, and a
             // single number to one decimal place claims a precision no method here has.
-            interval = "most likely %.0f–%.0f%%".format(low, high),
+            interval = "most likely %.0f to %.0f%%".format(low, high),
             // "Read from your photo" used to appear here whenever the abdomen's definition
             // score cleared a threshold. It is gone, and the reason is worth keeping: that
             // score had no zero, so a patch of blank wall cleared the threshold too, and the
