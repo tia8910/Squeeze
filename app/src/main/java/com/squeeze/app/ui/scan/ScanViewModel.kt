@@ -651,6 +651,7 @@ class ScanViewModel @Inject constructor(
             front.visibility,
             profile.heightCm,
             female = !isMale,
+            aspect = frontAspectRatio,
         )
         val result = measured.copy(circumferences = girthCheck.circumferences)
 

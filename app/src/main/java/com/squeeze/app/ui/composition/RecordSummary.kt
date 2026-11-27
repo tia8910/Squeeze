@@ -2,19 +2,17 @@ package com.squeeze.app.ui.composition
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -122,43 +120,33 @@ fun rememberReferencePhysique(percent: Double?, sex: Sex?): ReferencePhysiqueMat
 }
 
 /**
- * The figures, across the top, on the brand navy.
+ * The figures, across the top, on the brand navy, two to a row.
  *
- * Laid out even-width when they fit and scrolled when they do not, rather than shrunk. Five
- * cells across a phone gives each about seventy density-independent pixels, which is not
- * enough for "Waist-to-height" at a legible size — so the layout admits it and scrolls
- * instead of ellipsising a label into meaninglessness. On a sparse record with two or three
- * figures the row fills the width and never scrolls.
+ * A single scrolling row hid the fourth figure off the edge, where it read as cut off, and
+ * still wrapped "Waist-to-height" onto two lines at larger text sizes. Two even columns give
+ * every label room and show every figure without scrolling.
  */
 @Composable
 private fun HeadlineStrip(figures: List<HeadlineFigure>) {
-    BoxWithConstraints(
+    Column(
         Modifier
             .fillMaxWidth()
-            .background(Brand.Navy),
+            .background(Brand.Navy)
+            .padding(vertical = 4.dp),
     ) {
-        val even = maxWidth / figures.size >= MIN_CELL_WIDTH
-
-        if (even) {
-            Row(Modifier.fillMaxWidth()) {
-                figures.forEachIndexed { index, figure ->
-                    if (index > 0) CellDivider()
-                    HeadlineCell(figure, Modifier.weight(1f))
-                }
-            }
-        } else {
-            Row(Modifier.horizontalScroll(rememberScrollState())) {
-                figures.forEachIndexed { index, figure ->
-                    if (index > 0) CellDivider()
-                    HeadlineCell(figure, Modifier.width(MIN_CELL_WIDTH))
+        figures.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HeadlineCell(pair[0], Modifier.weight(1f))
+                CellDivider()
+                if (pair.size > 1) {
+                    HeadlineCell(pair[1], Modifier.weight(1f))
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
             }
         }
     }
 }
-
-/** How narrow a headline cell may get before the strip scrolls instead. */
-private val MIN_CELL_WIDTH = 108.dp
 
 @Composable
 private fun HeadlineCell(figure: HeadlineFigure, modifier: Modifier = Modifier) {
@@ -172,6 +160,8 @@ private fun HeadlineCell(figure: HeadlineFigure, modifier: Modifier = Modifier) 
             style = MaterialTheme.typography.labelMedium,
             color = Brand.OutlineBlue,
             textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         Text(
             text = figure.value,

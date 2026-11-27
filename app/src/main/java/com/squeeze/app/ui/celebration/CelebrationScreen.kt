@@ -5,7 +5,19 @@ import android.content.Intent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +39,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.squeeze.app.audio.LocalSoundEngine
-import com.squeeze.app.ui.brand.SqueezeMark
 import com.squeeze.core.audio.Cue
 import com.squeeze.app.ui.components.BrandCard
 import com.squeeze.app.ui.components.PrimaryButton
@@ -88,10 +99,7 @@ fun CelebrationScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SqueezeMark(
-            size = 96.dp,
-            modifier = Modifier.scale(markScale.value),
-        )
+        SavedRing(progress = contentAlpha.value, modifier = Modifier.scale(markScale.value))
 
         Column(
             modifier = Modifier.alpha(contentAlpha.value),
@@ -99,13 +107,17 @@ fun CelebrationScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Great job!",
+                text = "Scan saved",
                 style = MaterialTheme.typography.headlineMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(top = 10.dp),
             )
+            val next = java.time.LocalDate.now().plusDays(7)
             Text(
-                text = "You're building a stronger you.",
+                text = (if (entries <= 1) "Your starting point is set. " else "Another check in on the record. ") +
+                    "Next check in on " +
+                    next.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM")) + ".",
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (LocalIsDarkTheme.current) Brand.DarkSub else Brand.Sub,
                 textAlign = TextAlign.Center,
@@ -132,10 +144,30 @@ fun CelebrationScreen(
             )
         }
 
+        // The weekly check-in reminder, switched here where it makes the most sense.
+        var remind by remember {
+            mutableStateOf(
+                com.squeeze.app.notify.Reminders.enabled(context) &&
+                    com.squeeze.app.notify.Reminders.enabled(context, com.squeeze.app.notify.ReminderKind.TRAINING),
+            )
+        }
+        BrandCard(Modifier.fillMaxWidth().alpha(contentAlpha.value)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Remind me next week", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = remind,
+                    onCheckedChange = { on ->
+                        remind = on
+                        if (on) com.squeeze.app.notify.Reminders.setEnabled(context, true)
+                        com.squeeze.app.notify.Reminders.setEnabled(context, com.squeeze.app.notify.ReminderKind.TRAINING, on)
+                    },
+                )
+            }
+        }
+
         BrandCard(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp)
                 .alpha(contentAlpha.value),
         ) {
             Text(
@@ -185,6 +217,21 @@ fun CelebrationScreen(
                 onClick = { shareProgress(context, bodyFatPercent, entries, daysTracked) },
             )
         }
+    }
+}
+
+/** A green ring that fills as the screen arrives, with a check in the middle. */
+@Composable
+private fun SavedRing(progress: Float, modifier: Modifier = Modifier) {
+    val track = if (LocalIsDarkTheme.current) Brand.DarkLine else Brand.Line
+    val green = Color(0xFF16A34A)
+    Box(modifier.size(120.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(120.dp)) {
+            val stroke = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+            drawArc(track, 0f, 360f, useCenter = false, style = stroke)
+            drawArc(green, -90f, 360f * progress, useCenter = false, style = stroke)
+        }
+        Text("✓", color = green, fontSize = 44.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold)
     }
 }
 

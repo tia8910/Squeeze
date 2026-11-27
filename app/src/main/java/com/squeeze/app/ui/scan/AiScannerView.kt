@@ -619,6 +619,81 @@ private fun goalName(goal: Goal): String = when (goal) {
 
 /** Amber for "needs work": distinct from the blue accent in lightness as well as hue. */
 private val FocusAmber = Color(0xFFF59E0B)
+private val StrongGreen = Color(0xFF16A34A)
+private val BalancedBlue = Color(0xFF36A0FF)
+
+private data class Tone(val label: String, val color: Color)
+
+private fun toneOf(d: Development) = when (d) {
+    Development.DEVELOPED -> Tone("Strong", StrongGreen)
+    Development.AVERAGE -> Tone("Balanced", BalancedBlue)
+    Development.LAGGING -> Tone("Focus", FocusAmber)
+}
+
+@Composable
+private fun StatusTag(text: String, color: Color) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+/**
+ * A simple front figure with each judged area tinted, beside a legend of what is strong,
+ * balanced, a focus, and not judged. Drawn, not photographed, so it is the same for everyone.
+ */
+@Composable
+private fun BodyMapCard(report: PhysiqueReport) {
+    val dark = com.squeeze.app.ui.theme.LocalIsDarkTheme.current
+    val base = if (dark) Color(0xFF26324A) else Color(0xFFE3E8F2)
+    val muted = if (dark) com.squeeze.app.ui.theme.Brand.DarkMuted else com.squeeze.app.ui.theme.Brand.Muted
+    val tones = report.scores.associate { it.group to toneOf(it.development).color }
+    fun names(d: Development) = report.scores.filter { it.development == d }.joinToString { it.group.label }
+
+    com.squeeze.app.ui.components.BrandCard(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.Canvas(Modifier.size(width = 86.dp, height = 150.dp)) {
+                val u = size.width / 86f
+                fun rect(x: Float, y: Float, w: Float, h: Float, c: Color, r: Float) =
+                    drawRoundRect(c, androidx.compose.ui.geometry.Offset(x * u, y * u), androidx.compose.ui.geometry.Size(w * u, h * u), androidx.compose.ui.geometry.CornerRadius(r * u))
+                fun tint(g: MuscleGroup) = tones[g]?.copy(alpha = 0.85f)
+                drawCircle(base, 11f * u, androidx.compose.ui.geometry.Offset(43f * u, 14f * u))
+                rect(25f, 28f, 36f, 50f, base, 12f)
+                rect(12f, 32f, 11f, 44f, tint(MuscleGroup.ARMS) ?: base, 5.5f)
+                rect(63f, 32f, 11f, 44f, tint(MuscleGroup.ARMS) ?: base, 5.5f)
+                rect(27f, 80f, 14f, 64f, tint(MuscleGroup.LEGS) ?: base.copy(alpha = 0.6f), 7f)
+                rect(45f, 80f, 14f, 64f, tint(MuscleGroup.LEGS) ?: base.copy(alpha = 0.6f), 7f)
+                tint(MuscleGroup.SHOULDERS)?.let { rect(25f, 28f, 36f, 8f, it, 4f) }
+                tint(MuscleGroup.CHEST)?.let { rect(29f, 37f, 28f, 11f, it, 5f) }
+                tint(MuscleGroup.ABS)?.let { rect(33f, 49f, 20f, 26f, it, 6f) }
+            }
+            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendRow(StrongGreen, "Strong", names(Development.DEVELOPED).ifEmpty { "None yet" }, muted)
+                LegendRow(BalancedBlue, "Balanced", names(Development.AVERAGE).ifEmpty { "None" }, muted)
+                LegendRow(FocusAmber, "Focus", names(Development.LAGGING).ifEmpty { "None yet" }, muted)
+                if (report.hidden.isNotEmpty()) {
+                    LegendRow(base, "Not judged", report.hidden.joinToString { it.label }, muted)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LegendRow(color: Color, title: String, detail: String, muted: Color) {
+    Row(verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 4.dp).size(10.dp).clip(RoundedCornerShape(3.dp)).background(color))
+        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 8.dp))
+    }
+}
 
 /**
  * The AI's physique analysis on the result screen: every group it judged, the strengths and
@@ -635,19 +710,20 @@ fun PhysiqueCard(
     val dark = com.squeeze.app.ui.theme.LocalIsDarkTheme.current
     val muted = if (dark) com.squeeze.app.ui.theme.Brand.DarkMuted else com.squeeze.app.ui.theme.Brand.Muted
     val track = if (dark) com.squeeze.app.ui.theme.Brand.DarkLine else com.squeeze.app.ui.theme.Brand.Line
-    val amberText = if (dark) Color(0xFFF8B84A) else Color(0xFFB45309)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
             Text("PHYSIQUE · ${goalName(report.goal).uppercase()}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text(report.summary, style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
         }
 
+        BodyMapCard(report)
+
         com.squeeze.app.ui.components.BrandCard(Modifier.fillMaxWidth(), contentPadding = 16.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 report.scores.forEach { score ->
-                    val lagging = score.development == Development.LAGGING
                     val sweep by androidx.compose.animation.core.animateFloatAsState(score.score.toFloat(), androidx.compose.animation.core.tween(900), label = "bar")
                     val change = previous?.second?.get(score.group)?.let { score.score - it }
+                    val tone = toneOf(score.development)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(score.group.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(92.dp))
                         Box(
@@ -662,19 +738,15 @@ fun PhysiqueCard(
                                     .fillMaxWidth(sweep.coerceIn(0.02f, 1f))
                                     .height(8.dp)
                                     .clip(RoundedCornerShape(50))
-                                    .background(if (lagging) FocusAmber else MaterialTheme.colorScheme.primary),
+                                    .background(tone.color),
                             )
                         }
-                        Column(Modifier.width(76.dp), horizontalAlignment = Alignment.End) {
-                            Text(
-                                if (score.group == MuscleGroup.ABS && lagging && score.group in report.weaknessEvidence) "Hidden" else score.development.label.replace("Strong point", "Strong"),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = when (score.development) {
-                                    Development.DEVELOPED -> MaterialTheme.colorScheme.primary
-                                    Development.AVERAGE -> muted
-                                    Development.LAGGING -> amberText
-                                },
+                        Column(Modifier.width(84.dp).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
+                            StatusTag(
+                                if (score.group == MuscleGroup.ABS && score.development == Development.LAGGING &&
+                                    score.group in report.weaknessEvidence
+                                ) "Hidden" else tone.label,
+                                tone.color,
                             )
                             change?.takeIf { kotlin.math.abs(it) >= 0.03 }?.let {
                                 Text(
@@ -686,16 +758,28 @@ fun PhysiqueCard(
                         }
                     }
                 }
-                if (report.hidden.isNotEmpty()) {
+                // Groups the photo could not judge stay in the list, greyed, so a missing row
+                // reads as "not scored" rather than as forgotten.
+                report.hidden.forEach { group ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(group.label, style = MaterialTheme.typography.titleSmall, color = muted, modifier = Modifier.width(92.dp))
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(track),
+                        )
+                        Column(Modifier.width(84.dp).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
+                            StatusTag("Not judged", muted)
+                        }
+                    }
+                }
+                if (MuscleGroup.V_TAPER in report.hidden) {
                     Text(
-                        "Not judged: ${report.hidden.joinToString { it.label.lowercase() }}, covered or out of frame.",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        "Back width needs a back photo, so it is not scored from the front.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = muted,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(track.copy(alpha = 0.6f))
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
             }

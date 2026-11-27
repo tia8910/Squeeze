@@ -43,6 +43,30 @@ class PhotoGirthCheckTest {
     }
 
     @Test
+    fun `a mirror flex with the elbow just under the shoulder still counts as raised`() {
+        // The real scan: upper arm out to the side, elbow a little below shoulder height, fist
+        // above the shoulder. The first version only looked at the elbow and missed it.
+        val flex = standing.copy(
+            elbowRight = PosePoint(0.82, 0.28),
+            wristRight = PosePoint(0.70, 0.18),
+        )
+        val check = PhotoGirthCheck.check(girths, flex, emptyMap(), 178.0, female = false, aspect = 0.56)
+        assertTrue(PhotoIssue.ARM_RAISED in check.issues)
+        assertTrue(MuscleGroup.ARMS in check.untrusted)
+        assertNull(check.circumferences.armCm)
+    }
+
+    @Test
+    fun `arms held a little clear of the sides are not a flex`() {
+        val clear = standing.copy(
+            elbowLeft = PosePoint(0.36, 0.40), wristLeft = PosePoint(0.34, 0.52),
+            elbowRight = PosePoint(0.64, 0.40), wristRight = PosePoint(0.66, 0.52),
+        )
+        val check = PhotoGirthCheck.check(girths, clear, emptyMap(), 178.0, female = false, aspect = 0.56)
+        assertTrue(check.issues.isEmpty())
+    }
+
+    @Test
     fun `an arm across the chest drops the chest only`() {
         val across = standing.copy(elbowLeft = PosePoint(0.49, 0.38))
         val check = PhotoGirthCheck.check(girths, across, emptyMap(), 178.0, female = false)
