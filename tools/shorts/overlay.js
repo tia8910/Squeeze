@@ -160,57 +160,106 @@ export function drawHook(scene, local) {
   ctx.restore();
 }
 
+// End card: the brand, then the app's three standout features, then the Play badge.
+const FEATURES = [
+  { icon: 'scan', title: 'SCAN', text: 'Body fat from one photo' },
+  { icon: 'track', title: 'TRACK', text: 'Real change, not daily noise' },
+  { icon: 'lock', title: 'PRIVATE', text: 'Photos never leave your phone' },
+];
+
+function lineIcon(kind, x, y, s) {
+  // thin line icons drawn on the card, brand blue with a soft glow
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = C.sky; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 16;
+  const h = s / 2, k = s * .28;
+  if (kind === 'scan') {
+    // viewfinder corners and a scan line
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      ctx.beginPath(); ctx.moveTo(sx * h, sy * (h - k)); ctx.lineTo(sx * h, sy * h); ctx.lineTo(sx * (h - k), sy * h); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(-h * .62, 0); ctx.lineTo(h * .62, 0); ctx.stroke();
+  } else if (kind === 'track') {
+    // a trend line rising through noisy points
+    ctx.beginPath(); ctx.moveTo(-h, h * .55); ctx.lineTo(-h * .35, h * .1); ctx.lineTo(h * .1, h * .3); ctx.lineTo(h, -h * .55); ctx.stroke();
+    ctx.fillStyle = C.sky;
+    for (const [px, py] of [[-h * .75, h * .2], [-h * .1, h * .55], [h * .45, -h * .05], [h * .7, -h * .7]]) {
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    // padlock
+    ctx.beginPath(); ctx.roundRect(-h * .72, -h * .05, h * 1.44, h * 1.05, 8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -h * .05, h * .45, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, h * .3); ctx.lineTo(0, h * .58); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawCTA(scene, local) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.save();
-  const v = easeOut(clamp(local / .5, 0, 1));
-  const veil = ctx.createLinearGradient(0, 0, 0, H);
-  veil.addColorStop(0, `rgba(3,9,26,${.97 * v})`); veil.addColorStop(.45, `rgba(3,9,26,${.95 * v})`); veil.addColorStop(.62, `rgba(3,9,26,${.82 * v})`); veil.addColorStop(1, `rgba(3,9,26,${.35 * v})`);
-  ctx.fillStyle = veil; ctx.fillRect(0, 0, W, H);
-  const a = easeOut(clamp((local - .15) / .5, 0, 1));
+  // a clean, almost solid ground with one soft pool of brand light
+  const v = easeOut(clamp(local / .35, 0, 1));
+  ctx.fillStyle = `rgba(3,7,20,${.96 * v})`; ctx.fillRect(0, 0, W, H);
+  const pool = ctx.createRadialGradient(540, 760, 40, 540, 760, 900);
+  pool.addColorStop(0, `rgba(23,104,255,${.22 * v})`); pool.addColorStop(1, 'rgba(23,104,255,0)');
+  ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  const appear = (delay, dur = .45) => easeOut(clamp((local - delay) / dur, 0, 1));
+
+  // brand: emblem and wordmark
+  let a = appear(.15);
   ctx.globalAlpha = a;
-  ctx.translate(0, (1 - a) * 50);
-  const s = 260, iy = 300;
+  ctx.save(); ctx.translate(0, (1 - a) * 30);
+  const es = 150, ey = 330;
   if (emblem && emblem.naturalWidth) {
-    // the app's figure emblem on its own, no tile behind it: a soft brand-blue halo
-    const halo = ctx.createRadialGradient(540, iy + s / 2, 10, 540, iy + s / 2, s * .95);
-    halo.addColorStop(0, 'rgba(23,104,255,.45)'); halo.addColorStop(1, 'rgba(23,104,255,0)');
-    ctx.fillStyle = halo; ctx.fillRect(540 - s, iy - s / 2, s * 2, s * 2);
-    ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 40;
-    ctx.drawImage(emblem, 540 - s / 2, iy, s, s);
+    ctx.shadowColor = 'rgba(141,179,255,.8)'; ctx.shadowBlur = 36;
+    ctx.drawImage(emblem, 540 - es / 2, ey, es, es);
     ctx.shadowBlur = 0;
-  } else {
-    ctx.shadowColor = 'rgba(23,104,255,.9)'; ctx.shadowBlur = 110;
-    ctx.fillStyle = C.blue; ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.save(); ctx.beginPath(); ctx.roundRect(540 - s / 2, iy, s, s, 64); ctx.clip();
-    ctx.drawImage(icon, 540 - s / 2, iy, s, s); ctx.restore();
   }
-  display('SQUEEZE FIT', 540, iy + s + 150, 120, { spacing: 3 });
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(221,232,255,.82)';
-  (scene.lines || []).forEach((ln, i) => {
-    const px = font(`500 42px J`, ln, 860);
-    ctx.font = `500 ${px}px J`; ctx.fillText(ln, 540, iy + s + 262 + i * 58);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '112px Anton'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.white;
+  ctx.fillText('SQUEEZE FIT', 544, ey + es + 135);
+  ctx.letterSpacing = '0px';
+  ctx.font = '500 34px J'; ctx.fillStyle = 'rgba(221,232,255,.7)';
+  ctx.fillText('Your body coach, fully on your phone.', 540, ey + es + 200);
+  ctx.restore();
+
+  // features: three rows, revealed one after another
+  const rows = scene.features || FEATURES;
+  const top = 860, gap = 150, x0 = 210;
+  rows.forEach((f, i) => {
+    const r = appear(.55 + i * .22);
+    if (r <= 0) return;
+    ctx.globalAlpha = r;
+    ctx.save(); ctx.translate((1 - r) * 40, 0);
+    const y = top + i * gap;
+    // divider above each row
+    ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0 - 40, y - 62); ctx.lineTo(W - x0 + 40, y - 62); ctx.stroke();
+    lineIcon(f.icon, x0 + 20, y, 64);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '600 30px Oswald'; ctx.letterSpacing = '8px'; ctx.fillStyle = C.sky;
+    ctx.fillText(f.title, x0 + 100, y - 22);
+    ctx.letterSpacing = '0px';
+    ctx.font = '600 40px J'; ctx.fillStyle = C.white;
+    ctx.fillText(f.text, x0 + 100, y + 24);
+    ctx.restore();
   });
-  const by = iy + s + 262 + (scene.lines || []).length * 58 + 70;
-  const pulse = 1 + .02 * Math.sin(local * 5);
-  ctx.translate(540, by + 75); ctx.scale(pulse, pulse);
+  ctx.globalAlpha = appear(.55 + rows.length * .22);
+  ctx.strokeStyle = 'rgba(141,179,255,.18)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0 - 40, top + rows.length * gap - 62); ctx.lineTo(W - x0 + 40, top + rows.length * gap - 62); ctx.stroke();
+
+  // the official badge, last
+  const b = appear(.55 + rows.length * .22 + .15);
+  ctx.globalAlpha = b;
   if (badge && badge.naturalWidth) {
-    // Google's "Get it on Google Play" badge, at its own proportions
-    const bw = 470, bh = bw * badge.naturalHeight / badge.naturalWidth;
-    ctx.shadowColor = 'rgba(23,104,255,.55)'; ctx.shadowBlur = 50;
-    ctx.drawImage(badge, -bw / 2, -bh / 2, bw, bh);
-    ctx.shadowBlur = 0;
-  } else {
-    const label = (scene.button || 'Free on Google Play').toUpperCase();
-    ctx.font = '600 44px Oswald'; ctx.letterSpacing = '4px';
-    const w = ctx.measureText(label).width + 120;
-    ctx.fillStyle = C.blue; ctx.beginPath(); ctx.roundRect(-w / 2, -55, w, 110, 55); ctx.fill();
-    ctx.fillStyle = C.white; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 3);
+    const bw = 400, bh = bw * badge.naturalHeight / badge.naturalWidth;
+    ctx.drawImage(badge, 540 - bw / 2, 1440 + (1 - b) * 20, bw, bh);
   }
   ctx.restore();
   ctx.letterSpacing = '0px';
+  ctx.globalAlpha = 1;
 }
 
 // Dashed arrow in screen space beside a moving point; v is its screen velocity (px/s).
