@@ -94,6 +94,8 @@ private const val ROUTE_ACHIEVEMENTS = "achievements"
 private const val ROUTE_COMPARE = "compare"
 private const val ROUTE_SHARE = "share"
 private const val ROUTE_FORM = "form_coach"
+private const val ROUTE_PHYSIQUE = "physique_check"
+private const val ROUTE_MORNING = "morning_routine"
 
 private enum class Destination(
     val route: String,
@@ -359,6 +361,8 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
                         onProgress = { navController.navigate(ROUTE_PROGRESS) },
                         onFormCoach = { navController.navigate(ROUTE_FORM) },
+                        onPhysiqueCheck = { navController.navigate(ROUTE_PHYSIQUE) },
+                        onMorningRoutine = { navController.navigate(ROUTE_MORNING) },
                     )
                 }
 
@@ -388,6 +392,30 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         return@composable
                     }
                     com.squeeze.app.ui.form.FormCoachScreen(onDone = { navController.popBackStack() })
+                }
+
+                composable(ROUTE_PHYSIQUE) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked(
+                            "Physique check",
+                            "Four poses led by the coach. A voice gets you into each one and the photo takes itself.",
+                            openPro,
+                        )
+                        return@composable
+                    }
+                    com.squeeze.app.ui.physique.PhysiqueCheckScreen(onDone = { navController.popBackStack() })
+                }
+
+                composable(ROUTE_MORNING) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked(
+                            "Morning routine",
+                            "Five moves in five minutes, talked through by voice, with the stomach vacuum at its centre.",
+                            openPro,
+                        )
+                        return@composable
+                    }
+                    com.squeeze.app.ui.morning.MorningRoutineScreen(onDone = { navController.popBackStack() })
                 }
 
                 composable(ROUTE_SHARE) {

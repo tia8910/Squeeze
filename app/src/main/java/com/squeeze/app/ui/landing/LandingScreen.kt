@@ -222,7 +222,7 @@ private fun LandingContent(
 
         Column(Modifier.alpha(reveal.value)) {
             Text(
-                "SEE EVERY MUSCLE",
+                "YOUR REAL COACH IN YOUR POCKET",
                 color = Sky,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.ExtraBold,

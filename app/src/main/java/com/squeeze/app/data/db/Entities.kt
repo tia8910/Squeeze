@@ -227,3 +227,17 @@ data class MealLogEntity(
     val carbsG: Int,
     val fatG: Int,
 )
+
+/**
+ * One photo of a physique check: the pose and the encrypted photo it points at.
+ *
+ * The photo itself lives in [com.squeeze.app.data.photo.ScanPhotoStore], encrypted; this row
+ * only says which pose it is and which day it was taken, so two checks can be put side by side.
+ */
+@Entity(tableName = "physique_checks", indices = [Index("epochDay")])
+data class PhysiqueCheckEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val pose: String,
+    val photoId: String,
+)

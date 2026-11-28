@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -159,7 +161,10 @@ private fun PickStep(selected: FormExercise, onPick: (FormExercise) -> Unit, onS
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
                 ) {
-                    Text(emoji(ex), fontSize = 28.sp)
+                    CoachPhoto(
+                        coachFor(ex),
+                        Modifier.fillMaxWidth().height(96.dp).clip(RoundedCornerShape(14.dp)),
+                    )
                     Text(ex.label, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
                     Text(if (ex.sideOn) "Side on" else "Facing", style = MaterialTheme.typography.labelSmall, color = muted)
                 }
@@ -192,11 +197,8 @@ private fun PickStep(selected: FormExercise, onPick: (FormExercise) -> Unit, onS
     }
 }
 
-private fun emoji(ex: FormExercise) = when (ex) {
-    FormExercise.SQUAT -> "🏋️"
-    FormExercise.PUSH_UP -> "🤸"
-    FormExercise.BICEP_CURL -> "💪"
-}
+/** The coach picture that shows how to stand for each exercise. */
+internal fun coachFor(ex: FormExercise) = if (ex.sideOn) CoachView.QUARTER else CoachView.FRONT
 
 /** Lines between landmarks that make the skeleton. */
 private val Bones = listOf(
@@ -295,6 +297,19 @@ private fun LiveStep(exercise: FormExercise, analyzer: FormAnalyzer, set: Int, o
                     joints.filterKeys { it in 11..28 }.forEach { (i, j) ->
                         if (j.visibility >= 0.5) drawCircle(if (i in slipping) Color(0xFFF59E0B) else Color.White, 9f, at(j))
                     }
+                }
+            }
+            // Until the camera finds a body, the coach shows how to stand.
+            if (update?.visible != true) {
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    CoachGhost(coachFor(exercise), matched = false, modifier = Modifier.fillMaxHeight(0.5f).aspectRatio(0.67f))
+                    Text(
+                        if (exercise.sideOn) "Stand side on, like this" else "Face the camera, like this",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).background(Color(0x99050B18)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
                 }
             }
         } else {
@@ -458,7 +473,7 @@ private fun DoneStep(
 }
 
 /** The pose model in video mode: one frame at a time, in order, on the caller's thread. */
-private class LivePose(context: Context) {
+internal class LivePose(context: Context) {
     private val landmarker: PoseLandmarker? = runCatching {
         PoseLandmarker.createFromOptions(
             context,
@@ -482,7 +497,7 @@ private class LivePose(context: Context) {
     fun close() = runCatching { landmarker?.close() }
 }
 
-private fun Bitmap.uprightAndMirrored(degrees: Int, mirror: Boolean): Bitmap {
+internal fun Bitmap.uprightAndMirrored(degrees: Int, mirror: Boolean): Bitmap {
     if (degrees == 0 && !mirror) return this
     val m = Matrix().apply {
         postRotate(degrees.toFloat())
@@ -491,7 +506,7 @@ private fun Bitmap.uprightAndMirrored(degrees: Int, mirror: Boolean): Bitmap {
     return Bitmap.createBitmap(this, 0, 0, width, height, m, true)
 }
 
-private suspend fun awaitProvider(context: Context): ProcessCameraProvider = suspendCoroutine { cont ->
+internal suspend fun awaitProvider(context: Context): ProcessCameraProvider = suspendCoroutine { cont ->
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({ cont.resume(future.get()) }, ContextCompat.getMainExecutor(context))
 }

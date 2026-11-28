@@ -55,7 +55,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.CenterFocusWeak
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.WbSunny
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.components.entrance
@@ -67,6 +69,8 @@ fun TrainingScreen(
     onLog: () -> Unit = {},
     onScanMachine: () -> Unit = {},
     onFormCoach: () -> Unit = {},
+    onPhysiqueCheck: () -> Unit = {},
+    onMorningRoutine: () -> Unit = {},
     onProgress: () -> Unit = {},
     nextStep: com.squeeze.core.coach.JourneyStep? = null,
     onNextStep: () -> Unit = {},
@@ -174,6 +178,22 @@ fun TrainingScreen(
                 onClick = onFormCoach,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionTile(
+                    icon = androidx.compose.material.icons.Icons.Rounded.Accessibility,
+                    title = "Physique check",
+                    detail = "Four poses, hands free",
+                    onClick = onPhysiqueCheck,
+                    modifier = Modifier.weight(1f),
+                )
+                ActionTile(
+                    icon = androidx.compose.material.icons.Icons.Rounded.WbSunny,
+                    title = "Morning routine",
+                    detail = "5 minutes, voice led",
+                    onClick = onMorningRoutine,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             SecondaryButton(text = "Log any workout", onClick = onLog)
 
             Expandable("How your week was built") {

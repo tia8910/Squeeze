@@ -45,6 +45,7 @@ object AppModule {
     @Provides fun provideProfileDao(db: SqueezeDatabase): ProfileDao = db.profileDao()
     @Provides fun providePhysiqueDao(db: SqueezeDatabase): PhysiqueDao = db.physiqueDao()
     @Provides fun provideMealLogDao(db: SqueezeDatabase): com.squeeze.app.data.db.MealLogDao = db.mealLogDao()
+    @Provides fun providePhysiqueCheckDao(db: SqueezeDatabase): com.squeeze.app.data.db.PhysiqueCheckDao = db.physiqueCheckDao()
     @Provides fun provideActivityDao(db: SqueezeDatabase): ActivityDao = db.activityDao()
 
     @Provides

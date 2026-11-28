@@ -221,3 +221,20 @@ interface MealLogDao {
     @Query("DELETE FROM meal_logs WHERE epochDay = :epochDay AND mealName = :mealName")
     suspend fun remove(epochDay: Long, mealName: String)
 }
+
+@Dao
+interface PhysiqueCheckDao {
+
+    @Query("SELECT * FROM physique_checks WHERE epochDay = :epochDay ORDER BY id ASC")
+    suspend fun forDay(epochDay: Long): List<PhysiqueCheckEntity>
+
+    /** The latest day with a check before [epochDay], or null when there is none. */
+    @Query("SELECT MAX(epochDay) FROM physique_checks WHERE epochDay < :epochDay")
+    suspend fun dayBefore(epochDay: Long): Long?
+
+    @Insert
+    suspend fun insert(entry: PhysiqueCheckEntity)
+
+    @Query("DELETE FROM physique_checks WHERE epochDay = :epochDay AND pose = :pose")
+    suspend fun remove(epochDay: Long, pose: String)
+}
