@@ -18,8 +18,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         DefinitionLabelEntity::class,
         PhysiqueReadEntity::class,
         ActivitySessionEntity::class,
+        MealLogEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -30,6 +31,7 @@ abstract class SqueezeDatabase : RoomDatabase() {
     abstract fun definitionLabelDao(): DefinitionLabelDao
     abstract fun physiqueDao(): PhysiqueDao
     abstract fun activityDao(): ActivityDao
+    abstract fun mealLogDao(): MealLogDao
 }
 
 /**
@@ -186,6 +188,19 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /** Meals ticked as eaten in Fuel. A new table, so nothing existing is touched. */
+    private val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS meal_logs (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, epochDay INTEGER NOT NULL, " +
+                    "mealName TEXT NOT NULL, calories INTEGER NOT NULL, proteinG INTEGER NOT NULL, " +
+                    "carbsG INTEGER NOT NULL, fatG INTEGER NOT NULL)",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_meal_logs_epochDay ON meal_logs (epochDay)")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -205,6 +220,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to

@@ -205,3 +205,19 @@ interface ActivityDao {
     @Query("DELETE FROM activity_sessions")
     suspend fun deleteAll()
 }
+
+@Dao
+interface MealLogDao {
+
+    @Query("SELECT * FROM meal_logs WHERE epochDay = :epochDay ORDER BY id ASC")
+    suspend fun forDay(epochDay: Long): List<MealLogEntity>
+
+    @Query("SELECT DISTINCT epochDay FROM meal_logs WHERE epochDay >= :sinceEpochDay")
+    suspend fun daysLoggedSince(sinceEpochDay: Long): List<Long>
+
+    @Insert
+    suspend fun insert(entry: MealLogEntity)
+
+    @Query("DELETE FROM meal_logs WHERE epochDay = :epochDay AND mealName = :mealName")
+    suspend fun remove(epochDay: Long, mealName: String)
+}

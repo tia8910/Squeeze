@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import com.squeeze.app.ui.components.entrance
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -111,7 +113,13 @@ fun NutritionScreen(
                 )
 
                 when (tab) {
-                    0 -> TodayTab(context, state.showTrainingDay, viewModel::showTrainingDay)
+                    0 -> TodayTab(
+                        context,
+                        state.showTrainingDay,
+                        viewModel::showTrainingDay,
+                        eaten = state.eaten,
+                        onToggleEaten = viewModel::toggleEaten,
+                    )
                     1 -> {
                         FavouritesSection(state, viewModel)
                         WeekSection(context, state.selectedDay, viewModel::selectDay)
@@ -149,7 +157,13 @@ private fun goalLabel(goal: Goal) = when (goal) {
 }
 
 @Composable
-private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType: (Boolean) -> Unit) {
+private fun TodayTab(
+    context: NutritionContext,
+    trainingDay: Boolean,
+    onDayType: (Boolean) -> Unit,
+    eaten: List<com.squeeze.app.data.db.MealLogEntity> = emptyList(),
+    onToggleEaten: (Meal) -> Unit = {},
+) {
     val plan = context.plan
     val day = if (trainingDay) plan.trainingDay else plan.restDay
 
@@ -209,7 +223,14 @@ private fun TodayTab(context: NutritionContext, trainingDay: Boolean, onDayType:
     }
     // Today's meals, in the order they are eaten, the one around training marked.
     val today = java.time.LocalDate.now().dayOfWeek.value - 1
-    plan.week.getOrNull(today)?.let { MealTimeline(it.meals) }
+    plan.week.getOrNull(today)?.let { dayPlan ->
+        EatenTodayCard(target = dayPlan.macros, eaten = eaten)
+        MealTimeline(
+            dayPlan.meals,
+            eaten = eaten.map { it.mealName }.toSet(),
+            onToggle = onToggleEaten,
+        )
+    }
 
     val gaps = plan.micros.filter { it.short }
     gaps.firstOrNull()?.let { gap ->
@@ -253,9 +274,79 @@ private fun MacroLine(label: String, grams: Int, share: Float, colour: androidx.
     }
 }
 
+/** Calories and macros eaten so far today, against today's plan. */
+@Composable
+private fun EatenTodayCard(target: com.squeeze.core.nutrition.Macros, eaten: List<com.squeeze.app.data.db.MealLogEntity>) {
+    val kcal = eaten.sumOf { it.calories }
+    val protein = eaten.sumOf { it.proteinG }
+    val carbs = eaten.sumOf { it.carbsG }
+    val fat = eaten.sumOf { it.fatG }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color(0xFF2F8CFF), Color(0xFF0E4BD8), Color(0xFF081C45)),
+                ),
+            )
+            .padding(16.dp),
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            Text("Eaten today", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            Text("Target %,d kcal".format(target.calories), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+        }
+        Text(
+            "%,d kcal".format(kcal),
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+        )
+        Box(
+            Modifier
+                .padding(top = 8.dp)
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.2f)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth((kcal.toFloat() / target.calories.coerceAtLeast(1)).coerceIn(0f, 1f))
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White),
+            )
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            listOf(
+                Triple("Protein", protein, target.proteinG),
+                Triple("Carbs", carbs, target.carbsG),
+                Triple("Fat", fat, target.fatG),
+            ).forEach { (name, got, goal) ->
+                Column(Modifier.weight(1f)) {
+                    Text("$got g", color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("$name of $goal", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        Text(
+            "Tick each meal below once you have eaten it.",
+            color = Color.White.copy(alpha = 0.8f),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+    }
+}
+
 /** A day's meals as a timeline: a dot per meal, the line joining them, cards beside. */
 @Composable
-private fun MealTimeline(meals: List<Meal>) {
+private fun MealTimeline(
+    meals: List<Meal>,
+    /** Today's ticked meals; null on other days, where there is nothing to tick. */
+    eaten: Set<String>? = null,
+    onToggle: (Meal) -> Unit = {},
+) {
     val line = MaterialTheme.colorScheme.outline
     Column {
         meals.forEachIndexed { i, meal ->
@@ -284,7 +375,22 @@ private fun MealTimeline(meals: List<Meal>) {
                         .border(1.dp, if (training) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else line, RoundedCornerShape(18.dp))
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                 ) {
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (eaten != null) {
+                            val done = meal.name in eaten
+                            Box(
+                                Modifier
+                                    .padding(end = 10.dp)
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (done) Color(0xFF16A34A) else Color.Transparent)
+                                    .border(2.dp, if (done) Color(0xFF16A34A) else line, RoundedCornerShape(12.dp))
+                                    .clickable(onClickLabel = if (done) "Mark not eaten" else "Mark eaten") { onToggle(meal) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (done) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
                         Text(if (training) "Pre/post-workout" else meal.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                         Text(
                             "${meal.macros.calories} kcal · ${meal.macros.proteinG} g P",

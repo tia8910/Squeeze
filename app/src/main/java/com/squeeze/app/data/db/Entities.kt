@@ -210,3 +210,20 @@ data class ActivitySessionEntity(
     val distanceKm: Double?,
     val netKcal: Int,
 )
+
+/**
+ * A meal from the Fuel plan the user ticked as eaten.
+ *
+ * The figures are copied from the plan at the moment of ticking, so a plan rebuilt later
+ * (new favourites, a new weight) does not rewrite what was already eaten.
+ */
+@Entity(tableName = "meal_logs", indices = [Index("epochDay")])
+data class MealLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val mealName: String,
+    val calories: Int,
+    val proteinG: Int,
+    val carbsG: Int,
+    val fatG: Int,
+)
