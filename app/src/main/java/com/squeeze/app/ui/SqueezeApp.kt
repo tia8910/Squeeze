@@ -91,6 +91,7 @@ private const val ROUTE_PROGRESS = "progress"
 private const val ROUTE_PRO = "pro"
 private const val ROUTE_PLAN_OFFER = "plan_offer"
 private const val ROUTE_ACHIEVEMENTS = "achievements"
+private const val ROUTE_COMPARE = "compare"
 
 private enum class Destination(
     val route: String,
@@ -374,6 +375,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                     )
                 }
 
+                composable(ROUTE_COMPARE) {
+                    com.squeeze.app.ui.compare.CompareScreen(onScan = { navController.navigate(ROUTE_SCAN) })
+                }
+
                 composable(ROUTE_ACHIEVEMENTS) {
                     com.squeeze.app.ui.achievements.AchievementsScreen()
                 }
@@ -466,6 +471,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         pro = entitlement,
                         onOpenPro = openPro,
                         onOpenAchievements = { navController.navigate(ROUTE_ACHIEVEMENTS) },
+                        onOpenCompare = { navController.navigate(ROUTE_COMPARE) },
                     )
                 }
 

@@ -78,6 +78,7 @@ fun SettingsScreen(
     pro: com.squeeze.app.billing.EntitlementState = com.squeeze.app.billing.EntitlementState(),
     onOpenPro: () -> Unit = {},
     onOpenAchievements: () -> Unit = {},
+    onOpenCompare: () -> Unit = {},
 ) {
     val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     Column(
@@ -123,6 +124,21 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text("Achievements", style = MaterialTheme.typography.titleSmall)
                     Text("Badges for showing up, private to you", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenCompare)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("🖼️", style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("Compare photos", style = MaterialTheme.typography.titleSmall)
+                    Text("Then and now, side by side", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
