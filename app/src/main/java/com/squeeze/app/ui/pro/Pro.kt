@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Workspaces
@@ -88,6 +89,7 @@ class ProViewModel @Inject constructor(
 
 /** What Pro adds, in the order people care about it. */
 private val FEATURES = listOf(
+    Triple(Icons.Rounded.Mic, "Live form coach", "Counts your reps and corrects your form out loud"),
     Triple(Icons.Rounded.FitnessCenter, "Your training week", "Built for your sports, goal and weak points"),
     Triple(Icons.Rounded.TrendingUp, "Set by set coaching", "Logging with progressive overload advice"),
     Triple(Icons.Rounded.Restaurant, "Nutrition and meals", "Macros, micronutrients and meals from foods you like"),
@@ -146,12 +148,12 @@ private fun PaywallContent(onClose: () -> Unit, viewModel: ProViewModel) {
                         state.pro && !state.debugUnlocked && state.trialDaysLeft != null ->
                             com.squeeze.app.ui.settings.trialLine(state.trialDaysLeft!!)
                         state.pro && !state.debugUnlocked -> "You're Pro"
-                        else -> "Turn your scan into a plan"
+                        else -> "Your real coach in your pocket"
                     },
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    "The body scan stays free. Pro adds the coach around it.",
+                    "The body scan stays free. Pro adds a coach that plans your week, watches your form and talks you through every rep.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = muted,
                     modifier = Modifier.padding(top = 4.dp),
