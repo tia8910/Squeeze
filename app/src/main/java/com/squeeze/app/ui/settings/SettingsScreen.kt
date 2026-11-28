@@ -77,6 +77,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     pro: com.squeeze.app.billing.EntitlementState = com.squeeze.app.billing.EntitlementState(),
     onOpenPro: () -> Unit = {},
+    onOpenAchievements: () -> Unit = {},
 ) {
     val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     Column(
@@ -108,6 +109,24 @@ fun SettingsScreen(
         }
 
         if (pro.onSale) ProCard(pro, onOpenPro)
+
+        // Achievements sit with the plan: they are about the user's own progress.
+        GroupCard {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenAchievements)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("🏅", style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("Achievements", style = MaterialTheme.typography.titleSmall)
+                    Text("Badges for showing up, private to you", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         // Three groups, in the order people come here for them: what the plan is built on,
         // what happens to their data, and how the app looks and sounds.
