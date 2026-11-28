@@ -19,7 +19,7 @@ Deno.test("home page renders with the brand and the tagline", async () => {
 
   assert(response.status === 200, `expected 200, got ${response.status}`);
   assert(body.includes("squeeze"), "wordmark missing");
-  assert(body.includes("Small steps."), "tagline missing");
+  assert(body.includes("Your real coach."), "tagline missing");
   assert(
     response.headers.get("content-type")?.includes("text/html") === true,
     "wrong content type",

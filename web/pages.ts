@@ -87,10 +87,11 @@ export function homePage(): string {
   <div class="wrap hero">
     <img class="mark" src="/static/logo.png" alt="Squeeze.fit" width="132" height="132">
     <h1>squeeze<i>.fit</i></h1>
-    <p class="tagline">Small steps. <i>Big change.</i></p>
+    <p class="tagline">Your real coach. <i>In your pocket.</i></p>
     <p class="lede">
-      Body composition tracking that runs entirely on your phone. Measure with a photo or a
-      tape, and see what is actually changing, separated from the noise.
+      Body composition tracking and live coaching that run entirely on your phone. Measure with
+      a photo or a tape, see what is actually changing, and train with a voice that watches
+      every rep.
     </p>
     <div class="cta">
       <a class="btn primary" href="${REPO}/releases" rel="noopener">Get the app</a>
@@ -173,7 +174,7 @@ export function homePage(): string {
 </main>`;
 
   return layout({
-    title: "Squeeze.fit · body composition that stays on your phone",
+    title: "Squeeze.fit · your real coach in your pocket",
     description:
       "Track body fat, training and nutrition from a photo or a tape measure. Photos are analysed on your phone and never uploaded. No ads, no analytics.",
     path: "/",
