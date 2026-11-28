@@ -97,7 +97,7 @@ object Achievements {
      * @return the day each streak length was first reached (index 0 for 1 week), and the
      *   current run of consecutive weeks including this one or the last
      */
-    internal fun weekStreakDays(workoutDays: List<Long>): Pair<List<Long>, Int> {
+    fun weekStreakDays(workoutDays: List<Long>): Pair<List<Long>, Int> {
         if (workoutDays.isEmpty()) return emptyList<Long>() to 0
         val firstDayOfWeek = workoutDays.groupBy { it.floorDiv(7L) }.mapValues { (_, d) -> d.min() }
         val weeks = firstDayOfWeek.keys.sorted()
