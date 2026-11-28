@@ -43,6 +43,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HelpOutline
@@ -290,7 +292,7 @@ private fun CaptureStep(
      * auto-capture is that the frame it fires on has already passed the same checks the scan
      * will apply afterwards, so a photo it takes cannot be rejected for framing.
      */
-    onCheckFraming: suspend (Bitmap) -> String?,
+    onCheckFraming: suspend (Bitmap, Boolean) -> String?,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -305,6 +307,24 @@ private fun CaptureStep(
 
     var autoDetect by remember { mutableStateOf(false) }
     var framingHint by remember { mutableStateOf<String?>(null) }
+
+    // Spoken guidance for the auto camera, on by default and remembered.
+    val voicePrefs = remember { context.getSharedPreferences("squeeze_ui", android.content.Context.MODE_PRIVATE) }
+    var voiceOn by remember { mutableStateOf(voicePrefs.getBoolean("voice_guide", true)) }
+    val voice = remember { VoiceGuide(context) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { voice.shutdown() } }
+    LaunchedEffect(autoDetect, voiceOn) {
+        if (autoDetect && voiceOn) {
+            delay(600)
+            voice.say(
+                if (step == ScanStep.SIDE) "Auto camera on. Turn side-on and step back so I can see you from head to feet."
+                else "Auto camera on. Prop your phone up at chest height, then step back so I can see you from head to feet.",
+                force = true,
+            )
+        } else {
+            voice.stop()
+        }
+    }
 
     // Held so the zoom control has something to talk to. CameraControl only exists once a
     // camera is bound, so this is null until the provider callback has run.
@@ -388,8 +408,9 @@ private fun CaptureStep(
             }
 
             scope.launch {
-                val hint = onCheckFraming(frame.rotated(degrees))
+                val hint = onCheckFraming(frame.rotated(degrees), useFrontCamera)
                 framingHint = hint
+                if (voiceOn && hint != null && countdown == 0) voice.say(hint)
 
                 if (hint == null) {
                     goodStreak++
@@ -414,6 +435,7 @@ private fun CaptureStep(
                         // watching when it went wrong.
                         var abandoned = false
                         countdown = AUTO_DETECT_COUNTDOWN_SECONDS
+                        if (voiceOn) voice.say("Perfect. Hold still.", force = true)
 
                         while (countdown > 0) {
                             delay(1000)
@@ -422,10 +444,14 @@ private fun CaptureStep(
                                 break
                             }
                             countdown--
+                            if (voiceOn && countdown > 0) voice.say("$countdown", force = true)
                         }
 
                         countdown = 0
-                        if (!abandoned) shoot()
+                        if (!abandoned) {
+                            shoot()
+                            if (voiceOn) voice.say("Got it.", force = true)
+                        }
                         return@launch
                     }
                 } else {
@@ -608,6 +634,23 @@ private fun CaptureStep(
                         },
                         label = { Text("Auto") },
                     )
+                    if (autoDetect) {
+                        FilterChip(
+                            selected = voiceOn,
+                            onClick = {
+                                voiceOn = !voiceOn
+                                voicePrefs.edit().putBoolean("voice_guide", voiceOn).apply()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (voiceOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            },
+                            label = { Text("Voice") },
+                        )
+                    }
 
                     // Two fixed steps rather than a slider. The useful zooms here are "as
                     // wide as possible" and "framed on the body from across the room", and a
