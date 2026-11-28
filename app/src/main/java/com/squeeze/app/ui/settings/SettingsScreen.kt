@@ -79,6 +79,7 @@ fun SettingsScreen(
     onOpenPro: () -> Unit = {},
     onOpenAchievements: () -> Unit = {},
     onOpenCompare: () -> Unit = {},
+    onOpenShare: () -> Unit = {},
 ) {
     val muted = if (LocalIsDarkTheme.current) Brand.DarkMuted else Brand.Muted
     Column(
@@ -139,6 +140,21 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text("Compare photos", style = MaterialTheme.typography.titleSmall)
                     Text("Then and now, side by side", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenShare)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("📤", style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("Share progress", style = MaterialTheme.typography.titleSmall)
+                    Text("A progress card, never your photos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
