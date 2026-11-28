@@ -63,6 +63,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var backupManager: com.squeeze.app.data.backup.BackupManager
     @Inject lateinit var appUpdates: com.squeeze.app.play.AppUpdates
     @Inject lateinit var appReview: com.squeeze.app.play.AppReview
+    @Inject lateinit var coachRepository: com.squeeze.app.data.CoachRepository
 
     /** Play's update sheet. A cancelled flexible update is remembered so it is not re-asked. */
     private val updateLauncher = registerForActivityResult(
@@ -309,6 +310,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // Leaving the app is when the home screen is about to be seen: bring the widgets up to
+        // date. Only after the user has unlocked once, so the gate is never bypassed.
+        if (everUnlocked) lifecycleScope.launch { coachRepository.refreshWidgets() }
         soundEngine.stopAmbient()
 
         // Leaving the app is the natural moment to back up: whatever was logged is done.
