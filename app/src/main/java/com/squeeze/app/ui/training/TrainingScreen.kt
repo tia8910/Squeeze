@@ -55,7 +55,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.CenterFocusWeak
 import androidx.compose.material.icons.rounded.TrendingUp
-import androidx.compose.material.icons.automirrored.rounded.RecordVoiceOver
+import androidx.compose.material.icons.rounded.Mic
 import com.squeeze.app.ui.theme.LocalIsDarkTheme
 import com.squeeze.app.ui.theme.Brand
 import com.squeeze.app.ui.components.entrance
@@ -168,7 +168,7 @@ fun TrainingScreen(
                 )
             }
             ActionTile(
-                icon = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.RecordVoiceOver,
+                icon = androidx.compose.material.icons.Icons.Rounded.Mic,
                 title = "Form coach",
                 detail = "Counts reps and coaches your form out loud",
                 onClick = onFormCoach,
