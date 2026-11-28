@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.FitnessCenter
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Workspaces
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -90,6 +92,8 @@ class ProViewModel @Inject constructor(
 /** What Pro adds, in the order people care about it. */
 private val FEATURES = listOf(
     Triple(Icons.Rounded.Mic, "Live form coach", "Counts your reps and corrects your form out loud"),
+    Triple(Icons.Rounded.Accessibility, "Physique check", "Four poses, voice guided, the photo takes itself"),
+    Triple(Icons.Rounded.WbSunny, "Morning routine", "Five minutes, voice led, stomach vacuum included"),
     Triple(Icons.Rounded.FitnessCenter, "Your training week", "Built for your sports, goal and weak points"),
     Triple(Icons.Rounded.TrendingUp, "Set by set coaching", "Logging with progressive overload advice"),
     Triple(Icons.Rounded.Restaurant, "Nutrition and meals", "Macros, micronutrients and meals from foods you like"),

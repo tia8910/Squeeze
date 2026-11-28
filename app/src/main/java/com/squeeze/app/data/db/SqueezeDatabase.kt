@@ -19,8 +19,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         PhysiqueReadEntity::class,
         ActivitySessionEntity::class,
         MealLogEntity::class,
+        PhysiqueCheckEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class SqueezeDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class SqueezeDatabase : RoomDatabase() {
     abstract fun physiqueDao(): PhysiqueDao
     abstract fun activityDao(): ActivityDao
     abstract fun mealLogDao(): MealLogDao
+    abstract fun physiqueCheckDao(): PhysiqueCheckDao
 }
 
 /**
@@ -201,6 +203,18 @@ object SqueezeDatabaseFactory {
         }
     }
 
+    /** Physique check photos. A new table, so nothing existing is touched. */
+    private val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS physique_checks (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, epochDay INTEGER NOT NULL, " +
+                    "pose TEXT NOT NULL, photoId TEXT NOT NULL)",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_physique_checks_epochDay ON physique_checks (epochDay)")
+        }
+    }
+
     fun create(context: Context, keyManager: DatabaseKeyManager): SqueezeDatabase {
         System.loadLibrary("sqlcipher")
 
@@ -221,6 +235,7 @@ object SqueezeDatabaseFactory {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
                 // No fallbackToDestructiveMigration: silently wiping a user's measurement
                 // history on a schema change would destroy the one thing this app exists to
