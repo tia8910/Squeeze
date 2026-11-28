@@ -90,6 +90,7 @@ private const val ROUTE_MACHINE = "machine"
 private const val ROUTE_PROGRESS = "progress"
 private const val ROUTE_PRO = "pro"
 private const val ROUTE_PLAN_OFFER = "plan_offer"
+private const val ROUTE_ACHIEVEMENTS = "achievements"
 
 private enum class Destination(
     val route: String,
@@ -373,6 +374,10 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                     )
                 }
 
+                composable(ROUTE_ACHIEVEMENTS) {
+                    com.squeeze.app.ui.achievements.AchievementsScreen()
+                }
+
                 composable(ROUTE_PROGRESS) {
                     if (!isPro) {
                         com.squeeze.app.ui.pro.ProLocked("Your progress", "Progressive overload on every lift and a summary of every workout.", openPro)
@@ -460,6 +465,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onLabelPhotos = { navController.navigate(LABEL_ROUTE) },
                         pro = entitlement,
                         onOpenPro = openPro,
+                        onOpenAchievements = { navController.navigate(ROUTE_ACHIEVEMENTS) },
                     )
                 }
 

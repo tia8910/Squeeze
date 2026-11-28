@@ -300,6 +300,48 @@ class CoachRepository @Inject constructor(
         )
     }
 
+    /**
+     * Everything the badges are worked out from, read fresh each time so they always agree
+     * with the record.
+     */
+    suspend fun achievementInputs(): com.squeeze.core.coach.AchievementInputs {
+        val measurements = measurementDao.since(Long.MIN_VALUE)
+        val sessions = activityDao.since(Long.MIN_VALUE)
+        val sets = workoutDao.since(Long.MIN_VALUE)
+
+        // A lift sets a record on a day its best estimated one-rep max beats every earlier day.
+        val recordDays = sets.filter { it.reps > 0 }
+            .groupBy { it.exerciseName }
+            .flatMap { (_, rows) ->
+                var best = 0.0
+                rows.groupBy { it.epochDay }.toSortedMap().mapNotNull { (day, daySets) ->
+                    val top = daySets.maxOf { it.weightKg * (1 + it.reps / 30.0) }
+                    val beat = best > 0.0 && top > best
+                    if (top > best) best = top
+                    day.takeIf { beat }
+                }
+            }
+            .distinct()
+
+        val target = profileDao.get()?.targetBodyFatPercent
+        val goalReachedOn = target?.let { goal ->
+            measurements.firstOrNull { m ->
+                val bf = m.referenceBodyFatPercent ?: m.visualBodyFatPercent ?: m.shapeBodyFatPercent
+                bf != null && bf <= goal
+            }?.epochDay
+        }
+
+        return com.squeeze.core.coach.AchievementInputs(
+            scanDays = measurements.map { it.epochDay },
+            sideScanDays = measurements.filter { it.abdominalBodyFatPercent != null }.map { it.epochDay },
+            workoutDays = sessions.map { it.epochDay },
+            recordDays = recordDays,
+            mealDays = mealLogDao.daysLoggedSince(Long.MIN_VALUE),
+            waistByDay = measurements.mapNotNull { m -> m.waistCm?.let { m.epochDay to it } },
+            goalReachedOn = goalReachedOn,
+        )
+    }
+
     /** Days with at least one meal ticked, for achievements. */
     suspend fun mealDaysSince(epochDay: Long): List<Long> = mealLogDao.daysLoggedSince(epochDay)
 
