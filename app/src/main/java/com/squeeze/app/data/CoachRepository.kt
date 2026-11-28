@@ -69,6 +69,7 @@ class CoachRepository @Inject constructor(
     private val workoutDao: WorkoutDao,
     private val activityDao: ActivityDao,
     private val context: android.content.Context,
+    private val mealLogDao: com.squeeze.app.data.db.MealLogDao,
 ) {
 
     /**
@@ -272,6 +273,35 @@ class CoachRepository @Inject constructor(
         com.squeeze.app.notify.Reminders.noteSession(context)
         return kcal
     }
+
+    /** Names of today's plan meals the user has ticked as eaten. */
+    suspend fun mealsEatenToday(): List<com.squeeze.app.data.db.MealLogEntity> =
+        mealLogDao.forDay(LocalDate.now().toEpochDay())
+
+    /** Ticks a plan meal as eaten today, or unticks it. */
+    suspend fun setMealEaten(meal: com.squeeze.core.nutrition.Meal, eaten: Boolean) {
+        val today = LocalDate.now().toEpochDay()
+        mealLogDao.remove(today, meal.name)
+        if (eaten) {
+            mealLogDao.insert(
+                com.squeeze.app.data.db.MealLogEntity(
+                    epochDay = today,
+                    mealName = meal.name,
+                    calories = meal.macros.calories,
+                    proteinG = meal.macros.proteinG,
+                    carbsG = meal.macros.carbsG,
+                    fatG = meal.macros.fatG,
+                ),
+            )
+        }
+        com.squeeze.app.notify.Reminders.noteMealsEaten(
+            context,
+            mealLogDao.forDay(today).map { it.mealName }.toSet(),
+        )
+    }
+
+    /** Days with at least one meal ticked, for achievements. */
+    suspend fun mealDaysSince(epochDay: Long): List<Long> = mealLogDao.daysLoggedSince(epochDay)
 
     /** Celebrates new personal records from the session just saved. */
     fun celebrateRecords(exercises: List<String>) =

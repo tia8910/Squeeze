@@ -55,6 +55,8 @@ object Reminders {
     private const val KEY_LAST_OPEN = "last_open_day"
     private const val KEY_GOAL_DAY = "goal_day"
     private const val KEY_FUEL = "fuel_used"
+    private const val KEY_EATEN_DAY = "eaten_day"
+    private const val KEY_EATEN = "eaten_meals"
 
     internal const val ACTION_DAILY = "com.squeeze.app.REMIND_DAILY"
     internal const val ACTION_WEEKLY = "com.squeeze.app.REMIND_WEEKLY"
@@ -147,6 +149,21 @@ object Reminders {
             prefs(context).edit().putBoolean(KEY_FUEL, true).apply()
             schedule(context)
         }
+    }
+
+    /** Meals ticked as eaten today, so meal reminders skip them. Meal names only. */
+    fun noteMealsEaten(context: Context, names: Set<String>) {
+        prefs(context).edit()
+            .putLong(KEY_EATEN_DAY, LocalDate.now().toEpochDay())
+            .putStringSet(KEY_EATEN, names)
+            .apply()
+        noteFuelUsed(context)
+    }
+
+    private fun eatenToday(context: Context, keyword: String): Boolean {
+        val p = prefs(context)
+        if (p.getLong(KEY_EATEN_DAY, Long.MIN_VALUE) != LocalDate.now().toEpochDay()) return false
+        return p.getStringSet(KEY_EATEN, emptySet()).orEmpty().any { it.contains(keyword, ignoreCase = true) }
     }
 
     private fun sessionDays(context: Context): Set<Long> =
@@ -245,11 +262,11 @@ object Reminders {
                 post(context, ReminderKind.TRAINING, WEEKLY_ID, "Weekly check-in", "Take your scan today and see what changed this week.")
             }
 
-            ACTION_LUNCH -> if (enabled(context, ReminderKind.MEALS)) {
+            ACTION_LUNCH -> if (enabled(context, ReminderKind.MEALS) && !eatenToday(context, "Lunch")) {
                 post(context, ReminderKind.MEALS, LUNCH_ID, "Lunch is planned", "Today's lunch from your Fuel plan is ready. Eat for your goal.")
             }
 
-            ACTION_DINNER -> if (enabled(context, ReminderKind.MEALS)) {
+            ACTION_DINNER -> if (enabled(context, ReminderKind.MEALS) && !eatenToday(context, "Dinner")) {
                 post(context, ReminderKind.MEALS, DINNER_ID, "Dinner time", "Finish the day on plan. Your dinner is in Fuel.")
             }
 

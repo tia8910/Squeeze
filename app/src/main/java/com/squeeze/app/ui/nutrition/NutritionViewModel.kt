@@ -20,6 +20,8 @@ data class NutritionUiState(
     val favourites: Set<String> = emptySet(),
     val favouritesDirty: Boolean = false,
     val selectedDay: Int = 0,
+    /** Today's plan meals ticked as eaten, by name. */
+    val eaten: List<com.squeeze.app.data.db.MealLogEntity> = emptyList(),
 )
 
 /**
@@ -44,6 +46,7 @@ class NutritionViewModel @Inject constructor(
                 context = coach.nutritionPlan(),
                 favourites = coach.favouriteFoods(),
                 favouritesDirty = false,
+                eaten = coach.mealsEatenToday(),
             )
         }
     }
@@ -71,6 +74,15 @@ class NutritionViewModel @Inject constructor(
         viewModelScope.launch {
             coach.saveFavouriteFoods(_state.value.favourites)
             refresh()
+        }
+    }
+
+    /** Ticks or unticks one of today's plan meals. */
+    fun toggleEaten(meal: com.squeeze.core.nutrition.Meal) {
+        viewModelScope.launch {
+            val eaten = _state.value.eaten.any { it.mealName == meal.name }
+            coach.setMealEaten(meal, !eaten)
+            _state.value = _state.value.copy(eaten = coach.mealsEatenToday())
         }
     }
 
