@@ -423,9 +423,22 @@ class ScanViewModel @Inject constructor(
      *
      * @return advice the user can act on, or null when the frame is worth shooting
      */
-    suspend fun checkFraming(frame: Bitmap): String? = withContext(Dispatchers.Default) {
+    /**
+     * @param mirrored true for the front camera, so spoken left and right stay correct
+     */
+    suspend fun checkFraming(frame: Bitmap, mirrored: Boolean = false): String? = withContext(Dispatchers.Default) {
         when (val result = detector.detect(frame)) {
-            is DetectionResult.Success -> null
+            // A usable photo can still cost accuracy. The coach asks for the position that
+            // gives the best reading: head to feet, centred, arms relaxed and clear, level.
+            is DetectionResult.Success -> result.body.geometry?.let { pose ->
+                com.squeeze.core.scan.PositionCoach.advice(
+                    pose = pose,
+                    framing = result.body.framing,
+                    aspect = frame.width.toDouble() / frame.height,
+                    mirrored = mirrored,
+                    side = _state.value.step == ScanStep.SIDE,
+                )
+            }
             is DetectionResult.Failure -> when (val reason = result.reason) {
                 DetectionFailure.NoPersonDetected -> "Step into frame."
                 DetectionFailure.BodyNotFullyVisible,
