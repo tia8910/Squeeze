@@ -93,6 +93,7 @@ private const val ROUTE_PLAN_OFFER = "plan_offer"
 private const val ROUTE_ACHIEVEMENTS = "achievements"
 private const val ROUTE_COMPARE = "compare"
 private const val ROUTE_SHARE = "share"
+private const val ROUTE_FORM = "form_coach"
 
 private enum class Destination(
     val route: String,
@@ -357,6 +358,7 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         onLog = { navController.navigate(ROUTE_LOG) },
                         onScanMachine = { navController.navigate(ROUTE_MACHINE) },
                         onProgress = { navController.navigate(ROUTE_PROGRESS) },
+                        onFormCoach = { navController.navigate(ROUTE_FORM) },
                     )
                 }
 
@@ -374,6 +376,18 @@ fun SqueezeApp(viewModel: SqueezeViewModel = hiltViewModel()) {
                         },
                         onProgress = { navController.navigate(ROUTE_PROGRESS) },
                     )
+                }
+
+                composable(ROUTE_FORM) {
+                    if (!isPro) {
+                        com.squeeze.app.ui.pro.ProLocked(
+                            "Live form coach",
+                            "The camera counts your reps and a voice coaches your form, rep by rep.",
+                            openPro,
+                        )
+                        return@composable
+                    }
+                    com.squeeze.app.ui.form.FormCoachScreen(onDone = { navController.popBackStack() })
                 }
 
                 composable(ROUTE_SHARE) {

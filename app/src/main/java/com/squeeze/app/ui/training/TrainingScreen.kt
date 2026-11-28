@@ -65,6 +65,7 @@ fun TrainingScreen(
     onOpenNutrition: () -> Unit = {},
     onLog: () -> Unit = {},
     onScanMachine: () -> Unit = {},
+    onFormCoach: () -> Unit = {},
     onProgress: () -> Unit = {},
     nextStep: com.squeeze.core.coach.JourneyStep? = null,
     onNextStep: () -> Unit = {},
@@ -165,6 +166,13 @@ fun TrainingScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            ActionTile(
+                icon = androidx.compose.material.icons.Icons.Rounded.RecordVoiceOver,
+                title = "Form coach",
+                detail = "Counts reps and coaches your form out loud",
+                onClick = onFormCoach,
+                modifier = Modifier.fillMaxWidth(),
+            )
             SecondaryButton(text = "Log any workout", onClick = onLog)
 
             Expandable("How your week was built") {
