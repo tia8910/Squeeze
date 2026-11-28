@@ -7,4 +7,8 @@
     <string name="lock_cancel">Cancel</string>
     <string name="lock_prompt">Authenticate to view your data</string>
 
+    <string name="widget_wide_label">Squeeze streak and plan</string>
+    <string name="widget_wide_description">Your training streak, today\'s workout and your next scan. No body data.</string>
+    <string name="widget_scan_label">Squeeze next scan</string>
+    <string name="widget_scan_description">Days until your next scan.</string>
 </resources>

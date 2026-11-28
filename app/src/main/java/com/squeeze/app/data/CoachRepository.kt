@@ -342,6 +342,26 @@ class CoachRepository @Inject constructor(
         )
     }
 
+    /**
+     * Saves the widget figures: streak, today's workout name, days to the next weekly scan.
+     * Never a weight or a body fat; the widgets sit on the home screen.
+     */
+    suspend fun refreshWidgets() {
+        runCatching {
+            val inputs = achievementInputs()
+            val today = LocalDate.now().toEpochDay()
+            val lastScan = inputs.scanDays.maxOrNull()
+            com.squeeze.app.notify.WidgetData.save(
+                context,
+                com.squeeze.app.notify.WidgetData.Snapshot(
+                    streakWeeks = com.squeeze.core.coach.Achievements.weekStreakDays(inputs.workoutDays).second,
+                    nextWorkout = dashboard().todaysTraining,
+                    nextScanDays = lastScan?.let { (7 - (today - it)).toInt().coerceAtLeast(0) },
+                ),
+            )
+        }
+    }
+
     /** Days with at least one meal ticked, for achievements. */
     suspend fun mealDaysSince(epochDay: Long): List<Long> = mealLogDao.daysLoggedSince(epochDay)
 
